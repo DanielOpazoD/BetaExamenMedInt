@@ -1,0 +1,8 @@
+{
+  "name": "mi-2025-v8-oficial",
+  "version": "1.0.0",
+  "description": "Temario para Examen Final de Medicina Interna",
+  "dependencies": {
+    "@google/genai": "^1.8.0"
+  }
+}
