@@ -1140,12 +1140,22 @@ document.addEventListener('DOMContentLoaded', function () {
                     body: JSON.stringify({ question, context }),
                 });
 
-                const data = await response.json();
-
                 if (!response.ok) {
-                    throw new Error(data.error || `Error del servidor: ${response.status}`);
+                    let errorText = `Error del servidor: ${response.status}`;
+                    // Try to get a more specific error message from the response body
+                    try {
+                        // The body might be JSON with an 'error' key
+                        const errorData = await response.json();
+                        errorText = errorData.error || JSON.stringify(errorData);
+                    } catch (e) {
+                        // Or it might be plain text or HTML
+                        const text = await response.text();
+                        if (text) errorText = text;
+                    }
+                    throw new Error(errorText);
                 }
 
+                const data = await response.json();
                 aiResponseArea.innerHTML = data.answer || '<p>La IA no proporcionó una respuesta.</p>';
 
             } catch (error) {
