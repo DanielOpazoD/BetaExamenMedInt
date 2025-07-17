@@ -29,7 +29,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 app.post('/api/ask-ai', async (req, res) => {
     try {
         if (!process.env.API_KEY) {
-            throw new Error('La clave API de Gemini no está configurada en el servidor.');
+            // Send a clear error message to the client
+            return res.status(500).json({ error: 'Error de configuración del servidor: La clave API de Gemini (API_KEY) no se ha encontrado. Asegúrate de que esté configurada en las variables de entorno de Netlify.' });
         }
 
         const { question, context } = req.body;
