@@ -1132,7 +1132,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             
             try {
-                const response = await fetch('/.netlify/functions/ask-ai', {
+                const response = await fetch('/api/ask-ai', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
