@@ -101,7 +101,7 @@
         
         .notes-modal-content { max-width: 900px; height: 95vh; max-height: 95vh; padding: 0; }
         
-        .note-icon, .link-anchor, .edit-link-icon, .print-section-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; transition: background-color 0.2s, color 0.2s, opacity 0.2s; cursor: pointer; }
+        .note-icon, .link-anchor, .edit-link-icon, .print-section-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; transition: background-color 0.2s, color 0.2s, opacity 0.2s, filter 0.2s; cursor: pointer; }
         .note-icon:hover, .link-anchor:hover, .edit-link-icon:hover, .print-section-btn:hover { background-color: rgba(0,0,0,0.1); }
         
         .link-icon { width: 1.1em; height: 1.1em; }
@@ -109,10 +109,12 @@
         .note-icon.section-note-icon, .print-section-btn { color: var(--section-header-text); opacity: 0.8; }
         
         .note-icon.has-note {
-            color: #2563eb; /* blue-600 */
+            background-color: var(--btn-primary-bg);
+            color: var(--btn-primary-text);
         }
         .note-icon.has-note:hover {
-             background-color: rgba(59, 130, 246, 0.1);
+             background-color: var(--btn-primary-bg);
+             filter: brightness(1.15);
         }
         
         .confidence-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #d1d5db; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; }
@@ -135,7 +137,7 @@
             gap: 2px;
         }
         #notes-editor { border: 1px solid var(--border-color); padding: 12px; flex-grow: 1; overflow-y: auto; border-bottom-left-radius: 0.5rem; border-bottom-right-radius: 0.5rem; line-height: 1.6; background-color: var(--bg-secondary); }
-        #notes-editor:focus { outline: none; border-color: var(--btn-primary-bg); }
+        #notes-editor:focus { outline: none; }
         #notes-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; cursor: pointer; }
         #notes-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
         
@@ -466,4 +468,3 @@
             body > *:not(#print-area) { display: none !important; }
             #print-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; }
         }
-    

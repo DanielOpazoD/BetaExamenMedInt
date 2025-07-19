@@ -109,7 +109,7 @@
         
         .notes-modal-content { max-width: 900px; height: 95vh; max-height: 95vh; padding: 0; }
         
-        .note-icon, .link-anchor, .edit-link-icon, .print-section-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; transition: background-color 0.2s, color 0.2s, opacity 0.2s; cursor: pointer; }
+        .note-icon, .link-anchor, .edit-link-icon, .print-section-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; transition: background-color 0.2s, color 0.2s, opacity 0.2s, filter 0.2s; cursor: pointer; }
         .note-icon:hover, .link-anchor:hover, .edit-link-icon:hover, .print-section-btn:hover { background-color: rgba(0,0,0,0.1); }
         
         .link-icon { width: 1.1em; height: 1.1em; }
@@ -118,10 +118,12 @@
         .note-icon.section-note-icon, .print-section-btn { color: var(--section-header-text); opacity: 0.8; }
         
         .note-icon.has-note {
-            color: #2563eb; /* blue-600 */
+            background-color: var(--btn-primary-bg);
+            color: var(--btn-primary-text);
         }
         .note-icon.has-note:hover {
-             background-color: rgba(59, 130, 246, 0.1);
+             background-color: var(--btn-primary-bg);
+             filter: brightness(1.15);
         }
         
         .confidence-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #d1d5db; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; }
@@ -144,7 +146,7 @@
             gap: 2px;
         }
         #notes-editor { border: 1px solid var(--border-color); padding: 12px; flex-grow: 1; overflow-y: auto; border-bottom-left-radius: 0.5rem; border-bottom-right-radius: 0.5rem; line-height: 1.6; background-color: var(--bg-secondary); }
-        #notes-editor:focus { outline: none; border-color: var(--btn-primary-bg); }
+        #notes-editor:focus { outline: none; }
         #notes-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; cursor: pointer; }
         #notes-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
         
@@ -177,7 +179,7 @@
         .notes-modal-content.readonly-mode .editor-toolbar { display: none; }
         .notes-modal-content.readonly-mode #notes-modal-actions { display: none; }
         .notes-modal-content.readonly-mode #add-note-panel-btn { display: none; }
-        .notes-modal-content.readonly-mode .delete-note-btn { display: none; }
+        .notes-modal-content.readonly-mode #notes-list li:hover .delete-note-btn { visibility: hidden; opacity: 0;}
         .notes-modal-content.readonly-mode #notes-modal-title { pointer-events: none; }
 
 
@@ -304,10 +306,6 @@
             letter-spacing: 0.075em;
         }
 
-        #notes-modal-counter {
-            font-size: 0.8rem;
-        }
-
         #notes-main-content {
             padding: 1rem 1rem 1rem 0;
             flex-grow: 1;
@@ -361,7 +359,7 @@
         #notes-list li:hover .delete-note-btn:hover {
              opacity: 1;
              color: #ef4444; /* red-500 */
-        }
+         }
          #notes-list li .note-item-btn.active .delete-note-btn {
             color: var(--btn-primary-text);
          }
@@ -767,7 +765,9 @@
                      <div class="flex justify-between items-center mb-4 flex-shrink-0 pl-10">
                         <h3 id="notes-modal-title" class="text-xl font-bold text-primary truncate" contenteditable="true"></h3>
                         <div class="flex items-center gap-1">
-                            <span id="notes-modal-counter" class="text-sm text-text-muted font-mono"></span>
+                            <button id="note-info-btn" class="toolbar-btn" title="Información de la nota">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-info w-5 h-5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                            </button>
                             <button id="toggle-readonly-btn" class="toolbar-btn" title="Modo Lectura/Edición">
                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye w-5 h-5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                             </button>
@@ -812,6 +812,41 @@
             <div class="flex justify-end gap-2">
                 <button id="cancel-ai-qa-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cancelar</button>
                 <button id="send-ai-qa-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Enviar</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="note-info-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-sm">
+            <h3 class="text-lg font-bold mb-4">Información de la Nota</h3>
+            <div class="space-y-3 text-sm text-text-secondary">
+                 <p><strong>Palabras:</strong> <span id="info-word-count" class="font-mono text-text-primary">0</span></p>
+                 <p><strong>Tamaño:</strong> <span id="info-note-size" class="font-mono text-text-primary">0 KB</span></p>
+                 <p><strong>Última edición:</strong> <span id="info-last-edited" class="font-mono text-text-primary">N/A</span></p>
+            </div>
+            <div class="flex justify-end mt-6">
+                 <button id="close-note-info-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmation-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-md">
+            <h3 id="confirmation-title" class="text-lg font-bold mb-4">Confirmar Acción</h3>
+            <p id="confirmation-message" class="mb-6 text-text-secondary"></p>
+            <div class="flex justify-end items-center gap-2">
+                <button id="cancel-confirmation-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cancelar</button>
+                <button id="confirm-confirmation-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="alert-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-md">
+            <h3 id="alert-title" class="text-lg font-bold mb-4">Aviso</h3>
+            <p id="alert-message" class="mb-6 text-text-secondary"></p>
+            <div class="flex justify-end items-center gap-2">
+                <button id="ok-alert-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Aceptar</button>
             </div>
         </div>
     </div>
