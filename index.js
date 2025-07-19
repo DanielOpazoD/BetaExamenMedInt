@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -266,8 +265,14 @@ document.addEventListener('DOMContentLoaded', function () {
             mainColors.forEach(color => {
                 const swatch = document.createElement('button');
                 swatch.className = 'color-swatch toolbar-btn';
-                swatch.style.backgroundColor = color;
-                swatch.title = color;
+                 if (color === 'transparent') {
+                    swatch.style.backgroundImage = 'linear-gradient(to top left, transparent calc(50% - 1px), red, transparent calc(50% + 1px))';
+                    swatch.style.backgroundColor = 'var(--bg-secondary)';
+                    swatch.title = 'Sin color';
+                } else {
+                    swatch.style.backgroundColor = color;
+                    swatch.title = color;
+                }
                 swatch.addEventListener('click', (e) => {
                     e.preventDefault();
                     action(color);
@@ -286,8 +291,14 @@ document.addEventListener('DOMContentLoaded', function () {
             extraColors.forEach(color => {
                 const swatch = document.createElement('button');
                 swatch.className = 'color-swatch';
-                swatch.style.backgroundColor = color;
-                swatch.title = color;
+                if (color === 'transparent') {
+                    swatch.style.backgroundImage = 'linear-gradient(to top left, transparent calc(50% - 1px), red, transparent calc(50% + 1px))';
+                    swatch.style.backgroundColor = 'var(--bg-secondary)';
+                    swatch.title = 'Sin color';
+                } else {
+                    swatch.style.backgroundColor = color;
+                    swatch.title = color;
+                }
                 swatch.addEventListener('click', (e) => {
                     e.preventDefault();
                     action(color);
@@ -406,16 +417,22 @@ document.addEventListener('DOMContentLoaded', function () {
         const textColors = ['#000000'];
         const extraTextColors = ['#FF0000', '#0000FF', '#008000', '#FFA500', '#FFFF00', '#800080', '#FFC0CB', '#00FFFF', '#00008B', '#8B0000', '#FF8C00', '#FFD700', '#ADFF2F', '#4B0082', '#48D1CC', '#191970', '#A52A2A', '#F0E68C', '#ADD8E6', '#DDA0DD', '#90EE90', '#FA8072'];
         const highlightColors = ['#FAFAD2']; // Pastel yellow
-        const extraHighlightColors = ['#FFFFFF', '#FFFF00', '#ADD8E6', '#F0FFF0', '#FFF0F5', '#F5FFFA', '#F0F8FF', '#E6E6FA', '#FFF5EE', '#FAEBD7', '#FFE4E1', '#FFFFE0', '#D3FFD3', '#B0E0E6', '#FFB6C1', '#F5DEB3', '#C8A2C8', '#FFDEAD', '#E0FFFF', '#FDF5E6', '#FFFACD', '#F8F8FF'];
+        const extraHighlightColors = ['transparent', '#FFFFFF', '#FFFF00', '#ADD8E6', '#F0FFF0', '#FFF0F5', '#F5FFFA', '#F0F8FF', '#E6E6FA', '#FFF5EE', '#FAEBD7', '#FFE4E1', '#FFFFE0', '#D3FFD3', '#B0E0E6', '#FFB6C1', '#F5DEB3', '#C8A2C8', '#FFDEAD', '#E0FFFF', '#FDF5E6', '#FFFACD', '#F8F8FF'];
         
         const applyForeColor = (color) => document.execCommand('foreColor', false, color);
         const applyHiliteColor = (color) => document.execCommand('hiliteColor', false, color);
         const applyLineHighlight = (color) => {
              getSelectedBlockElements().forEach(block => {
-                // Also check for details element to color it properly
-                const targetBlock = block.nodeName === 'DETAILS' ? block : block.closest('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details');
-                if(targetBlock) {
-                    targetBlock.style.backgroundColor = color;
+                if (block === notesEditor) {
+                    // This can happen if the editor is empty or focus is weird.
+                    // Let's try to get the first child block element.
+                    block = notesEditor.querySelector('p, div, h1, h2, h3, h4, h5, h6, li, blockquote, pre, details');
+                }
+                
+                const targetBlock = block ? (block.nodeName === 'DETAILS' ? block : block.closest('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details')) : null;
+
+                if (targetBlock && targetBlock !== notesEditor) {
+                    targetBlock.style.backgroundColor = color === 'transparent' ? '' : color;
                 }
             });
         };
