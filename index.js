@@ -1138,7 +1138,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (topicData && topicData.notes && topicData.notes.length > 0) {
                     topicData.notes.forEach(note => {
                         if (note.content && note.content.trim() && note.content.trim() !== '<p><br></p>') {
-                            combinedContent += `<h3>${note.title}</h3><div>${note.content}</div><hr style="margin: 2em 0;">`;
+                            combinedContent += `<div>${note.content}</div><hr style="margin: 2em 0;">`;
                         }
                     });
                 }
@@ -1640,14 +1640,11 @@ document.addEventListener('DOMContentLoaded', function () {
     notesPanelToggle.addEventListener('click', () => {
         notesSidePanel.classList.toggle('open');
         notesPanelToggle.classList.toggle('open');
-        
-        if (notesSidePanel.classList.contains('open')) {
-            notesPanelToggle.style.left = `${notesSidePanel.offsetWidth - 12}px`;
-             notesMainContent.style.paddingLeft = '0';
-        } else {
-            notesPanelToggle.style.left = '0.75rem';
-             notesMainContent.style.paddingLeft = '1rem';
-        }
+    
+        // Let CSS handle layout transitions via the '.open' class.
+        // The JS was setting styles directly, which caused conflicts and bugs.
+        // The existing CSS rule '#notes-side-panel:not(.open) + #notes-main-content'
+        // correctly handles the padding adjustment for the main content area.
     });
 
     addNotePanelBtn.addEventListener('click', () => {
