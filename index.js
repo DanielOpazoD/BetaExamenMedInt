@@ -1,5 +1,6 @@
 
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -138,6 +139,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const notesList = getElem('notes-list');
     const addNotePanelBtn = getElem('add-note-panel-btn');
     const notesMainContent = getElem('notes-main-content');
+    const notesModalCounter = getElem('notes-modal-counter');
 
     // Custom Dialog Modals
     const confirmationModal = getElem('confirmation-modal');
@@ -158,6 +160,19 @@ document.addEventListener('DOMContentLoaded', function () {
     const infoLastEdited = getElem('info-last-edited');
     const closeNoteInfoBtn = getElem('close-note-info-btn');
 
+    // Image Gallery Modals
+    const imageGalleryLinkModal = getElem('image-gallery-link-modal');
+    const imageGalleryInputs = getElem('image-gallery-inputs');
+    const addGalleryImageUrlBtn = getElem('add-gallery-image-url-btn');
+    const cancelGalleryLinkBtn = getElem('cancel-gallery-link-btn');
+    const saveGalleryLinkBtn = getElem('save-gallery-link-btn');
+    const imageLightboxModal = getElem('image-lightbox-modal');
+    const closeLightboxBtn = getElem('close-lightbox-btn');
+    const prevLightboxBtn = getElem('prev-lightbox-btn');
+    const nextLightboxBtn = getElem('next-lightbox-btn');
+    const lightboxImage = getElem('lightbox-image');
+    const lightboxCaption = getElem('lightbox-caption');
+
     // --- State Variables ---
     let activeConfidenceFilter = 'all';
     let activeNoteIcon = null;
@@ -169,6 +184,10 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeNoteIndex = 0;
     let isResizing = false;
     let resolveConfirmation;
+    let activeGalleryRange = null;
+    let lightboxImages = [];
+    let currentLightboxIndex = 0;
+    let currentNoteRow = null;
 
 
     const grandTotalSpans = {
@@ -351,7 +370,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     document.execCommand(command, false, value);
                 }
                 if (action) {
-                    action(value);
+                    action();
                 }
                 notesEditor.focus();
             });
@@ -447,14 +466,14 @@ document.addEventListener('DOMContentLoaded', function () {
             return group;
         };
 
-        const createSymbolDropdown = (symbols) => {
+        const createSymbolDropdown = (symbols, title, icon) => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
             
             const btn = document.createElement('button');
             btn.className = 'toolbar-btn';
-            btn.title = 'Insertar Símbolo';
-            btn.innerHTML = '📌';
+            btn.title = title;
+            btn.innerHTML = icon;
             dropdown.appendChild(btn);
 
             const content = document.createElement('div');
@@ -517,6 +536,11 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createButton('Cursiva', '<i>I</i>', 'italic'));
         editorToolbar.appendChild(createButton('Subrayado', '<u>U</u>', 'underline'));
         editorToolbar.appendChild(createButton('Tachado', '<s>S</s>', 'strikeThrough'));
+        editorToolbar.appendChild(createButton('Superíndice', 'X²', 'superscript'));
+        
+        const eraserSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eraser w-5 h-5"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21H7Z"/><path d="M22 21H7"/><path d="m5 12 5 5"/></svg>`;
+        editorToolbar.appendChild(createButton('Borrar formato', eraserSVG, 'removeFormat'));
+
         editorToolbar.appendChild(createSeparator());
 
         // --- Color Palettes ---
@@ -571,12 +595,13 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Symbols
         const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
-        editorToolbar.appendChild(createSymbolDropdown(symbols));
+        editorToolbar.appendChild(createSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
+
+        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
+        editorToolbar.appendChild(createSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
 
         // Image controls
-        const imageBtn = createButton('Insertar Imagen desde URL', '🖼️', null);
-        imageBtn.addEventListener('click', (e) => {
-            e.preventDefault();
+        const imageBtn = createButton('Insertar Imagen desde URL', '🖼️', null, null, () => {
             const url = prompt("Ingresa la URL de la imagen:");
             if (url) {
                 notesEditor.focus();
@@ -585,18 +610,19 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(imageBtn);
         
-        const resizePlusBtn = createButton('Aumentar tamaño de imagen (+10%)', '+', null);
-        resizePlusBtn.addEventListener('click', () => resizeSelectedImage(1.1));
+        const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
+        editorToolbar.appendChild(createButton('Crear Galería de Imágenes', gallerySVG, null, null, openGalleryLinkEditor));
+
+        const resizePlusBtn = createButton('Aumentar tamaño de imagen (+10%)', '➕', null, null, () => resizeSelectedImage(1.1));
         editorToolbar.appendChild(resizePlusBtn);
 
-        const resizeMinusBtn = createButton('Disminuir tamaño de imagen (-10%)', '-', null);
-        resizeMinusBtn.addEventListener('click', () => resizeSelectedImage(0.9));
+        const resizeMinusBtn = createButton('Disminuir tamaño de imagen (-10%)', '➖', null, null, () => resizeSelectedImage(0.9));
         editorToolbar.appendChild(resizeMinusBtn);
+
         editorToolbar.appendChild(createSeparator());
 
         // Print/Save
-        const printBtn = createButton('Imprimir o Guardar como PDF', '💾', null);
-        printBtn.addEventListener('click', () => {
+        const printBtn = createButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
              const printArea = getElem('print-area');
              printArea.innerHTML = `<h1>${notesModalTitle.innerText}</h1><div>${notesEditor.innerHTML}</div>`;
              window.print();
@@ -608,7 +634,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (selectedImageForResize) {
             const currentWidth = selectedImageForResize.style.width
                 ? parseFloat(selectedImageForResize.style.width)
-                : selectedImageForResize.naturalWidth;
+                : selectedImageForResize.offsetWidth;
             const newWidth = currentWidth * multiplier;
             selectedImageForResize.style.width = `${newWidth}px`;
             selectedImageForResize.style.height = 'auto'; // Keep aspect ratio
@@ -882,7 +908,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 let stateToMigrate;
                 if (manifestStr) { // Granular format
-                    const manifest = JSON.parse(manifestStr);
                     stateToMigrate = { topics: {}, sections: {}, settings: {}, headers: {} };
                     stateToMigrate.settings = JSON.parse(localStorage.getItem('app-settings') || '{}');
                     stateToMigrate.headers = JSON.parse(localStorage.getItem('app-headers') || '{}');
@@ -971,55 +996,40 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function filterTable() {
         const query = searchBar.value.toLowerCase().trim();
-        const allTopicRows = document.querySelectorAll('#table-body tr[data-topic-id]');
-        
-        // This object will track if a section has any visible rows after filtering
-        const sectionVisibility = {};
-        Object.keys(sections).forEach(name => sectionVisibility[name] = false);
-
-        allTopicRows.forEach(row => {
-            const topicText = row.querySelector('.topic-text')?.textContent.toLowerCase() || '';
-            const confidence = row.querySelector('.confidence-dot')?.dataset.confidenceLevel || '0';
-
-            // Determine if the row should be visible based on filters
-            const matchesSearch = query === '' || topicText.includes(query);
-            const matchesConfidence = activeConfidenceFilter === 'all' || confidence === activeConfidenceFilter;
-
-            if (matchesSearch && matchesConfidence) {
-                row.style.display = '';
-                const sectionName = row.dataset.section;
-                if(sectionName) {
-                    sectionVisibility[sectionName] = true;
-                }
-            } else {
-                row.style.display = 'none';
-            }
-        });
-        
-        // Now, show/hide section headers and totals based on whether they have visible rows
-        const isFilteringActive = query !== '' || activeConfidenceFilter !== 'all';
+        const isFiltering = query !== '' || activeConfidenceFilter !== 'all';
 
         document.querySelectorAll('.section-header-row').forEach(headerRow => {
             const sectionName = headerRow.dataset.sectionHeader;
             const totalRow = document.getElementById(`total-row-${sectionName}`);
+            const isCollapsed = headerRow.classList.contains('collapsed');
             
-            // If any filter is active, hide sections that have no visible children
-            if (isFilteringActive) {
-                const shouldBeVisible = sectionVisibility[sectionName];
-                headerRow.style.display = shouldBeVisible ? '' : 'none';
+            let hasVisibleChildren = false;
+
+            document.querySelectorAll(`tr[data-section="${sectionName}"]`).forEach(row => {
+                const topicText = row.querySelector('.topic-text')?.textContent.toLowerCase() || '';
+                const confidence = row.querySelector('.confidence-dot')?.dataset.confidenceLevel || '0';
+                
+                const matchesSearch = query === '' || topicText.includes(query);
+                const matchesConfidence = activeConfidenceFilter === 'all' || confidence === activeConfidenceFilter;
+                
+                if (matchesSearch && matchesConfidence) {
+                    hasVisibleChildren = true;
+                    row.style.display = isCollapsed ? 'none' : '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            if (isFiltering) {
+                headerRow.style.display = hasVisibleChildren ? '' : 'none';
                 if (totalRow) {
-                    totalRow.style.display = shouldBeVisible ? '' : 'none';
+                    totalRow.style.display = hasVisibleChildren ? '' : 'none';
                 }
             } else {
-                // If no filters are active, respect the collapsed/expanded state
                 headerRow.style.display = '';
                 if (totalRow) {
-                    totalRow.style.display = '';
+                    totalRow.style.display = isCollapsed ? 'none' : '';
                 }
-                 const isCollapsed = headerRow.classList.contains('collapsed');
-                 document.querySelectorAll(`tr[data-section="${sectionName}"]`).forEach(topicRow => {
-                    topicRow.style.display = isCollapsed ? 'none' : '';
-                 });
             }
         });
     }
@@ -1110,188 +1120,718 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         showModal(referencesModal);
     }
+    
+    // --- Note Modal Functions ---
+    function closeNotesModal() {
+        hideModal(notesModal);
+        activeNoteIcon = null;
+        currentNoteRow = null;
+        currentNotesArray = [];
+        activeNoteIndex = 0;
+    }
 
-    // --- Event Listeners ---
-    tableBody.addEventListener('click', async (e) => {
-        const target = e.target;
-    
-        // Print Section Button Click
-        const printBtn = target.closest('.print-section-btn');
-        if (printBtn) {
-            e.stopPropagation();
-            const headerRow = printBtn.closest('.section-header-row');
-            const sectionId = headerRow.dataset.sectionHeader;
-            const sectionTitle = headerRow.querySelector('.section-title').textContent;
-    
-            const printArea = getElem('print-area');
-            let combinedContent = `<h1>${sectionTitle}</h1>`;
-    
-            const sectionNoteContent = headerRow.dataset.sectionNote || '';
-            if (sectionNoteContent) {
-                combinedContent += `<h2>Nota de la sección</h2><div>${sectionNoteContent}</div><hr>`;
-            }
-    
-            const topicRows = document.querySelectorAll(`tr[data-section="${sectionId}"]`);
-            for (const row of topicRows) {
-                const topicId = row.dataset.topicId;
-                const topicData = await db.get('topics', topicId);
-                if (topicData && topicData.notes && topicData.notes.length > 0) {
-                    topicData.notes.forEach(note => {
-                        if (note.content && note.content.trim() && note.content.trim() !== '<p><br></p>') {
-                            combinedContent += `<div>${note.content}</div><hr style="margin: 2em 0;">`;
-                        }
-                    });
-                }
-            }
-    
-            printArea.innerHTML = combinedContent;
-            window.print();
-            printArea.innerHTML = ''; // Clean up
-            return; // Exit after handling print
-        }
-    
-        // Confidence Dot Click
-        if (target.classList.contains('confidence-dot')) {
-            let currentLevel = parseInt(target.dataset.confidenceLevel, 10);
-            currentLevel = (currentLevel + 1) % 4; // Cycles 0 -> 1 -> 2 -> 3 -> 0
-            target.dataset.confidenceLevel = currentLevel;
-            filterTable(); // Apply filter after changing confidence
-            saveState();
-            return;
-        }
-    
-        const cell = target.closest('td');
-        if (!cell) return;
-    
-        // Lectura cell click
-        if (cell.classList.contains('lectura-cell')) {
-            const counter = cell.querySelector('.lectura-counter');
-            if (counter) {
-                let count = parseInt(counter.textContent, 10);
-                count = (count + 1) % 5;
-                counter.textContent = String(count);
-                cell.classList.toggle('lectura-filled', count > 0);
-                updateAllTotals();
-                saveState();
-            }
-        }
-    
-        // Note Icon Click
-        if (target.closest('.note-icon')) {
-            e.stopPropagation();
-            activeNoteIcon = target.closest('.note-icon');
-            openNotesModal();
-        }
-    
-        // References cell click
-        if (target.closest('.references-cell')) {
-            e.stopPropagation();
-            activeReferencesCell = target.closest('.references-cell');
-            const row = activeReferencesCell.closest('tr');
-            const references = JSON.parse(row.dataset.references || '[]');
-            openReferencesModal(references);
-        }
-    });
-
-    // Section header click
-    tableBody.addEventListener('click', (e) => {
-        const headerRow = e.target.closest('.section-header-row');
-        if (!headerRow) return;
-
-        // Ignore clicks on icons within the header
-        if (e.target.closest('.note-icon, .print-section-btn')) {
-            return;
-        }
-
-        const sectionName = headerRow.dataset.sectionHeader;
-        headerRow.classList.toggle('collapsed');
-        const isCollapsed = headerRow.classList.contains('collapsed');
+    function saveCurrentNote() {
+        if (!currentNoteRow || !currentNotesArray || currentNotesArray.length === 0) return;
         
-        // When collapsing/expanding, we need to re-evaluate visibility based on current filters
-        filterTable(); 
+        const currentContent = notesEditor.innerHTML;
+        const currentTitle = notesModalTitle.textContent.trim();
         
-        saveState();
-    });
+        // Update the array in memory
+        currentNotesArray[activeNoteIndex] = {
+            title: currentTitle,
+            content: currentContent,
+            lastEdited: new Date().toISOString()
+        };
 
-    searchBar.addEventListener('input', filterTable);
-
-    confidenceFiltersContainer.addEventListener('click', e => {
-        const btn = e.target.closest('button.filter-btn');
-        if (!btn) return;
-        
-        confidenceFiltersContainer.querySelector('.active').classList.remove('active');
-        btn.classList.add('active');
-        activeConfidenceFilter = btn.dataset.filter;
-        filterTable();
-    });
-
-    // Top Controls
-    exportBtn.addEventListener('click', async () => {
-        try {
-            const topics = await db.getAll('topics');
-            const sections = await db.getAll('sections');
-            const settings = await db.get('keyvalue', 'settings');
-            const headers = await db.get('keyvalue', 'headers');
-
-            const fullState = {
-                version: "temario_indexeddb_v1",
-                data: {
-                    topics,
-                    sections,
-                    settings: settings ? settings.value : {},
-                    headers: headers ? headers.value : {},
-                }
-            };
-            const dataStr = JSON.stringify(fullState, null, 2);
-            const blob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const date = new Date().toISOString().slice(0, 10);
-            a.download = `temario-progreso-${date}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error("Error exporting data:", error);
-            await showAlert("Hubo un error al exportar el progreso.");
+        const noteType = activeNoteIcon.dataset.noteType;
+        if (noteType === 'section') {
+            currentNoteRow.dataset.sectionNote = JSON.stringify(currentNotesArray);
+        } else {
+            // Save back to the row's dataset for topics
+            currentNoteRow.dataset.notes = JSON.stringify(currentNotesArray);
         }
-    });
+        
+        // Update the 'has-note' status on the icon
+        const hasContent = currentNotesArray.some(n => n.content && n.content.trim() !== '' && n.content.trim() !== '<p><br></p>');
+        if (activeNoteIcon) {
+            activeNoteIcon.classList.toggle('has-note', hasContent);
+        }
 
-    importBtn.addEventListener('click', () => importFileInput.click());
+        renderNotesList(); // Re-render list to show title changes
+        saveState(); // Persist changes to IndexedDB
+        updateNoteInfo(); // Update stats display
+    }
+
+    function renderNotesList() {
+        notesList.innerHTML = '';
+        if (currentNotesArray.length === 0) {
+             if (notesModalCounter) notesModalCounter.textContent = '0 / 0';
+             return;
+        }
+
+        currentNotesArray.forEach((note, index) => {
+            const li = document.createElement('li');
+            const btn = document.createElement('button');
+            btn.className = 'note-item-btn w-full';
+            btn.dataset.index = index;
+            
+            if (index === activeNoteIndex) {
+                btn.classList.add('active');
+            }
+            
+            const titleSpan = document.createElement('span');
+            titleSpan.className = 'note-title-text';
+            titleSpan.textContent = note.title || `Nota ${index + 1}`;
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-note-btn toolbar-btn';
+            deleteBtn.innerHTML = '🗑️';
+            deleteBtn.title = 'Borrar esta nota';
+            deleteBtn.dataset.index = index;
+
+            btn.appendChild(titleSpan);
+            btn.appendChild(deleteBtn);
+            li.appendChild(btn);
+            notesList.appendChild(li);
+        });
+        
+        // Update counter
+        if(notesModalCounter) {
+            notesModalCounter.textContent = `${activeNoteIndex + 1} / ${currentNotesArray.length}`;
+        }
+    }
+
+    function loadNoteIntoEditor(index) {
+        if (index < 0 || index >= currentNotesArray.length) {
+            if (currentNotesArray.length === 0) {
+               addNewNote(false);
+               return;
+            }
+            index = 0; // fallback to the first note
+        }
+        
+        activeNoteIndex = index;
+        const note = currentNotesArray[index];
+        
+        notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
+        notesEditor.innerHTML = note.content || '<p><br></p>';
+
+        renderNotesList();
+        notesEditor.focus();
+        updateNoteInfo();
+    }
     
-    importFileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const confirmed = await showConfirmation("¿Estás seguro de que quieres importar este archivo? Tu progreso actual se sobrescribirá.");
+    function addNewNote(shouldSaveCurrent = true) {
+        if (shouldSaveCurrent) {
+            saveCurrentNote();
+        }
+        
+        const newIndex = currentNotesArray.length;
+        currentNotesArray.push({
+            title: `Nota ${newIndex + 1}`,
+            content: '<p><br></p>',
+            lastEdited: new Date().toISOString()
+        });
+        
+        loadNoteIntoEditor(newIndex);
+    }
+    
+    async function deleteNote(indexToDelete) {
+        const confirmed = await showConfirmation("¿Estás seguro de que quieres eliminar esta nota? Esta acción no se puede deshacer.");
         if (!confirmed) return;
 
-        const reader = new FileReader();
-        reader.onload = async (event) => {
+        currentNotesArray.splice(indexToDelete, 1);
+        
+        let newIndexToShow = activeNoteIndex;
+        if (activeNoteIndex === indexToDelete) {
+             newIndexToShow = Math.max(0, indexToDelete - 1);
+        } else if (activeNoteIndex > indexToDelete) {
+            newIndexToShow = activeNoteIndex - 1;
+        }
+
+        if (currentNotesArray.length === 0) {
+            addNewNote(false);
+        } else {
+            loadNoteIntoEditor(newIndexToShow);
+        }
+        
+        // This is a destructive action, save immediately
+        const noteType = activeNoteIcon.dataset.noteType;
+        if (currentNoteRow) {
+             if (noteType === 'section') {
+                currentNoteRow.dataset.sectionNote = JSON.stringify(currentNotesArray);
+             } else {
+                currentNoteRow.dataset.notes = JSON.stringify(currentNotesArray);
+             }
+        }
+        saveState();
+    }
+
+    function openNotesModal(noteIconElement) {
+        if (!noteIconElement) return;
+        activeNoteIcon = noteIconElement;
+        
+        currentNoteRow = activeNoteIcon.closest('tr');
+        if (!currentNoteRow) {
+            console.error("Could not find parent row for note icon.");
+            return;
+        }
+        
+        const noteType = activeNoteIcon.dataset.noteType;
+        let notesJson;
+        let defaultTitle;
+        
+        if (noteType === 'section') {
+            notesJson = currentNoteRow.dataset.sectionNote || '[]';
+            defaultTitle = currentNoteRow.querySelector('.section-title')?.textContent;
+             notesSidePanel.style.display = 'none'; // No multi-note for sections for now
+        } else { // topic
+            notesJson = currentNoteRow.dataset.notes || '[]';
+            defaultTitle = currentNoteRow.querySelector('.topic-text')?.textContent;
+            notesSidePanel.style.display = 'flex';
+        }
+        
+        try {
+            currentNotesArray = JSON.parse(notesJson);
+        } catch(e) {
+            console.error("Error parsing notes JSON:", e, notesJson);
+            currentNotesArray = [];
+        }
+
+        if (!Array.isArray(currentNotesArray)) {
+            // Handle legacy case where note was a single object, not an array
+            currentNotesArray = (typeof currentNotesArray === 'object' && currentNotesArray !== null && currentNotesArray.content) ? 
+                [{ title: defaultTitle || "Nota Principal", ...currentNotesArray }] 
+                : [];
+        }
+        
+        if (currentNotesArray.length === 0) {
+            currentNotesArray.push({
+                title: defaultTitle || 'Nota Principal',
+                content: '<p><br></p>',
+                lastEdited: new Date().toISOString()
+            });
+        }
+        
+        loadNoteIntoEditor(0);
+        showModal(notesModal);
+    }
+    
+    function updateNoteInfo() {
+        const note = currentNotesArray[activeNoteIndex];
+        if (!note) return;
+
+        const wordCount = notesEditor.innerText.match(/\b\w+\b/g)?.length || 0;
+        const size = new TextEncoder().encode(note.content).length;
+        const lastEdited = note.lastEdited ? new Date(note.lastEdited).toLocaleString() : 'N/A';
+        
+        infoWordCount.textContent = wordCount;
+        infoNoteSize.textContent = formatBytes(size);
+        infoLastEdited.textContent = lastEdited;
+    }
+
+    // --- Image Gallery & Lightbox Functions ---
+    function createGalleryUrlInput(url = '') {
+        const inputContainer = document.createElement('div');
+        inputContainer.className = 'gallery-url-input';
+        
+        const urlInput = document.createElement('input');
+        urlInput.type = 'url';
+        urlInput.placeholder = 'https://ejemplo.com/imagen.jpg';
+        urlInput.className = 'w-full p-2 border border-border-color rounded-lg bg-secondary focus:ring-2 focus:ring-sky-400';
+        urlInput.value = url;
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'toolbar-btn text-red-500 hover:bg-red-100 dark:hover:bg-red-900';
+        deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm1 4a1 1 0 100 2h2a1 1 0 100-2H8z" clip-rule="evenodd" /></svg>`;
+        deleteBtn.title = "Borrar URL";
+        deleteBtn.onclick = () => inputContainer.remove();
+
+        inputContainer.appendChild(urlInput);
+        inputContainer.appendChild(deleteBtn);
+        return inputContainer;
+    }
+
+    function openGalleryLinkEditor() {
+        const selection = window.getSelection();
+        if (selection.isCollapsed || !notesEditor.contains(selection.anchorNode)) {
+            showAlert("Por favor, selecciona algo de texto en el editor para crear una galería.");
+            return;
+        }
+        activeGalleryRange = selection.getRangeAt(0).cloneRange();
+        
+        imageGalleryInputs.innerHTML = '';
+        const existingLink = selection.getRangeAt(0).startContainer.parentElement.closest('.gallery-link');
+        
+        if (existingLink) {
             try {
-                const importedState = JSON.parse(event.target.result);
-                
-                if (importedState.version !== "temario_indexeddb_v1" || !importedState.data) {
-                    await showAlert("Error: El archivo de importación no es compatible o está corrupto.");
-                    return;
-                }
-                const { topics, sections, settings, headers } = importedState.data;
-
-                const topicPromises = topics.map(topic => db.set('topics', topic));
-                const sectionPromises = sections.map(section => db.set('sections', section));
-                const settingsPromise = db.set('keyvalue', { key: 'settings', value: settings });
-                const headersPromise = db.set('keyvalue', { key: 'headers', value: headers });
-
-                await Promise.all([...topicPromises, ...sectionPromises, settingsPromise, headersPromise]);
-                
-                await showAlert("Importación completada. La página se recargará.");
-                location.reload();
-            } catch (err) {
-                console.error("Error al importar el archivo:", err);
-                await showAlert("Error: El archivo seleccionado no es un JSON válido o está corrupto.");
+                const images = JSON.parse(existingLink.dataset.galleryImages);
+                images.forEach(url => imageGalleryInputs.appendChild(createGalleryUrlInput(url)));
+            } catch (e) {
+                 console.error("Could not parse existing gallery data", e);
+                 imageGalleryInputs.appendChild(createGalleryUrlInput());
             }
-        };
-        reader.readAsText(file);
+        } else {
+             imageGalleryInputs.appendChild(createGalleryUrlInput());
+        }
+
+        showModal(imageGalleryLinkModal);
+    }
+    
+    function saveGalleryLink() {
+        if (!activeGalleryRange) return;
+
+        const urls = Array.from(imageGalleryInputs.querySelectorAll('input[type="url"]'))
+            .map(input => input.value.trim())
+            .filter(url => url);
+
+        if (urls.length === 0) {
+            showAlert("Debes añadir al menos una URL de imagen.");
+            return;
+        }
+        
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(activeGalleryRange);
+
+        const existingLink = activeGalleryRange.startContainer.parentElement.closest('.gallery-link');
+        if (existingLink) {
+            existingLink.dataset.galleryImages = JSON.stringify(urls);
+        } else {
+            const span = document.createElement('span');
+            span.className = 'gallery-link';
+            span.dataset.galleryImages = JSON.stringify(urls);
+            
+            try {
+                // Use surroundContents for robustness
+                activeGalleryRange.surroundContents(span);
+            } catch(e) {
+                console.error("Error wrapping content with surroundContents, falling back:", e);
+                // Fallback for complex selections
+                document.execCommand('insertHTML', false, '<span></span>');
+                const tempSpan = notesEditor.querySelector('span:not([class])');
+                if (tempSpan) {
+                    tempSpan.className = 'gallery-link';
+                    tempSpan.dataset.galleryImages = JSON.stringify(urls);
+                    tempSpan.innerHTML = activeGalleryRange.toString();
+                }
+            }
+        }
+
+        activeGalleryRange = null;
+        hideModal(imageGalleryLinkModal);
+        saveCurrentNote();
+    }
+    
+    function openLightbox(images, startIndex) {
+        lightboxImages = images;
+        currentLightboxIndex = startIndex;
+        showLightboxImage(currentLightboxIndex);
+        showModal(imageLightboxModal);
+    }
+
+    function showLightboxImage(index) {
+        if (index < 0 || index >= lightboxImages.length) return;
+        currentLightboxIndex = index;
+        lightboxImage.src = lightboxImages[index];
+        lightboxCaption.textContent = `${index + 1} / ${lightboxImages.length}`;
+        prevLightboxBtn.style.display = lightboxImages.length > 1 ? 'block' : 'none';
+        nextLightboxBtn.style.display = lightboxImages.length > 1 ? 'block' : 'none';
+    }
+
+    function navigateLightbox(direction) {
+        const newIndex = (currentLightboxIndex + direction + lightboxImages.length) % lightboxImages.length;
+        showLightboxImage(newIndex);
+    }
+
+    function exportSectionWithIndex(sectionId) {
+        const sectionHeaderRow = document.querySelector(`tr[data-section-header="${sectionId}"]`);
+        const sectionTitle = sectionHeaderRow.querySelector('.section-title').textContent.trim();
+        const sectionRows = document.querySelectorAll(`tr[data-section="${sectionId}"]`);
+        
+        let contentHtml = `<h1 style="font-size: 2em; margin-bottom: 1em;">${sectionTitle}</h1>`;
+        let indexHtml = '<h2>Índice</h2><ul>';
+        let notesContentHtml = '';
+        let hasContent = false;
+
+        sectionRows.forEach(row => {
+            const topicId = row.dataset.topicId;
+            const topicTitle = row.querySelector('.topic-text')?.textContent.trim() || 'Sin Título';
+            const notes = JSON.parse(row.dataset.notes || '[]');
+            
+            if (notes && notes.length > 0 && notes.some(n => n.content && n.content.trim() !== '' && n.content.trim() !== '<p><br></p>')) {
+                hasContent = true;
+                const anchorId = `topic-anchor-${topicId.replace(/\s+/g, '-')}`;
+                indexHtml += `<li><a href="#${anchorId}">${topicTitle}</a></li>`;
+                
+                notesContentHtml += `<div style="margin-bottom: 2em; page-break-before: auto;">`;
+                notesContentHtml += `<h2 id="${anchorId}" style="font-size: 1.5em; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 2em;">${topicTitle}</h2>`;
+                notes.forEach(note => {
+                    const noteTitle = note.title || '';
+                    if (noteTitle && noteTitle.trim().toLowerCase() !== topicTitle.trim().toLowerCase()) {
+                        notesContentHtml += `<h3>${noteTitle}</h3>`;
+                    }
+                    notesContentHtml += `<div>${note.content}</div>`;
+                });
+                notesContentHtml += `</div>`;
+            }
+        });
+
+        if (!hasContent) {
+            showAlert("Esta sección no tiene notas para exportar.");
+            return;
+        }
+
+        indexHtml += '</ul><hr style="margin: 2em 0;">';
+        contentHtml += indexHtml + notesContentHtml;
+
+        const fullHtml = getStyledExportHtml(contentHtml, sectionTitle);
+        
+        const blob = new Blob([fullHtml], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${sectionTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function getStyledExportHtml(content, title) {
+        const styles = `
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+                body { font-family: 'Inter', sans-serif; line-height: 1.6; color: #1f2937; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+                h1, h2, h3 { color: #111827; }
+                a { color: #2563eb; text-decoration: none; }
+                a:hover { text-decoration: underline; }
+                img { max-width: 100%; height: auto; border-radius: 0.5rem; }
+                details { border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; margin: 1rem 0; background-color: #f9fafb; }
+                summary { font-weight: 600; cursor: pointer; }
+                summary::marker { color: #3b82f6; }
+                hr { border: none; border-top: 1px solid #e5e7eb; }
+                p, div, li, span { background-color: transparent !important; }
+                
+                /* By default, remove list styling to match editor */
+                ul, ol {
+                    list-style: none;
+                    padding-left: 0;
+                }
+                /* Add list styling only to the main Index list */
+                body > ul {
+                    list-style: disc;
+                    list-style-position: inside;
+                }
+                li { 
+                    margin-bottom: 0.5rem; 
+                }
+            </style>
+        `;
+        return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${title}</title>${styles}</head><body>${content}</body></html>`;
+    }
+
+    // --- Event Listeners Setup ---
+    
+    // Main table interactions
+    tableBody.addEventListener('click', (e) => {
+        const target = e.target;
+        const exportSectionBtn = target.closest('.export-section-btn');
+        const printSectionBtn = target.closest('.print-section-btn');
+        const noteIcon = target.closest('.note-icon');
+
+        // Check for specific buttons within the header first
+        if (exportSectionBtn) {
+            e.stopPropagation(); // Stop the header from collapsing
+            const sectionId = exportSectionBtn.closest('.section-header-row').dataset.sectionHeader;
+            exportSectionWithIndex(sectionId);
+            return; // Done
+        }
+        
+        if (printSectionBtn) {
+            e.stopPropagation(); // Stop the header from collapsing
+            const sectionId = printSectionBtn.closest('.section-header-row').dataset.sectionHeader;
+            const sectionHeaderRow = document.querySelector(`tr[data-section-header="${sectionId}"]`);
+            const sectionTitle = sectionHeaderRow.querySelector('.section-title').textContent.trim();
+            const sectionRows = document.querySelectorAll(`tr[data-section="${sectionId}"]`);
+            let contentToPrint = `<h1 style="font-size: 2em;">${sectionTitle}</h1>`;
+            let notesFound = false;
+
+            sectionRows.forEach(row => {
+                const notes = JSON.parse(row.dataset.notes || '[]');
+                if (notes && notes.length > 0 && notes.some(n => n.content && n.content.trim() !== '' && n.content.trim() !== '<p><br></p>')) {
+                    notesFound = true;
+                    const topicTitle = row.cells[1].textContent;
+                    contentToPrint += `<h2 style="font-size: 1.5em; margin-top: 1.5em; border-bottom: 1px solid #ccc;">${topicTitle}</h2>`;
+                    notes.forEach(note => {
+                         contentToPrint += `<h3>${note.title || ''}</h3><div>${note.content}</div>`;
+                    });
+                }
+            });
+
+            if (!notesFound) {
+                showAlert("No hay notas en esta sección para imprimir.");
+                return;
+            }
+            
+            const printArea = getElem('print-area');
+            printArea.innerHTML = getStyledExportHtml(contentToPrint, `Notas - ${sectionTitle}`);
+            window.print();
+            return; // Done
+        }
+
+        if (noteIcon) {
+            // This will catch note icons in topic rows and header rows
+            e.stopPropagation(); // Stop header from collapsing if it's a header icon
+            openNotesModal(noteIcon);
+            return; // Done
+        }
+        
+        // Now handle other clicks.
+        const cell = target.closest('.lectura-cell');
+        const refCell = target.closest('.references-cell');
+        const sectionHeader = target.closest('.section-header-row');
+        const confidenceDot = target.closest('.confidence-dot');
+        const galleryLink = target.closest('.gallery-link');
+
+        if (cell) {
+            e.preventDefault();
+            const counter = cell.querySelector('.lectura-counter');
+            let count = parseInt(counter.textContent, 10);
+            count = (count + 1);
+            if(count > 1) count = 0; // Cycle through 0, 1
+            counter.textContent = String(count);
+            cell.classList.toggle('lectura-filled', count > 0);
+            updateAllTotals();
+            saveState();
+        } else if (refCell) {
+            e.preventDefault();
+            activeReferencesCell = refCell;
+            const row = refCell.closest('tr');
+            const currentReferences = JSON.parse(row.dataset.references || '[]');
+            openReferencesModal(currentReferences);
+        } else if (confidenceDot) {
+            let level = parseInt(confidenceDot.dataset.confidenceLevel || '0');
+            level = (level + 1) % 4; // Cycle 0, 1, 2, 3 -> 0
+            confidenceDot.dataset.confidenceLevel = level;
+            filterTable();
+            saveState();
+        } else if (galleryLink) {
+             try {
+                const images = JSON.parse(galleryLink.dataset.galleryImages);
+                if (images && images.length > 0) {
+                    openLightbox(images, 0);
+                }
+            } catch (e) {
+                console.error("Failed to open gallery lightbox:", e);
+            }
+        } else if (sectionHeader) { // This will now only run if no button was clicked inside it
+            const sectionName = sectionHeader.dataset.sectionHeader;
+            sectionHeader.classList.toggle('collapsed');
+            const isCollapsed = sectionHeader.classList.contains('collapsed');
+
+            document.querySelectorAll(`tr[data-section="${sectionName}"]`).forEach(row => {
+                row.style.display = isCollapsed ? 'none' : '';
+            });
+            const totalRow = sections[sectionName]?.totalRow;
+            if (totalRow) {
+                totalRow.style.display = isCollapsed ? 'none' : '';
+            }
+            filterTable(); // Re-apply filters with new collapsed state
+            saveState();
+        }
+    });
+
+    // References Modal listeners
+    addReferenceSlotBtn.addEventListener('click', () => referencesEditor.appendChild(createReferenceSlot()));
+    saveReferencesBtn.addEventListener('click', () => {
+        if (!activeReferencesCell) return;
+        const references = Array.from(referencesEditor.querySelectorAll('.reference-slot')).map(slot => ({
+            icon: slot.querySelector('.icon-display').textContent,
+            url: slot.querySelector('input').value,
+        })).filter(ref => ref.url); // only save if URL is present
+
+        const row = activeReferencesCell.closest('tr');
+        row.dataset.references = JSON.stringify(references);
+        
+        renderReferencesCell(activeReferencesCell);
+        hideModal(referencesModal);
+        updateAllTotals();
+        saveState();
+    });
+    cancelReferencesBtn.addEventListener('click', () => hideModal(referencesModal));
+
+    // Icon Picker Modal listeners
+    iconPickerCategories.addEventListener('click', (e) => {
+        if (e.target.classList.contains('category-btn')) {
+            document.querySelector('.category-btn.active').classList.remove('active');
+            e.target.classList.add('active');
+            loadEmojisForCategory(e.target.dataset.category);
+        }
+    });
+    emojiGrid.addEventListener('click', (e) => {
+        if (e.target.classList.contains('emoji-btn')) {
+            if (activeIconPickerButton) {
+                activeIconPickerButton.textContent = e.target.dataset.emoji;
+            }
+            hideModal(iconPickerModal);
+        }
+    });
+    cancelIconPickerBtn.addEventListener('click', () => hideModal(iconPickerModal));
+
+    // Note Modal listeners
+    saveNoteBtn.addEventListener('click', saveCurrentNote);
+    saveAndCloseNoteBtn.addEventListener('click', () => {
+        saveCurrentNote();
+        closeNotesModal();
+    });
+    cancelNoteBtn.addEventListener('click', closeNotesModal);
+    unmarkNoteBtn.addEventListener('click', async () => {
+        const confirmed = await showConfirmation("¿Estás seguro de que quieres borrar todo el contenido de esta nota? Esta acción no se puede deshacer.");
+        if(confirmed) {
+            notesEditor.innerHTML = '<p><br></p>';
+            saveCurrentNote();
+        }
+    });
+    
+    notesModalTitle.addEventListener('blur', saveCurrentNote);
+    
+    // Multi-note panel listeners
+    notesPanelToggle.addEventListener('click', () => {
+        notesSidePanel.classList.toggle('open');
+        notesPanelToggle.classList.toggle('open');
+        if(notesSidePanel.classList.contains('open')) {
+            notesPanelToggle.style.left = '228px';
+        } else {
+            notesPanelToggle.style.left = '0.75rem';
+        }
+    });
+    addNotePanelBtn.addEventListener('click', () => addNewNote());
+    notesList.addEventListener('click', (e) => {
+        const itemBtn = e.target.closest('.note-item-btn');
+        const deleteBtn = e.target.closest('.delete-note-btn');
+
+        if (deleteBtn) {
+            e.stopPropagation();
+            const indexToDelete = parseInt(deleteBtn.dataset.index, 10);
+            deleteNote(indexToDelete);
+        } else if (itemBtn) {
+            const index = parseInt(itemBtn.dataset.index, 10);
+            if (index !== activeNoteIndex) {
+                 saveCurrentNote();
+                 loadNoteIntoEditor(index);
+            }
+        }
+    });
+
+    noteInfoBtn.addEventListener('click', () => {
+        updateNoteInfo();
+        showModal(noteInfoModal);
+    });
+    closeNoteInfoBtn.addEventListener('click', () => hideModal(noteInfoModal));
+
+    // Notes Editor listeners
+    notesEditor.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/html') || e.clipboardData.getData('text/plain');
+        document.execCommand('insertHTML', false, text);
+    });
+
+    notesEditor.addEventListener('click', (e) => {
+        if (e.target.tagName === 'IMG') {
+            document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
+            e.target.classList.add('selected-for-resize');
+            selectedImageForResize = e.target;
+        } else {
+            document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
+            selectedImageForResize = null;
+        }
+    });
+
+    toggleReadOnlyBtn.addEventListener('click', () => {
+        const contentDiv = notesModal.querySelector('.notes-modal-content');
+        contentDiv.classList.toggle('readonly-mode');
+        notesEditor.contentEditable = !notesEditor.isContentEditable;
+    });
+
+    // Gallery Modal Listeners
+    addGalleryImageUrlBtn.addEventListener('click', () => {
+        imageGalleryInputs.appendChild(createGalleryUrlInput());
+    });
+    saveGalleryLinkBtn.addEventListener('click', saveGalleryLink);
+    cancelGalleryLinkBtn.addEventListener('click', () => {
+        activeGalleryRange = null;
+        hideModal(imageGalleryLinkModal);
+    });
+    
+    // Lightbox Listeners
+    closeLightboxBtn.addEventListener('click', () => hideModal(imageLightboxModal));
+    prevLightboxBtn.addEventListener('click', () => navigateLightbox(-1));
+    nextLightboxBtn.addEventListener('click', () => navigateLightbox(1));
+    document.addEventListener('keydown', (e) => {
+        if (imageLightboxModal.classList.contains('visible')) {
+            if (e.key === 'ArrowLeft') navigateLightbox(-1);
+            if (e.key === 'ArrowRight') navigateLightbox(1);
+            if (e.key === 'Escape') hideModal(imageLightboxModal);
+        }
+    });
+
+    // AI Modal Listeners
+    askAiBtn.addEventListener('click', async () => {
+        if (!API_KEY) {
+            await showAlert("La clave de API de Gemini no está configurada. No se puede usar la función de IA.");
+            return;
+        }
+        aiResponseArea.innerHTML = "Escribe tu pregunta a continuación...";
+        aiQuestionInput.value = '';
+        showModal(aiQaModal);
+    });
+    cancelAiQaBtn.addEventListener('click', () => hideModal(aiQaModal));
+    sendAiQaBtn.addEventListener('click', async () => {
+        const question = aiQuestionInput.value.trim();
+        if (!question) return;
+
+        aiQaLoader.style.display = 'block';
+        sendAiQaBtn.disabled = true;
+        
+        try {
+            const state = getStateObject();
+            let context = "Información del temario:\n";
+            state.topics.forEach((topicData, topicId) => {
+                const row = document.querySelector(`tr[data-topic-id="${topicId}"]`);
+                const topicTitle = row.cells[1].textContent;
+                if (topicData.note) {
+                    context += `\n---\nTEMA: ${topicTitle}\nAPUNTES: ${topicData.note}\n---\n`;
+                }
+            });
+            
+            const fullPrompt = `Contexto:\n${context}\n\nPregunta del usuario: ${question}\n\nResponde a la pregunta basándote únicamente en el contexto proporcionado. Sé conciso y directo.`;
+            
+            const ai = new GoogleGenAI({ apiKey: API_KEY });
+            const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: [{ parts: [{ text: fullPrompt }] }],
+            });
+
+            aiResponseArea.innerHTML = response.text.replace(/\n/g, '<br>');
+
+        } catch (error) {
+            console.error("Gemini API error:", error);
+            aiResponseArea.innerHTML = "Hubo un error al contactar a la IA. Revisa la consola para más detalles.";
+        } finally {
+            aiQaLoader.style.display = 'none';
+            sendAiQaBtn.disabled = false;
+        }
+    });
+
+    // Global listeners & settings
+    searchBar.addEventListener('input', filterTable);
+    confidenceFiltersContainer.addEventListener('click', (e) => {
+        const btn = e.target.closest('.filter-btn');
+        if (btn) {
+            confidenceFiltersContainer.querySelector('.active').classList.remove('active');
+            btn.classList.add('active');
+            activeConfidenceFilter = btn.dataset.filter;
+            filterTable();
+        }
     });
 
     settingsBtn.addEventListener('click', (e) => {
@@ -1303,250 +1843,88 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!settingsBtn.contains(e.target) && !settingsDropdown.contains(e.target)) {
             settingsDropdown.classList.add('hidden');
         }
-        const visibleSubmenu = document.querySelector('.color-submenu.visible, .symbol-dropdown-content.visible');
-        if (visibleSubmenu && !visibleSubmenu.parentElement.contains(e.target)) {
-             visibleSubmenu.classList.remove('visible');
-        }
+        document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+            if (!d.parentElement.contains(e.target)) {
+                d.classList.remove('visible');
+            }
+        });
     });
-    
+
     settingsDropdown.addEventListener('click', (e) => {
         e.preventDefault();
-        const target = e.target;
-        if(target.classList.contains('theme-option')) {
-            applyTheme(target.dataset.theme);
-            settingsDropdown.classList.add('hidden');
+        const themeOption = e.target.closest('.theme-option');
+        const iconStyleOption = e.target.closest('.icon-style-option');
+        if (themeOption) {
+            applyTheme(themeOption.dataset.theme);
             saveState();
         }
-        if(target.classList.contains('icon-style-option')) {
-            applyIconStyle(target.dataset.style);
-            settingsDropdown.classList.add('hidden');
+        if (iconStyleOption) {
+            applyIconStyle(iconStyleOption.dataset.style);
             saveState();
         }
     });
 
     toggleAllSectionsBtn.addEventListener('click', () => {
-        const allHeaders = document.querySelectorAll('.section-header-row');
-        // Check if any section is currently expanded (i.e., not collapsed)
-        const isAnyExpanded = Array.from(allHeaders).some(h => !h.classList.contains('collapsed'));
-
-        allHeaders.forEach(headerRow => {
-            const shouldCollapse = isAnyExpanded; // If any is open, collapse all. Otherwise, expand all.
-            headerRow.classList.toggle('collapsed', shouldCollapse);
-        });
+        const areAllCollapsed = Array.from(document.querySelectorAll('.section-header-row')).every(row => row.classList.contains('collapsed'));
         
-        filterTable(); // Re-apply filters to show/hide rows correctly
+        document.querySelectorAll('.section-header-row').forEach(headerRow => {
+            if (areAllCollapsed) { // expand all
+                headerRow.classList.remove('collapsed');
+            } else { // collapse all
+                headerRow.classList.add('collapsed');
+            }
+            const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+            headerRow.dispatchEvent(event); // trigger collapse/expand logic
+            headerRow.dispatchEvent(event); // needs to be called twice to override individual states
+        });
         saveState();
     });
 
-    // Notes Modal Functions
-    function openNotesModal() {
-        const noteType = activeNoteIcon.dataset.noteType;
-        const parentEl = noteType === 'topic' ? activeNoteIcon.closest('tr') : activeNoteIcon.closest('.section-header-row');
-
-        // Configure modal based on note type
-        if (noteType === 'topic') {
-            const topicTitle = parentEl.querySelector('.topic-text')?.textContent.trim() || 'Nota';
-            currentNotesArray = JSON.parse(parentEl.dataset.notes || '[]');
-            if (currentNotesArray.length === 0) {
-                currentNotesArray.push({ id: `note-${Date.now()}`, title: topicTitle, content: '', lastEdited: new Date().toISOString() });
-            } else {
-                 // Ensure title is up-to-date with main table
-                currentNotesArray.forEach(note => {
-                    if(!note.title || note.title === 'Nota') note.title = topicTitle;
-                });
-            }
-            notesSidePanel.style.display = 'flex';
-            notesPanelToggle.style.display = 'block';
-             if (!notesSidePanel.classList.contains('open')) {
-                notesMainContent.style.paddingLeft = '1rem';
-             }
-        } else { // section note
-            const sectionTitle = parentEl.querySelector('.section-title')?.textContent.trim() || 'Nota de sección';
-            currentNotesArray = [{ id: `section-${parentEl.dataset.sectionHeader}`, title: sectionTitle, content: parentEl.dataset.sectionNote || '', lastEdited: new Date().toISOString() }];
-            notesSidePanel.style.display = 'none';
-            notesPanelToggle.style.display = 'none';
-            notesMainContent.style.paddingLeft = '1rem';
-        }
-        
-        // Reset to edit mode when opening
-        const modalContent = notesModal.querySelector('.notes-modal-content');
-        modalContent.classList.remove('readonly-mode');
-        notesEditor.setAttribute('contenteditable', 'true');
-        notesModalTitle.setAttribute('contenteditable', 'true');
-        const eyeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye w-5 h-5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
-        toggleReadOnlyBtn.innerHTML = eyeIcon;
-        toggleReadOnlyBtn.title = "Activar modo lectura";
-
-        activeNoteIndex = 0;
-        loadNoteIntoEditor(activeNoteIndex);
-        updateNotesList();
-        showModal(notesModal);
-        notesEditor.focus();
-    }
-
-    function loadNoteIntoEditor(index) {
-        if (index < 0 || index >= currentNotesArray.length) {
-            console.error("Invalid note index");
-            return;
-        }
-        activeNoteIndex = index;
-        const note = currentNotesArray[activeNoteIndex];
-        notesModalTitle.textContent = note.title;
-        notesEditor.innerHTML = note.content || '<p><br></p>';
-        
-        // Update active state in side panel
-        document.querySelectorAll('#notes-list .note-item-btn.active').forEach(btn => btn.classList.remove('active'));
-        const activeBtn = document.querySelector(`#notes-list button[data-note-index="${index}"]`);
-        if (activeBtn) {
-            activeBtn.classList.add('active');
-        }
-    }
-
-    function saveCurrentNote() {
-        if (activeNoteIndex < 0 || activeNoteIndex >= currentNotesArray.length) return;
-        
-        const note = currentNotesArray[activeNoteIndex];
-        note.title = notesModalTitle.textContent.trim() || 'Sin Título';
-        note.content = notesEditor.innerHTML;
-        note.lastEdited = new Date().toISOString();
-        
-        // Update the main data structure
-        const noteType = activeNoteIcon.dataset.noteType;
-        const parentEl = noteType === 'topic' ? activeNoteIcon.closest('tr') : activeNoteIcon.closest('.section-header-row');
-
-        if (noteType === 'topic') {
-            parentEl.dataset.notes = JSON.stringify(currentNotesArray);
-            const hasContent = currentNotesArray.some(n => n.content && n.content.trim() !== '' && n.content.trim() !== '<p><br></p>');
-            activeNoteIcon.classList.toggle('has-note', hasContent);
-        } else {
-             parentEl.dataset.sectionNote = note.content;
-             activeNoteIcon.classList.toggle('has-note', note.content && note.content.trim() !== '');
-        }
-        
-        updateNotesList();
-        saveState();
-    }
-    
-    function updateNotesList() {
-        notesList.innerHTML = '';
-        currentNotesArray.forEach((note, index) => {
-            const li = document.createElement('li');
-            const btn = document.createElement('button');
-            btn.className = 'note-item-btn';
-            btn.dataset.noteIndex = index;
-            if (index === activeNoteIndex) {
-                btn.classList.add('active');
-            }
-            
-            const titleSpan = document.createElement('span');
-            titleSpan.className = 'note-title-text';
-            titleSpan.textContent = note.title;
-            
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'delete-note-btn toolbar-btn';
-            deleteBtn.title = 'Borrar nota';
-            deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>`;
-            deleteBtn.dataset.noteIndex = index;
-            
-            btn.appendChild(titleSpan);
-            btn.appendChild(deleteBtn);
-            li.appendChild(btn);
-            notesList.appendChild(li);
-        });
-    }
-    
-    saveNoteBtn.addEventListener('click', saveCurrentNote);
-    saveAndCloseNoteBtn.addEventListener('click', () => {
-        saveCurrentNote();
-        hideModal(notesModal);
-    });
-    cancelNoteBtn.addEventListener('click', () => hideModal(notesModal));
-
-    unmarkNoteBtn.addEventListener('click', async () => {
-        const confirmed = await showConfirmation("¿Estás seguro de que quieres borrar todo el contenido de esta nota?");
-        if (confirmed) {
-            notesEditor.innerHTML = '<p><br></p>';
-            saveCurrentNote();
-        }
-    });
-
-    // AI Q&A Modal Listeners
-    askAiBtn.addEventListener('click', () => {
-        if (!API_KEY) {
-            showAlert("La clave de API para Gemini no está configurada. No se puede realizar la pregunta.", "Error de Configuración");
-            return;
-        }
-
-        // Pre-fill with context if possible
-        if(activeNoteIcon) {
-            const parentEl = activeNoteIcon.closest('tr[data-topic-id]');
-            const topicTitle = parentEl ? parentEl.querySelector('.topic-text')?.textContent.trim() : '';
-            const notes = parentEl ? JSON.parse(parentEl.dataset.notes || '[]').map(n => `Title: ${n.title}\nContent:\n${n.content.replace(/<[^>]+>/g, ' ')}`).join('\n\n') : '';
-
-            if (notes.trim()) {
-                 aiQuestionInput.value = `Basado en mis notas sobre "${topicTitle}", responde a la siguiente pregunta: `;
-            }
-        }
-        showModal(aiQaModal);
-        aiQuestionInput.focus();
-    });
-
-    cancelAiQaBtn.addEventListener('click', () => hideModal(aiQaModal));
-    sendAiQaBtn.addEventListener('click', async () => {
-        const question = aiQuestionInput.value.trim();
-        if (!question) return;
-        
-        aiResponseArea.innerHTML = '';
-        aiQaLoader.style.display = 'block';
-        sendAiQaBtn.disabled = true;
-
-        try {
-            const ai = new GoogleGenAI({apiKey: API_KEY});
-
-            // Gather context from all notes
-            let allNotesContext = "CONTEXTO DE NOTAS DEL USUARIO:\n\n";
-            const topicsData = await db.getAll('topics');
-            for(const topic of topicsData) {
-                const notes = topic.notes || [];
-                const hasContent = notes.some(n => n.content && n.content.trim() !== '' && n.content.trim() !== '<p><br></p>');
-                if (hasContent) {
-                    const row = document.querySelector(`tr[data-topic-id="${topic.id}"]`);
-                    const topicTitle = row ? row.querySelector('.topic-text')?.textContent.trim() : 'Sin Título';
-                    allNotesContext += `--- TEMA: ${topicTitle} ---\n`;
-                    notes.forEach(note => {
-                         allNotesContext += `Título de la Nota: ${note.title}\nContenido (HTML): ${note.content}\n\n`;
-                    });
-                }
-            }
-
-            const fullPrompt = `${allNotesContext}\n\nPREGUNTA DEL USUARIO:\n${question}\n\nResponde a la pregunta del usuario en español, basándote únicamente en el contexto proporcionado. Si la respuesta no está en el contexto, indícalo. Formatea la respuesta en HTML simple (usa <p>, <b>, <ul>, <li>).`;
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
-            });
-
-            aiResponseArea.innerHTML = response.text.replace(/\n/g, '<br>');
-
-        } catch (error) {
-            console.error("Gemini API Error:", error);
-            aiResponseArea.innerHTML = `<p class="text-red-500">Ocurrió un error al contactar a la IA. Detalles: ${error.message}</p>`;
-        } finally {
-            aiQaLoader.style.display = 'none';
-            sendAiQaBtn.disabled = false;
-        }
-    });
-
-    // Note Import/Export
-    exportNoteBtn.addEventListener('click', () => {
-        if (activeNoteIndex < 0 || activeNoteIndex >= currentNotesArray.length) return;
-        const note = currentNotesArray[activeNoteIndex];
-        const htmlContent = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${note.title}</title></head><body><h1>${note.title}</h1>${note.content}</body></html>`;
-        const blob = new Blob([htmlContent], { type: 'text/html' });
+    // Import/Export listeners
+    exportBtn.addEventListener('click', () => {
+        const state = getStateObject();
+        const dataStr = JSON.stringify(state);
+        const blob = new Blob([dataStr], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${note.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.html`;
+        a.download = `temario_progreso_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    importBtn.addEventListener('click', () => importFileInput.click());
+    importFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const newState = JSON.parse(event.target.result);
+                    _loadStateFromObject(newState);
+                    updateAllTotals();
+                    filterTable();
+                    saveState(); // Save the newly imported state to DB
+                    showAlert("Progreso importado con éxito.");
+                } catch (error) {
+                    console.error("Error parsing imported file:", error);
+                    showAlert("El archivo importado no es válido.", "Error de Importación");
+                }
+            };
+            reader.readAsText(file);
+        }
+        importFileInput.value = ''; // Reset for next import
+    });
+
+    exportNoteBtn.addEventListener('click', () => {
+        const title = notesModalTitle.textContent || 'Nota';
+        const content = notesEditor.innerHTML;
+        const fullHtml = getStyledExportHtml(content, title);
+        const blob = new Blob([fullHtml], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${title.replace(/ /g, '_')}.html`;
         a.click();
         URL.revokeObjectURL(url);
     });
@@ -1554,257 +1932,87 @@ document.addEventListener('DOMContentLoaded', function () {
     importNoteBtn.addEventListener('click', () => importNoteFileInput.click());
     importNoteFileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            const content = event.target.result;
-            const confirmed = await showConfirmation("¿Estás seguro? El contenido actual del editor será reemplazado.");
-            if (confirmed) {
-                if (file.type === 'text/html') {
-                     const parser = new DOMParser();
-                     const doc = parser.parseFromString(content, 'text/html');
-                     notesEditor.innerHTML = doc.body.innerHTML;
-                } else { // Plain text
-                    notesEditor.innerHTML = `<p>${content.replace(/\n/g, '</p><p>')}</p>`;
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                notesEditor.focus();
+                const currentContent = notesEditor.innerHTML;
+                // Avoid inserting into an empty editor, just replace content
+                if (currentContent === '<p><br></p>' || currentContent.trim() === '') {
+                     document.execCommand('insertHTML', false, event.target.result);
+                } else {
+                     document.execCommand('insertHTML', false, '<hr>' + event.target.result);
                 }
-                saveCurrentNote();
-            }
-        };
-        reader.readAsText(file);
-    });
-
-    // References Modal listeners
-    addReferenceSlotBtn.addEventListener('click', () => {
-        referencesEditor.appendChild(createReferenceSlot());
+            };
+            reader.readAsText(file);
+        }
+        importNoteFileInput.value = '';
     });
     
-    cancelReferencesBtn.addEventListener('click', () => hideModal(referencesModal));
-    
-    saveReferencesBtn.addEventListener('click', () => {
-        const references = [];
-        referencesEditor.querySelectorAll('.reference-slot').forEach(slot => {
-            const icon = slot.querySelector('.icon-display').textContent;
-            const url = slot.querySelector('input[type="url"]').value;
-            if (url && icon) {
-                references.push({ icon, url });
-            }
-        });
-        
-        if (activeReferencesCell) {
-            const row = activeReferencesCell.closest('tr');
-            row.dataset.references = JSON.stringify(references);
-            renderReferencesCell(activeReferencesCell);
-            updateAllTotals();
-            saveState();
-        }
-        
-        hideModal(referencesModal);
-    });
-
-    // Icon picker listeners
-    cancelIconPickerBtn.addEventListener('click', () => hideModal(iconPickerModal));
-
-    iconPickerCategories.addEventListener('click', e => {
-        const btn = e.target.closest('.category-btn');
-        if (!btn) return;
-        iconPickerCategories.querySelector('.active').classList.remove('active');
-        btn.classList.add('active');
-        loadEmojisForCategory(btn.dataset.category);
-    });
-
-    emojiGrid.addEventListener('click', e => {
-        const btn = e.target.closest('.emoji-btn');
-        if (!btn) return;
-
-        if (activeIconPickerButton) {
-            activeIconPickerButton.textContent = btn.dataset.emoji;
-        }
-        hideModal(iconPickerModal);
-    });
-    
-    // Editor Listeners for resize and others
-    notesEditor.addEventListener('click', e => {
-        if (e.target.tagName === 'IMG') {
-            document.querySelectorAll('img.selected-for-resize').forEach(img => img.classList.remove('selected-for-resize'));
-            e.target.classList.add('selected-for-resize');
-            selectedImageForResize = e.target;
-        } else {
-            if (selectedImageForResize) {
-                selectedImageForResize.classList.remove('selected-for-resize');
-                selectedImageForResize = null;
-            }
-        }
-    });
-
-    // Multi-note panel listeners
-    notesPanelToggle.addEventListener('click', () => {
-        notesSidePanel.classList.toggle('open');
-        notesPanelToggle.classList.toggle('open');
-    
-        // Let CSS handle layout transitions via the '.open' class.
-        // The JS was setting styles directly, which caused conflicts and bugs.
-        // The existing CSS rule '#notes-side-panel:not(.open) + #notes-main-content'
-        // correctly handles the padding adjustment for the main content area.
-    });
-
-    addNotePanelBtn.addEventListener('click', () => {
-        const newNote = {
-            id: `note-${Date.now()}`,
-            title: 'Nueva Nota',
-            content: '',
-            lastEdited: new Date().toISOString()
-        };
-        currentNotesArray.push(newNote);
-        activeNoteIndex = currentNotesArray.length - 1;
-        updateNotesList();
-        loadNoteIntoEditor(activeNoteIndex);
-        notesModalTitle.focus();
-        // Select text in contenteditable element
-        const range = document.createRange();
-        range.selectNodeContents(notesModalTitle);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-    });
-
-    notesList.addEventListener('click', async e => {
-        const itemBtn = e.target.closest('.note-item-btn');
-        const deleteBtn = e.target.closest('.delete-note-btn');
-
-        if (deleteBtn) {
-            e.stopPropagation();
-            const indexToDelete = parseInt(deleteBtn.dataset.noteIndex, 10);
-            if (currentNotesArray.length <= 1) {
-                await showAlert("No puedes borrar la última nota.");
-                return;
-            }
-            const confirmed = await showConfirmation("¿Estás seguro de que quieres borrar esta nota? Esta acción no se puede deshacer.");
-            if (confirmed) {
-                currentNotesArray.splice(indexToDelete, 1);
-                if (activeNoteIndex >= indexToDelete) {
-                    activeNoteIndex = Math.max(0, activeNoteIndex - 1);
-                }
-                updateNotesList();
-                loadNoteIntoEditor(activeNoteIndex);
-                saveCurrentNote(); // Persist the deletion
-            }
-        } else if (itemBtn) {
-            saveCurrentNote(); // Save current before switching
-            const newIndex = parseInt(itemBtn.dataset.noteIndex, 10);
-            loadNoteIntoEditor(newIndex);
-        }
-    });
-
-    // Confirmation Modal Logic
+    // Dialog modal buttons
     confirmConfirmationBtn.addEventListener('click', () => {
-        if (resolveConfirmation) resolveConfirmation(true);
+        if(resolveConfirmation) resolveConfirmation(true);
         hideModal(confirmationModal);
     });
     cancelConfirmationBtn.addEventListener('click', () => {
-        if (resolveConfirmation) resolveConfirmation(false);
+        if(resolveConfirmation) resolveConfirmation(false);
         hideModal(confirmationModal);
     });
     okAlertBtn.addEventListener('click', () => hideModal(alertModal));
 
-    // Readonly mode toggle
-    toggleReadOnlyBtn.addEventListener('click', () => {
-        const modalContent = notesModal.querySelector('.notes-modal-content');
-        const isReadonly = modalContent.classList.toggle('readonly-mode');
-        
-        notesEditor.setAttribute('contenteditable', !isReadonly);
-        notesModalTitle.setAttribute('contenteditable', !isReadonly);
+    // Resizer Logic
+    function initResize(modalElement) {
+        let startX, startY, startWidth, startHeight;
 
-        if (isReadonly) {
-            toggleReadOnlyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-off w-5 h-5"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>`;
-            toggleReadOnlyBtn.title = "Desactivar modo lectura";
-        } else {
-            toggleReadOnlyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye w-5 h-5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
-            toggleReadOnlyBtn.title = "Activar modo lectura";
-            notesEditor.focus();
+        function doDrag(e) {
+            modalElement.style.width = (startWidth + e.clientX - startX) + 'px';
+            modalElement.style.height = (startHeight + e.clientY - startY) + 'px';
         }
-    });
 
-    // Note Info Modal Logic
-    noteInfoBtn.addEventListener('click', () => {
-        if (activeNoteIndex < 0 || activeNoteIndex >= currentNotesArray.length) return;
-        const note = currentNotesArray[activeNoteIndex];
-        
-        const plainText = notesEditor.innerText || '';
-        const wordCount = plainText.trim().split(/\s+/).filter(Boolean).length;
-        infoWordCount.textContent = wordCount;
+        function stopDrag() {
+            document.documentElement.removeEventListener('mousemove', doDrag, false);
+            document.documentElement.removeEventListener('mouseup', stopDrag, false);
+        }
 
-        const sizeInBytes = new TextEncoder().encode(note.content).length;
-        infoNoteSize.textContent = formatBytes(sizeInBytes);
-        
-        infoLastEdited.textContent = note.lastEdited ? new Date(note.lastEdited).toLocaleString() : 'N/A';
-
-        showModal(noteInfoModal);
-    });
-    closeNoteInfoBtn.addEventListener('click', () => hideModal(noteInfoModal));
-
-    // --- Resizer Logic ---
-    function initResize(e, resizeFunc) {
-        isResizing = true;
-        document.body.style.cursor = getComputedStyle(e.target).cursor;
-
-        const moveHandler = (moveEvent) => {
-            if (isResizing) {
-                resizeFunc(moveEvent);
-            }
-        };
-
-        const upHandler = () => {
-            isResizing = false;
-            document.body.style.cursor = 'default';
-            document.removeEventListener('mousemove', moveHandler);
-            document.removeEventListener('mouseup', upHandler);
-        };
-
-        document.addEventListener('mousemove', moveHandler);
-        document.addEventListener('mouseup', upHandler);
+        modalElement.querySelector('.resizer-br').addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            startX = e.clientX;
+            startY = e.clientY;
+            startWidth = parseInt(document.defaultView.getComputedStyle(modalElement).width, 10);
+            startHeight = parseInt(document.defaultView.getComputedStyle(modalElement).height, 10);
+            document.documentElement.addEventListener('mousemove', doDrag, false);
+            document.documentElement.addEventListener('mouseup', stopDrag, false);
+        });
     }
     
-    // Resizing for the main modal
-    const notesModalContent = notesModal.querySelector('.notes-modal-content');
-    notesModal.querySelector('.resizer-r').addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        initResize(e, (moveEvent) => {
-            const newWidth = moveEvent.clientX - notesModalContent.getBoundingClientRect().left;
-            notesModalContent.style.width = `${newWidth}px`;
-        });
-    });
-     notesModal.querySelector('.resizer-b').addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        initResize(e, (moveEvent) => {
-            const newHeight = moveEvent.clientY - notesModalContent.getBoundingClientRect().top;
-            notesModalContent.style.height = `${newHeight}px`;
-        });
-    });
-    notesModal.querySelector('.resizer-br').addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        initResize(e, (moveEvent) => {
-            const newWidth = moveEvent.clientX - notesModalContent.getBoundingClientRect().left;
-            const newHeight = moveEvent.clientY - notesModalContent.getBoundingClientRect().top;
-            notesModalContent.style.width = `${newWidth}px`;
-            notesModalContent.style.height = `${newHeight}px`;
-        });
-    });
+    function initPanelResize(panelElement) {
+        let startX, startWidth;
+        
+        function doDragPanel(e) {
+            panelElement.style.width = (startWidth + e.clientX - startX) + 'px';
+        }
+        
+        function stopDragPanel() {
+            document.documentElement.removeEventListener('mousemove', doDragPanel, false);
+            document.documentElement.removeEventListener('mouseup', stopDragPanel, false);
+        }
 
-    // Resizing for the side panel
-    notesSidePanel.querySelector('.resizer-e-panel').addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        initResize(e, (moveEvent) => {
-            const newWidth = moveEvent.clientX - notesSidePanel.getBoundingClientRect().left;
-            if (newWidth > 150 && newWidth < 500) { // Min/Max width
-                notesSidePanel.style.width = `${newWidth}px`;
-                notesPanelToggle.style.left = `${newWidth - 12}px`;
-            }
+        panelElement.querySelector('.resizer-e-panel').addEventListener('mousedown', (e) => {
+             e.preventDefault();
+             startX = e.clientX;
+             startWidth = parseInt(document.defaultView.getComputedStyle(panelElement).width, 10);
+             document.documentElement.addEventListener('mousemove', doDragPanel, false);
+             document.documentElement.addEventListener('mouseup', stopDragPanel, false);
         });
-    });
+    }
 
-    // --- Init App ---
+
+    // --- Initialization ---
+    initResize(notesModal.querySelector('.modal-content'));
+    initPanelResize(notesSidePanel);
     initializeCells();
+    loadState();
     setupEditorToolbar();
     populateIconPicker();
-    loadState();
+    updateSectionHeaderCounts();
 });
