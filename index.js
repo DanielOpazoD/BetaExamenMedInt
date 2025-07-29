@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -560,6 +561,51 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(selectSize);
 
+        // Line height selector
+        const selectLineHeight = document.createElement('select');
+        selectLineHeight.className = 'toolbar-select';
+        selectLineHeight.title = 'Interlineado';
+
+        const lineHeightPlaceholder = document.createElement('option');
+        lineHeightPlaceholder.value = "";
+        lineHeightPlaceholder.textContent = "Interlineado";
+        lineHeightPlaceholder.disabled = true;
+        lineHeightPlaceholder.selected = true;
+        selectLineHeight.appendChild(lineHeightPlaceholder);
+        
+        const orderedLineHeights = {
+            'Grande': '2.0',
+            'Normal': '',
+            'Pequeño': '1.4',
+            'Muy Pequeño': '1.2',
+            'Extremo Pequeño': '1.0'
+        };
+
+        for (const [name, value] of Object.entries(orderedLineHeights)) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = name;
+            selectLineHeight.appendChild(option);
+        }
+
+        selectLineHeight.addEventListener('change', () => {
+            const value = selectLineHeight.value;
+            if (value !== null) {
+                const elements = getSelectedBlockElements();
+                if (elements.length > 0) {
+                    elements.forEach(block => {
+                        if (block && notesEditor.contains(block)) {
+                            block.style.lineHeight = value;
+                        }
+                    });
+                }
+                selectLineHeight.selectedIndex = 0; // Reset to placeholder
+                notesEditor.focus();
+            }
+        });
+        editorToolbar.appendChild(selectLineHeight);
+
+
         editorToolbar.appendChild(createSeparator());
 
         // Basic formatting
@@ -591,7 +637,18 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             elements.forEach(block => {
                 if (block && notesEditor.contains(block)) {
-                    block.style.backgroundColor = color === 'transparent' ? '' : color;
+                    if (color === 'transparent') {
+                        block.style.backgroundColor = '';
+                        block.style.borderRadius = '';
+                        block.style.paddingLeft = '';
+                        block.style.paddingRight = '';
+
+                    } else {
+                        block.style.backgroundColor = color;
+                        block.style.borderRadius = '6px';
+                        block.style.paddingLeft = '6px';
+                        block.style.paddingRight = '6px';
+                    }
                 }
             });
         };
@@ -607,6 +664,60 @@ document.addEventListener('DOMContentLoaded', function () {
         
         const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
         editorToolbar.appendChild(lineHighlightPalette);
+
+        const applyBlockVerticalPadding = (level) => {
+            const paddingValues = [0, 2, 4, 6, 8, 10];
+            const padding = paddingValues[level] || 0;
+            const blocks = getSelectedBlockElements();
+            blocks.forEach(block => {
+                if (block && notesEditor.contains(block)) {
+                    block.style.paddingTop = `${padding}px`;
+                    block.style.paddingBottom = `${padding}px`;
+                }
+            });
+        };
+        
+        const createHighlightSizeDropdown = () => {
+            const dropdown = document.createElement('div');
+            dropdown.className = 'symbol-dropdown';
+    
+            const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up-down w-4 h-4"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>`;
+            const btn = createButton('Ajustar altura de destacado', iconSVG, null, null, null);
+            dropdown.appendChild(btn);
+    
+            const content = document.createElement('div');
+            content.className = 'symbol-dropdown-content flex-dropdown';
+            content.style.minWidth = '60px';
+    
+            const sizes = { 'N': 0, '+1': 1, '+2': 2, '+3': 3, '+4': 4, '+5': 5 };
+    
+            for (const [name, value] of Object.entries(sizes)) {
+                const sizeBtn = document.createElement('button');
+                sizeBtn.className = 'toolbar-btn';
+                sizeBtn.textContent = name;
+                sizeBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    applyBlockVerticalPadding(value);
+                    content.classList.remove('visible');
+                    notesEditor.focus();
+                });
+                content.appendChild(sizeBtn);
+            }
+            dropdown.appendChild(content);
+    
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                    if (d !== content) d.classList.remove('visible');
+                });
+                content.classList.toggle('visible');
+            });
+    
+            return dropdown;
+        };
+        
+        editorToolbar.appendChild(createHighlightSizeDropdown());
 
         const hrBtn = createButton('Insertar línea separadora', '—', 'insertHorizontalRule');
         editorToolbar.appendChild(hrBtn);
