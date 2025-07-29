@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="es" data-theme="default" data-icon-style="solid">
 <head>
@@ -6,502 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Temario para Examen Final de Medicina Interna</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        :root {
-            --progress-ring-radius: 16;
-            --progress-ring-circumference: calc(2 * 3.14159 * var(--progress-ring-radius));
-            
-            --bg-primary: #f8fafc; --bg-secondary: #ffffff; --bg-tertiary: #f1f5f9;
-            --text-primary: #1f2937; --text-secondary: #475569; --text-muted: #6b7280;
-            --border-color: #e5e7eb;
-            --header-bg: #38bdf8; --header-text: #fff;
-            --section-header-bg: linear-gradient(to right, #e0f2fe, #bae6fd);
-            --section-header-text: #0c4a6e;
-            --modal-bg: #ffffff; --modal-text: #1f2937;
-            --btn-primary-bg: #3b82f6; --btn-primary-text: #ffffff;
-            --filled-bg: #dcfce7; --filled-text: #166534;
-            --not-done-bg: #fee2e2; --not-done-text: #991b1b;
-            --lectura-filled-bg: #fef9c3; --lectura-filled-text: #854d0e;
-        }
-        html.dark { 
-            color-scheme: dark;
-            --bg-primary: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155;
-            --text-primary: #cbd5e1; --text-secondary: #94a3b8; --text-muted: #64748b;
-            --border-color: #334155;
-            --header-bg: #0369a1; --header-text: #fff;
-            --section-header-bg: linear-gradient(to right, #0c4a6e, #075985);
-            --section-header-text: #e0f2fe;
-            --modal-bg: #1e293b; --modal-text: #e2e8f0;
-            --btn-primary-bg: #2563eb; --btn-primary-text: #ffffff;
-            --filled-bg: #14532d; --filled-text: #bbf7d0;
-            --not-done-bg: #7f1d1d; --not-done-text: #fca5a5;
-            --lectura-filled-bg: #713f12; --lectura-filled-text: #fde047;
-        }
-        html[data-theme="ocean"] {
-            --header-bg: #164e63;
-            --section-header-bg: linear-gradient(to right, #0e7490, #164e63);
-            --section-header-text: #ecfeff;
-            --btn-primary-bg: #0891b2;
-        }
-        html[data-theme="ocean"].dark {
-            --header-bg: #155e75;
-            --section-header-bg: linear-gradient(to right, #164e63, #155e75);
-        }
-        html[data-theme="forest"] {
-            --header-bg: #166534;
-            --section-header-bg: linear-gradient(to right, #15803d, #166534);
-            --section-header-text: #f0fdf4;
-            --btn-primary-bg: #16a34a;
-        }
-        html[data-theme="forest"].dark {
-            --header-bg: #14532d;
-            --section-header-bg: linear-gradient(to right, #166534, #14532d);
-        }
-        html[data-theme="minimalist"] {
-            --header-bg: #4b5563;
-            --section-header-bg: linear-gradient(to right, #f3f4f6, #e5e7eb);
-            --section-header-text: #1f2937;
-            --btn-primary-bg: #374151;
-        }
-        html[data-theme="minimalist"].dark {
-            --header-bg: #374151;
-            --section-header-bg: linear-gradient(to right, #374151, #1f2937);
-            --section-header-text: #f3f4f6;
-        }
-
-
-        body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); }
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        
-        .fillable-cell, .lectura-cell { cursor: pointer; user-select: none; transition: background-color 0.2s; position: relative; text-align: center; }
-        .fillable-cell.filled { background-color: var(--filled-bg); }
-        .fillable-cell.not-done { background-color: var(--not-done-bg); }
-        .lectura-cell.lectura-filled { background-color: var(--lectura-filled-bg); }
-        
-        .lectura-counter {
-            font-weight: bold;
-            font-size: 1.1em;
-            min-width: 24px;
-            padding: 2px 4px;
-            border-radius: 4px;
-            color: var(--text-secondary);
-        }
-        .lectura-cell.lectura-filled .lectura-counter {
-            color: var(--lectura-filled-text);
-        }
-
-        .section-header-row td { background: var(--section-header-bg); color: var(--section-header-text); cursor: pointer; }
-        .section-header-row .chevron-icon { transition: transform 0.2s ease-in-out; }
-        .section-header-row.collapsed .chevron-icon { transform: rotate(-90deg); }
-        
-        .section-total-row td { background-color: var(--bg-tertiary); font-weight: bold; color: var(--text-secondary); }
-        .section-total-row .total-section-label { font-size: 0.75rem; }
-
-        .grand-total-row td { font-size: 0.75rem; }
-        
-        thead th { position: sticky; top: 0; z-index: 20; background-color: var(--header-bg); color: var(--header-text); }
-        
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease; }
-        .modal-overlay.visible { opacity: 1; visibility: visible; }
-        
-        .modal-content { background: var(--modal-bg); color: var(--modal-text); padding: 1.5rem; border-radius: 0.5rem; width: 95%; box-shadow: 0 5px 15px rgba(0,0,0,0.3); transform: translateY(-20px); transition: transform 0.3s ease; display: flex; flex-direction: column; }
-        .modal-overlay.visible .modal-content { transform: translateY(0); }
-        
-        .notes-modal-content { max-width: 900px; height: 95vh; max-height: 95vh; padding: 0; }
-        
-        .note-icon, .link-anchor, .edit-link-icon, .print-section-btn, .export-section-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; transition: background-color 0.2s, color 0.2s, opacity 0.2s, filter 0.2s; cursor: pointer; }
-        .note-icon:hover, .link-anchor:hover, .edit-link-icon:hover, .print-section-btn:hover, .export-section-btn:hover { background-color: rgba(0,0,0,0.1); }
-        
-        .link-icon { width: 1.1em; height: 1.1em; }
-        .note-icon svg, .print-section-btn, .export-section-btn { width: 1.1em; height: 1.1em; }
-        .note-icon.blue-icon { color: #3b82f6; }
-        .note-icon.section-note-icon, .print-section-btn, .export-section-btn { color: var(--section-header-text); opacity: 0.8; }
-        
-        .note-icon.has-note {
-            background-color: var(--btn-primary-bg);
-            color: var(--btn-primary-text);
-        }
-        .note-icon.has-note:hover {
-             background-color: var(--btn-primary-bg);
-             filter: brightness(1.15);
-        }
-        
-        .confidence-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #d1d5db; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; }
-        html.dark .confidence-dot { border-color: #4b5563; }
-        .confidence-dot:hover { border-color: #9ca3af; }
-        .confidence-dot[data-confidence-level="1"] { background-color: #4ade80; border-color: #16a34a; }
-        .confidence-dot[data-confidence-level="2"] { background-color: #facc15; border-color: #ca8a04; }
-        .confidence-dot[data-confidence-level="3"] { background-color: #f87171; border-color: #dc2626; }
-
-        .editor-toolbar {
-            border: 1px solid var(--border-color);
-            border-bottom: none;
-            padding: 2px;
-            background-color: var(--bg-primary);
-            border-top-left-radius: 0.5rem;
-            border-top-right-radius: 0.5rem;
-            display: flex;
-            flex-wrap: wrap; 
-            align-items: center;
-            gap: 2px;
-        }
-        #notes-editor { border: 1px solid var(--border-color); padding: 12px; flex-grow: 1; overflow-y: auto; border-bottom-left-radius: 0.5rem; border-bottom-right-radius: 0.5rem; line-height: 1.6; background-color: var(--bg-secondary); }
-        #notes-editor:focus { outline: none; }
-        #notes-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; cursor: pointer; }
-        #notes-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
-        
-        #notes-editor details {
-            border: 1px solid var(--border-color);
-            border-radius: 0.5rem;
-            padding: 0.5rem;
-            margin: 1rem 0;
-            background-color: var(--bg-tertiary);
-            transition: background-color 0.2s;
-        }
-        #notes-editor summary {
-            font-weight: 600;
-            cursor: pointer;
-            padding: 0.25rem;
-            outline: none;
-            user-select: none;
-        }
-        #notes-editor summary::marker {
-            color: var(--btn-primary-bg);
-        }
-        
-        .progress-ring-circle { transition: stroke-dashoffset 0.5s ease-out; }
-        
-        #icon-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 1rem; max-height: 300px; overflow-y: auto; padding: 1rem 0; }
-        .icon-picker-item { cursor: pointer; padding: 8px; border-radius: 8px; transition: background-color 0.2s; }
-        .icon-picker-item:hover { background-color: var(--bg-tertiary); }
-        .icon-picker-item svg { width: 32px; height: 32px; margin: auto; }
-
-        .notes-modal-content.readonly-mode .editor-toolbar { display: none; }
-        .notes-modal-content.readonly-mode #notes-modal-actions { display: none; }
-        .notes-modal-content.readonly-mode #add-note-panel-btn { display: none; }
-        .notes-modal-content.readonly-mode .delete-note-btn { display: none; }
-        .notes-modal-content.readonly-mode #notes-modal-title { pointer-events: none; }
-
-
-        /* Icon Styles */
-        html[data-icon-style="solid"] .outline-icon { display: none; }
-        html[data-icon-style="outline"] .solid-icon { display: none; }
-        html[data-icon-style="outline"] .outline-icon { display: inline-block; }
-
-        /* Toolbar styles */
-        .toolbar-separator {
-            border-left: 1px solid var(--border-color);
-            height: 20px;
-            margin: 0 2px;
-        }
-        .toolbar-btn {
-            background: none;
-            border: none;
-            padding: 2px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            line-height: 1;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 26px;
-            min-height: 26px;
-        }
-        .toolbar-btn:hover { background-color: var(--bg-tertiary); }
-        .toolbar-select {
-            font-size: 12px;
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            padding: 2px 3px;
-            margin-right: 2px;
-            height: 26px;
-        }
-
-        .color-palette-group {
-            position: relative;
-            display: inline-flex;
-            align-items: center;
-            border: 1px solid var(--border-color);
-            border-radius: 5px;
-            padding: 1px;
-            margin: 0 1px;
-            gap: 1px;
-        }
-        .color-swatch {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            cursor: pointer;
-            border: 1px solid rgba(0,0,0,0.2);
-            transition: transform 0.1s;
-            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
-        }
-        .color-swatch:hover { transform: scale(1.15); }
-        .other-colors-btn { font-size: 12px; }
-
-        .color-submenu { display: none; position: absolute; top: 110%; left: 0; background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 8px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 1010; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 180px; }
-        .color-submenu.visible { display: grid; }
-
-        .symbol-dropdown { position: relative; display: inline-block; }
-        .symbol-dropdown-content { display: none; position: absolute; right: 0; background-color: var(--bg-secondary); min-width: 280px; max-height: 200px; overflow-y: auto; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 10; border-radius: 8px; border: 1px solid var(--border-color); padding: 8px; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 4px; }
-        .symbol-dropdown-content.visible { display: grid; }
-        .symbol-btn {
-            font-size: 18px;
-            text-align: center;
-            font-family: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Symbol", sans-serif;
-        }
-
-        /* Top-right icon size reduction */
-        #notes-main-content .flex .toolbar-btn {
-            font-size: 1.1rem; /* Reduced */
-            min-width: 28px;
-            min-height: 28px;
-        }
-
-        #notes-modal-actions {
-            padding: 0.5rem; 
-            border-t: 1px solid var(--border-color);
-        }
-        #add-note-panel-btn, #notes-modal-actions button {
-            padding: 0.5rem 0.75rem;
-            font-size: 0.8rem; /* standard sm size */
-        }
-        #unmark-note-btn {
-            font-size: 1.1rem; /* Reduced */
-            padding: 4px;
-        }
-        
-        /* --- Multi-note Panel Styles --- */
-        #notes-panel-toggle {
-            position: absolute;
-            top: 1rem;
-            left: 0.75rem;
-            z-index: 20;
-            transition: transform 0.3s ease-in-out, left 0.3s ease-in-out;
-        }
-        #notes-panel-toggle.open {
-            transform: rotate(180deg);
-        }
-
-        #notes-side-panel {
-            width: 220px;
-            flex-shrink: 0;
-            margin-left: 0;
-            border-right: 1px solid var(--border-color);
-            transition: margin-left 0.3s ease-in-out;
-            position: relative;
-        }
-        #notes-side-panel:not(.open) {
-            margin-left: -220px;
-        }
-
-        #notes-side-panel h3 {
-            padding: 10px 8px;
-            font-size: 0.65rem;
-            font-weight: 500;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.075em;
-        }
-
-        #notes-modal-counter {
-            font-size: 0.8rem;
-        }
-
-        #notes-main-content {
-            padding: 1rem 1rem 1rem 0;
-            flex-grow: 1;
-            transition: all 0.3s ease-in-out;
-            position: relative;
-        }
-        
-        #notes-side-panel:not(.open) + #notes-main-content {
-            padding-left: 1rem; /* Add padding for symmetry when panel is closed */
-        }
-
-        #notes-list .note-item-btn {
-            display: flex;
-            align-items: center;
-            width: 100%;
-            padding: 4px 8px;
-            border-radius: 6px;
-            text-align: left;
-            background-color: transparent;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            border: 1px solid transparent;
-            font-size: 0.75rem;
-        }
-         #notes-list .note-item-btn:hover {
-            background-color: var(--border-color);
-         }
-        #notes-list .note-item-btn.active {
-            background-color: var(--btn-primary-bg);
-            color: var(--btn-primary-text);
-            font-weight: 600;
-        }
-        #notes-list .note-title-text {
-            flex-grow: 1;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        #notes-list .delete-note-btn {
-            flex-shrink: 0;
-            visibility: hidden;
-            opacity: 0;
-            transition: opacity 0.2s;
-            margin-left: 8px;
-            color: var(--text-muted);
-        }
-        #notes-list li:hover .delete-note-btn {
-            visibility: visible;
-            opacity: 0.7;
-        }
-        #notes-list li:hover .delete-note-btn:hover {
-             opacity: 1;
-             color: #ef4444; /* red-500 */
-         }
-         #notes-list li .note-item-btn.active .delete-note-btn {
-            color: var(--btn-primary-text);
-         }
-
-
-        /* --- REFERENCES STYLES --- */
-        .references-cell {
-            cursor: pointer;
-            text-align: center;
-            vertical-align: middle;
-        }
-        .references-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem; /* 8px */
-            min-height: 28px; /* Ensure clickable area */
-            padding: 2px 0;
-        }
-        .reference-icon-link {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            transition: all 0.2s;
-            color: var(--text-secondary);
-            background-color: var(--bg-tertiary);
-            text-decoration: none;
-            font-size: 1.25rem;
-        }
-        .reference-icon-link:hover {
-            transform: scale(1.15);
-            background-color: var(--btn-primary-bg);
-            color: var(--btn-primary-text);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .add-reference-icon {
-             color: var(--text-muted);
-             opacity: 0.6;
-        }
-        .references-cell:hover .add-reference-icon {
-            background-color: var(--bg-tertiary);
-            color: var(--text-primary);
-            opacity: 1;
-            transform: scale(1.1);
-        }
-        
-        #emoji-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-            gap: 0.5rem;
-            padding: 0.5rem;
-        }
-
-        .emoji-btn {
-            font-size: 1.5rem; /* 24px */
-            padding: 0.5rem;
-            border-radius: 0.5rem; /* 8px */
-            transition: background-color 0.2s;
-            text-align: center;
-            font-family: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Symbol", sans-serif;
-        }
-        .emoji-btn:hover {
-             background-color: var(--bg-tertiary);
-        }
-
-        .category-btn {
-             padding: 0.25rem 0.75rem;
-             border-radius: 9999px;
-             font-size: 0.875rem;
-             font-weight: 500;
-             transition: all 0.2s;
-             border: 1px solid transparent;
-        }
-        .category-btn.active {
-            background-color: var(--btn-primary-bg);
-            color: var(--btn-primary-text);
-            border-color: var(--btn-primary-bg);
-        }
-        .category-btn:not(.active) {
-            background-color: var(--bg-tertiary);
-            color: var(--text-secondary);
-        }
-         .category-btn:not(.active):hover {
-            background-color: var(--border-color);
-         }
-         
-        /* --- RESIZER STYLES --- */
-        .resizer {
-            position: absolute;
-            background: transparent;
-            z-index: 10;
-        }
-        .resizer.resizer-r {
-            top: 0; right: -2px; width: 5px; bottom: 0; cursor: ew-resize;
-        }
-        .resizer.resizer-b {
-            left: 0; bottom: -2px; height: 5px; right: 0; cursor: ns-resize;
-        }
-        .resizer.resizer-br {
-            bottom: -2px; right: -2px; width: 10px; height: 10px; cursor: se-resize;
-        }
-        .resizer.resizer-e-panel {
-             top: 0; right: -2px; width: 5px; bottom: 0; cursor: ew-resize;
-        }
-
-        /* --- GALLERY LINK STYLES --- */
-        .gallery-link {
-            cursor: pointer;
-        }
-        
-        .gallery-url-input {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem; /* 8px */
-        }
-
-        /* --- LIGHTBOX STYLES --- */
-        #image-lightbox-modal {
-            background-color: rgba(0,0,0,0.85); /* Darker overlay for lightbox */
-            z-index: 1050; /* Above other modals */
-        }
-        #image-lightbox-content button {
-            transition: opacity 0.2s;
-            opacity: 0.7;
-        }
-        #image-lightbox-content button:hover {
-            opacity: 1;
-        }
-
-        @media print {
-            body, html { background-color: white !important; color: black !important; }
-            body > *:not(#print-area) { display: none !important; }
-            #print-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; }
-        }
-    </style>
+    <link rel="stylesheet" href="index.css">
 <script type="importmap">
 {
   "imports": {
@@ -589,7 +95,7 @@
                         </tr>
 
                         <!-- SECCIÓN CARDIOVASCULAR -->
-                        <tr class="section-header-row" data-section-header="cardio"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">I. TEMAS CARDIOVASCULARES</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="export-section-btn toolbar-btn" title="Exportar sección con índice"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M12 13V7"/><path d="m9 10 3 3 3-3"/></svg></button><button class="print-section-btn toolbar-btn" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
+                        <tr class="section-header-row" data-section-header="cardio"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">I. TEMAS CARDIOVASCULARES</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="print-section-btn toolbar-btn no-print" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
                         <tr data-section="cardio" data-topic-id="topic-1"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">1</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Insuficiencia Cardíaca: Fisiopatología y tratamiento</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="cardio" class="bg-gray-50 dark:bg-slate-900" data-topic-id="topic-2"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">2</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Edema Pulmonar Agudo cardiogénico</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="cardio" data-topic-id="topic-3"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">3</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Hipertensión Arterial</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
@@ -610,7 +116,7 @@
                         <tr class="section-total-row" id="total-row-cardio"><td colspan="2" class="px-2 py-1 border border-border-color text-right font-bold total-section-label">Total Sección:</td><td class="px-2 py-1 border border-border-color text-center">-</td><td class="px-2 py-1 border border-border-color text-center">0</td></tr>
 
                         <!-- SECCIÓN NEUMOLÓGICOS -->
-                        <tr class="section-header-row" data-section-header="neumo"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">II. TEMAS NEUMOLÓGICOS</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="export-section-btn toolbar-btn" title="Exportar sección con índice"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M12 13V7"/><path d="m9 10 3 3 3-3"/></svg></button><button class="print-section-btn toolbar-btn" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
+                        <tr class="section-header-row" data-section-header="neumo"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">II. TEMAS NEUMOLÓGICOS</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="print-section-btn toolbar-btn no-print" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
                         <tr data-section="neumo" data-topic-id="topic-18"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">18</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Edema pulmonar no cardiogénico (SDRA)</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="neumo" class="bg-gray-50 dark:bg-slate-900" data-topic-id="topic-19"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">19</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Hemoptisis</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="neumo" data-topic-id="topic-20"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">20</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Dolor toráxico: Diagnóstico diferencial</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
@@ -625,7 +131,7 @@
                         <tr class="section-total-row" id="total-row-neumo"><td colspan="2" class="px-2 py-1 border border-border-color text-right font-bold total-section-label">Total Sección:</td><td class="px-2 py-1 border border-border-color text-center">-</td><td class="px-2 py-1 border border-border-color text-center">0</td></tr>
                         
                         <!-- SECCIÓN NEFROLÓGICOS -->
-                        <tr class="section-header-row" data-section-header="nefro"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">III. TEMAS NEFROLÓGICOS Y ALTERACIONES HIDROELECTROLÍTICAS</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="export-section-btn toolbar-btn" title="Exportar sección con índice"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M12 13V7"/><path d="m9 10 3 3 3-3"/></svg></button><button class="print-section-btn toolbar-btn" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
+                        <tr class="section-header-row" data-section-header="nefro"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">III. TEMAS NEFROLÓGICOS Y ALTERACIONES HIDROELECTROLÍTICAS</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="print-section-btn toolbar-btn no-print" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
                         <tr data-section="nefro" data-topic-id="topic-29"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">29</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Injuria renal aguda (AKI)</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="nefro" class="bg-gray-50 dark:bg-slate-900" data-topic-id="topic-30"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">30</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Insuficiencia renal crónica: Etiología y tratamiento</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="nefro" data-topic-id="topic-31"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">31</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Glomerulonefritis aguda</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
@@ -639,7 +145,7 @@
                         <tr class="section-total-row" id="total-row-nefro"><td colspan="2" class="px-2 py-1 border border-border-color text-right font-bold total-section-label">Total Sección:</td><td class="px-2 py-1 border border-border-color text-center">-</td><td class="px-2 py-1 border border-border-color text-center">0</td></tr>
 
                         <!-- SECCIÓN DIGESTIVOS -->
-                        <tr class="section-header-row" data-section-header="digestivo"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">IV. TEMAS DIGESTIVOS</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="export-section-btn toolbar-btn" title="Exportar sección con índice"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M12 13V7"/><path d="m9 10 3 3 3-3"/></svg></button><button class="print-section-btn toolbar-btn" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
+                        <tr class="section-header-row" data-section-header="digestivo"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">IV. TEMAS DIGESTIVOS</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="print-section-btn toolbar-btn no-print" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
                         <tr data-section="digestivo" data-topic-id="topic-39"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">39</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Reflujo gastroesofágico</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="digestivo" class="bg-gray-50 dark:bg-slate-900" data-topic-id="topic-40"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">40</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Hemorragia digestiva alta</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="digestivo" data-topic-id="topic-41"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">41</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Hemorragia digestiva baja</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
@@ -655,7 +161,7 @@
                         <tr class="section-total-row" id="total-row-digestivo"><td colspan="2" class="px-2 py-1 border border-border-color text-right font-bold total-section-label">Total Sección:</td><td class="px-2 py-1 border border-border-color text-center">-</td><td class="px-2 py-1 border border-border-color text-center">0</td></tr>
                         
                         <!-- SECCIÓN METABOLISMO -->
-                        <tr class="section-header-row" data-section-header="metabolismo"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">V. TEMAS DE METABOLISMO, NUTRICIÓN Y ENDOCRINOLOGÍA</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="export-section-btn toolbar-btn" title="Exportar sección con índice"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M12 13V7"/><path d="m9 10 3 3 3-3"/></svg></button><button class="print-section-btn toolbar-btn" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
+                        <tr class="section-header-row" data-section-header="metabolismo"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">V. TEMAS DE METABOLISMO, NUTRICIÓN Y ENDOCRINOLOGÍA</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="print-section-btn toolbar-btn no-print" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
                         <tr data-section="metabolismo" data-topic-id="topic-51"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">51</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Síndrome metabólico</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="metabolismo" class="bg-gray-50 dark:bg-slate-900" data-topic-id="topic-52"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">52</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Diabetes Mellitus tipo II</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="metabolismo" data-topic-id="topic-53"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">53</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Nefropatía diabética</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
@@ -668,7 +174,7 @@
                         <tr class="section-total-row" id="total-row-metabolismo"><td colspan="2" class="px-2 py-1 border border-border-color text-right font-bold total-section-label">Total Sección:</td><td class="px-2 py-1 border border-border-color text-center">-</td><td class="px-2 py-1 border border-border-color text-center">0</td></tr>
 
                         <!-- SECCIÓN HEMATOLÓGICOS -->
-                        <tr class="section-header-row" data-section-header="hemato"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">VI. TEMAS HEMATOLÓGICOS</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="export-section-btn toolbar-btn" title="Exportar sección con índice"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M12 13V7"/><path d="m9 10 3 3 3-3"/></svg></button><button class="print-section-btn toolbar-btn" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
+                        <tr class="section-header-row" data-section-header="hemato"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">VI. TEMAS HEMATOLÓGICOS</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="print-section-btn toolbar-btn no-print" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
                         <tr data-section="hemato" data-topic-id="topic-60"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">60</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Anemia ferropriva: Diagnóstico y tratamiento</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="hemato" class="bg-gray-50 dark:bg-slate-900" data-topic-id="topic-61"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">61</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Anemia megaloblástica: Diagnóstico y tratamiento</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="hemato" data-topic-id="topic-62"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">62</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Linfomas no Hodgkin: Diagnóstico y tratamiento</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
@@ -677,7 +183,7 @@
                         <tr class="section-total-row" id="total-row-hemato"><td colspan="2" class="px-2 py-1 border border-border-color text-right font-bold total-section-label">Total Sección:</td><td class="px-2 py-1 border border-border-color text-center">-</td><td class="px-2 py-1 border border-border-color text-center">0</td></tr>
 
                         <!-- SECCIÓN NEUROLÓGICOS -->
-                        <tr class="section-header-row" data-section-header="neuro"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">VII. TEMAS NEUROLÓGICOS</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="export-section-btn toolbar-btn" title="Exportar sección con índice"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M12 13V7"/><path d="m9 10 3 3 3-3"/></svg></button><button class="print-section-btn toolbar-btn" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
+                        <tr class="section-header-row" data-section-header="neuro"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">VII. TEMAS NEUROLÓGICOS</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="print-section-btn toolbar-btn no-print" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
                         <tr data-section="neuro" data-topic-id="topic-65"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">65</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Demencia: Etiología</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="neuro" class="bg-gray-50 dark:bg-slate-900" data-topic-id="topic-66"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">66</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Síncope: Diagnóstico diferencial</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="neuro" data-topic-id="topic-67"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">67</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Coma: Diagnóstico diferencial</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
@@ -687,7 +193,7 @@
                         <tr class="section-total-row" id="total-row-neuro"><td colspan="2" class="px-2 py-1 border border-border-color text-right font-bold total-section-label">Total Sección:</td><td class="px-2 py-1 border border-border-color text-center">-</td><td class="px-2 py-1 border border-border-color text-center">0</td></tr>
 
                         <!-- SECCIÓN REUMATOLOGÍA -->
-                        <tr class="section-header-row" data-section-header="reumato"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">VIII. REUMATOLOGÍA</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="export-section-btn toolbar-btn" title="Exportar sección con índice"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M12 13V7"/><path d="m9 10 3 3 3-3"/></svg></button><button class="print-section-btn toolbar-btn" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
+                        <tr class="section-header-row" data-section-header="reumato"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">VIII. REUMATOLOGÍA</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="print-section-btn toolbar-btn no-print" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
                         <tr data-section="reumato" data-topic-id="topic-71"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">71</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Osteoporosis: Diagnóstico y tratamiento</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="reumato" class="bg-gray-50 dark:bg-slate-900" data-topic-id="topic-72"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">72</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Lupus Eritematoso Sistémico: Diagnóstico y tratamiento</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="reumato" data-topic-id="topic-73"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">73</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Artritis Reumatoidea: Diagnóstico y tratamiento</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
@@ -696,7 +202,7 @@
                         <tr class="section-total-row" id="total-row-reumato"><td colspan="2" class="px-2 py-1 border border-border-color text-right font-bold total-section-label">Total Sección:</td><td class="px-2 py-1 border border-border-color text-center">-</td><td class="px-2 py-1 border border-border-color text-center">0</td></tr>
 
                         <!-- SECCIÓN INFECTOLÓGICOS -->
-                        <tr class="section-header-row" data-section-header="infecto"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">IX. TEMAS DE ENFERMEDADES INFECCIOSAS Y PARASITARIAS</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="export-section-btn toolbar-btn" title="Exportar sección con índice"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M12 13V7"/><path d="m9 10 3 3 3-3"/></svg></button><button class="print-section-btn toolbar-btn" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
+                        <tr class="section-header-row" data-section-header="infecto"><td colspan="4" class="px-2 py-1 font-bold border border-border-color"><div class="flex justify-between items-center w-full"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block chevron-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="text-xl">📁</span><span class="section-title">IX. TEMAS DE ENFERMEDADES INFECCIOSAS Y PARASITARIAS</span><span class="section-count text-gray-500 dark:text-gray-400 font-medium ml-2"></span></div><div class="flex items-center gap-2"><button class="print-section-btn toolbar-btn no-print" title="Imprimir notas de la sección">🖨️</button><span class="note-icon section-note-icon" data-note-type="section"><svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg><svg class="outline-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></span></div></div></td></tr>
                         <tr data-section="infecto" data-topic-id="topic-76"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">76</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Herpes Zóster: Diagnóstico y tratamiento</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="infecto" class="bg-gray-50 dark:bg-slate-900" data-topic-id="topic-77"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">77</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Mononucloeosis Infecciosa: Diagnóstico y tratamiento</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
                         <tr data-section="infecto" data-topic-id="topic-78"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 text-center">78</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">VIH/SIDA</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 references-cell" data-col="references"></td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 lectura-cell" data-col="lectura"></td></tr>
@@ -879,7 +385,7 @@
             </div>
             <button id="add-gallery-image-url-btn" class="mt-3 px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
-                Añadir URL
+                Añadir Imagen
             </button>
             <div class="flex justify-end items-center gap-2 mt-6 pt-4 border-t border-border-color">
                 <button id="cancel-gallery-link-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cancelar</button>
@@ -908,6 +414,24 @@
             <div class="flex justify-end items-center gap-2">
                 <button id="ok-alert-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Aceptar</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Post-it Note Modal -->
+    <div id="postit-note-modal" class="modal-overlay no-print">
+        <div id="postit-note-content" class="relative w-72 h-72 p-4 pt-8 flex flex-col font-mono shadow-xl rounded-sm" style="background-color: #fefabc;">
+            <div class="absolute top-1 right-1 flex items-center gap-1">
+                <button id="save-postit-icon-btn" class="p-1 rounded-full text-gray-600 hover:bg-black/10 transition-colors" title="Guardar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-save w-4 h-4"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                </button>
+                <button id="delete-postit-icon-btn" class="p-1 rounded-full text-gray-600 hover:bg-black/10 transition-colors" title="Borrar">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2 w-4 h-4"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                </button>
+                <button id="close-postit-icon-btn" class="p-1 rounded-full text-gray-600 hover:bg-black/10 transition-colors" title="Salir">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x w-4 h-4"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </div>
+            <textarea id="postit-note-textarea" class="w-full h-full bg-transparent border-none focus:outline-none resize-none text-gray-800" placeholder="Escribe tu nota..."></textarea>
         </div>
     </div>
 
