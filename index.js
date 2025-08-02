@@ -9,26 +9,12 @@ import { GoogleGenAI } from "@google/genai";
 // inline IndexedDB implementation and keeps the rest of the code unchanged.
 import db from './db.js';
 
-// Pull the API key from environment variables.  In a browser build (e.g. Vite
-// or Netlify), environment variables are exposed via `import.meta.env` and
-// must be prefixed with `VITE_`.  In a Node environment (for local
-// development) `process.env` can still be used.  We try both locations and
-// fall back to an empty string if nothing is defined.
-const API_KEY = (() => {
-  // Prefer Vite-style environment variables in the browser.  These are
-  // statically replaced at build time when prefixed with `VITE_`.
-  if (typeof import.meta !== 'undefined' && import.meta.env &&
-      (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY)) {
-    return import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY;
-  }
-  // Fallback to Node process.env for local builds or SSR.
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env.VITE_GEMINI_API_KEY || process.env.VITE_API_KEY || process.env.API_KEY || '';
-  }
-  // Ultimately return an empty string if no key is present.  This will cause
-  // calls to the AI service to fail gracefully and display an error message.
-  return '';
-})();
+// API Key for Google Gemini.  For simplicity and to avoid relying on build
+// environment variables, insert your key directly here.  Replace the
+// placeholder string below with your actual Gemini API key.  Note: embedding
+// secrets in client-side code exposes them to anyone who can view your
+// website, so only use this approach in personal or non-sensitive projects.
+const API_KEY = 'AIzaSyA9-VXmB8QyNS_wt5WclUlMVfXgbPuaLj4';
 
 // --- IndexedDB Helper ---
 // NOTE: The IndexedDB helper has been moved into db.js.  The following
