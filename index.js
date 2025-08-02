@@ -2485,6 +2485,13 @@ document.addEventListener('DOMContentLoaded', function () {
     let startWidth = 0;
     let resizingTable = null;
 
+    // Variables used during row resizing
+    let currentRow = null;
+    let startY = 0;
+    let startHeight = 0;
+    let rowResizing = false;
+    let rowTable = null;
+
     /**
      * Initialize column resizing for a given table. Adds resizer handles to the first row
      * of the table. Only applies if the table does not already have resizer handles.
@@ -2504,6 +2511,33 @@ document.addEventListener('DOMContentLoaded', function () {
             resizer.addEventListener('mousedown', startResize);
             cell.appendChild(resizer);
         }
+
+        // Row resizing detection
+        table.addEventListener('mousemove', (e) => {
+            if (currentResizer || rowResizing) return;
+            const row = e.target.closest('tr');
+            if (!row || !table.contains(row)) return;
+            const rect = row.getBoundingClientRect();
+            if (rect.bottom - e.clientY < 4) {
+                table.style.cursor = 'row-resize';
+                currentRow = row;
+            } else {
+                if (!rowResizing) table.style.cursor = '';
+                currentRow = null;
+            }
+        });
+
+        table.addEventListener('mousedown', (e) => {
+            if (table.style.cursor === 'row-resize' && currentRow) {
+                e.preventDefault();
+                rowResizing = true;
+                startY = e.pageY;
+                startHeight = currentRow.offsetHeight;
+                rowTable = table;
+                document.addEventListener('mousemove', resizeRow);
+                document.addEventListener('mouseup', stopRowResize);
+            }
+        });
     }
 
     /**
@@ -2547,6 +2581,29 @@ document.addEventListener('DOMContentLoaded', function () {
         document.removeEventListener('mouseup', stopResize);
         currentResizer = null;
         resizingTable = null;
+    }
+
+    /**
+     * Handler for mousemove during row resizing. Calculates new height based on
+     * vertical mouse movement and applies it to the active row.
+     */
+    function resizeRow(e) {
+        if (!rowResizing || !currentRow) return;
+        const dy = e.pageY - startY;
+        const newHeight = Math.max(20, startHeight + dy);
+        currentRow.style.height = newHeight + 'px';
+    }
+
+    /**
+     * Handler for mouseup after row resizing. Cleans up listeners and resets state.
+     */
+    function stopRowResize() {
+        document.removeEventListener('mousemove', resizeRow);
+        document.removeEventListener('mouseup', stopRowResize);
+        rowResizing = false;
+        currentRow = null;
+        if (rowTable) rowTable.style.cursor = '';
+        rowTable = null;
     }
 
     function renderNotesList() {
@@ -3520,6 +3577,7 @@ document.addEventListener('DOMContentLoaded', function () {
         populateIconPicker();
         loadState();
         setupEventListeners();
+        document.querySelectorAll('table.resizable-table').forEach(initTableResize);
         applyTheme(document.documentElement.dataset.theme || 'default');
     }
 
