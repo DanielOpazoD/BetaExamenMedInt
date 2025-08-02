@@ -5,11 +5,36 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { GoogleGenAI } from "@google/genai";
+// Import the database helper from a separate module.  This replaces the
+// inline IndexedDB implementation and keeps the rest of the code unchanged.
+import db from './db.js';
 
-const API_KEY = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : '';
+// Pull the API key from environment variables.  In a browser build (e.g. Vite
+// or Netlify), environment variables are exposed via `import.meta.env` and
+// must be prefixed with `VITE_`.  In a Node environment (for local
+// development) `process.env` can still be used.  We try both locations and
+// fall back to an empty string if nothing is defined.
+const API_KEY = (() => {
+  // Prefer Vite-style environment variables in the browser.  These are
+  // statically replaced at build time when prefixed with `VITE_`.
+  if (typeof import.meta !== 'undefined' && import.meta.env &&
+      (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY)) {
+    return import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY;
+  }
+  // Fallback to Node process.env for local builds or SSR.
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env.VITE_GEMINI_API_KEY || process.env.VITE_API_KEY || process.env.API_KEY || '';
+  }
+  // Ultimately return an empty string if no key is present.  This will cause
+  // calls to the AI service to fail gracefully and display an error message.
+  return '';
+})();
 
 // --- IndexedDB Helper ---
-const db = {
+// NOTE: The IndexedDB helper has been moved into db.js.  The following
+// object remains only to preserve its source for reference but is not
+// used.  It has been renamed to `_unusedDb` to avoid naming conflicts.
+const _unusedDb = {
     _dbPromise: null,
     connect() {
         if (this._dbPromise) return this._dbPromise;
@@ -132,6 +157,86 @@ document.addEventListener('DOMContentLoaded', function () {
     const emojiGrid = getElem('emoji-grid');
     const cancelIconPickerBtn = getElem('cancel-icon-picker-btn');
 
+    // Custom icon input elements
+    const newIconInput = getElem('new-icon-input');
+    const addIconBtn = getElem('add-icon-btn');
+
+    // Icon manager modal elements
+    const openIconManagerBtn = getElem('open-icon-manager-btn');
+    const iconManagerModal = getElem('icon-manager-modal');
+    const currentIcons = getElem('current-icons');
+    const newIconInputManager = getElem('new-icon-input-manager');
+    const addNewIconBtn = getElem('add-new-icon-btn');
+    const closeIconManagerBtn = getElem('close-icon-manager-btn');
+
+    // Character manager modal elements
+    const charManagerModal = getElem('char-manager-modal');
+    const currentChars = getElem('current-chars');
+    const newCharInputManager = getElem('new-char-input-manager');
+    const addNewCharBtn = getElem('add-new-char-btn');
+    const closeCharManagerBtn = getElem('close-char-manager-btn');
+
+    // Table grid element
+    const tableGridEl = getElem('table-grid');
+
+    // Flag to prevent multiple table insertions if user double-clicks or if events overlap
+    let isInsertingTable = false;
+
+
+    /**
+     * Initialize the table size selection grid.  This creates the 10x10 cells
+     * and binds mouseover and click events to highlight and insert tables.
+     * This function should be called once after DOMContentLoaded.
+     */
+    function initTableGrid() {
+        if (!tableGridEl) return;
+        // Create cells only once
+        if (tableGridEl.children.length === 0) {
+            for (let r = 1; r <= 10; r++) {
+                for (let c = 1; c <= 10; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.rows = r;
+                    cell.dataset.cols = c;
+                    tableGridEl.appendChild(cell);
+                }
+            }
+        }
+        // Hover to highlight selection
+        tableGridEl.addEventListener('mouseover', (e) => {
+            const target = e.target.closest('.cell');
+            if (!target) return;
+            const rows = parseInt(target.dataset.rows);
+            const cols = parseInt(target.dataset.cols);
+            tableGridEl.querySelectorAll('.cell').forEach(cell => {
+                const r = parseInt(cell.dataset.rows);
+                const c = parseInt(cell.dataset.cols);
+                if (r <= rows && c <= cols) {
+                    cell.classList.add('highlight');
+                } else {
+                    cell.classList.remove('highlight');
+                }
+            });
+        });
+        // Click to insert table
+        tableGridEl.addEventListener('click', (e) => {
+            const target = e.target.closest('.cell');
+            if (!target) return;
+            const rows = parseInt(target.dataset.rows);
+            const cols = parseInt(target.dataset.cols);
+            hideTableGrid();
+            insertTableWithDimensions(rows, cols);
+        });
+    }
+
+    // --- Customizable Icon and Character Lists ---
+    // These variables will be initialized later, after EMOJI_CATEGORIES is
+    // defined.  Using let allows us to assign values subsequently without
+    // triggering temporal dead zone errors.  See below for initialization.
+    let defaultSuggestedIcons;
+    let customIconsList;
+    let globalSpecialChars;
+
     // Multi-note panel elements
     const notesPanelToggle = getElem('notes-panel-toggle');
     const notesSidePanel = getElem('notes-side-panel');
@@ -171,6 +276,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const nextLightboxBtn = getElem('next-lightbox-btn');
     const lightboxImage = getElem('lightbox-image');
     const lightboxCaption = getElem('lightbox-caption');
+    const lightboxCaptionText = getElem('lightbox-caption-text');
+    const deleteCaptionBtn = getElem('delete-caption-btn');
+    const zoomInLightboxBtn = getElem('zoom-in-lightbox-btn');
+    const zoomOutLightboxBtn = getElem('zoom-out-lightbox-btn');
+    const downloadLightboxBtn = getElem('download-lightbox-btn');
 
     // Post-it Note Modal
     const postitNoteModal = getElem('postit-note-modal');
@@ -178,6 +288,476 @@ document.addEventListener('DOMContentLoaded', function () {
     const savePostitBtn = getElem('save-postit-icon-btn');
     const deletePostitBtn = getElem('delete-postit-icon-btn');
     const closePostitBtn = getElem('close-postit-icon-btn');
+
+    // Quick note and sub-note elements
+    const quickNoteBtn = getElem('quick-note-btn');
+    const subNoteModal = getElem('subnote-modal');
+    const subNoteTitle = getElem('subnote-title');
+    const subNoteEditor = getElem('subnote-editor');
+    const subNoteToolbar = getElem('subnote-toolbar');
+    const deleteSubnoteBtn = getElem('delete-subnote-btn');
+    const saveCloseSubnoteBtn = getElem('save-close-subnote-btn');
+    const saveSubnoteBtn = getElem('save-subnote-btn');
+
+    /*
+     * Build the simplified toolbar for sub-note editing.  This toolbar intentionally omits
+     * certain controls available in the main note editor, such as line height, image
+     * insertion from HTML, exporting to HTML, gallery links, collapsible blocks, and
+     * creating nested sub-notes.  The sub-note editor retains only basic formatting
+     * options like bold, italic, underline, lists, and hyperlink management.
+     */
+    function setupSubnoteToolbar() {
+        if (!subNoteToolbar) return;
+        subNoteToolbar.innerHTML = '';
+
+        // Local state for sub-note toolbar color selections
+        let savedSubnoteSelection = null;
+
+        // Collapse the current selection so formatting doesn't persist beyond the selected range
+        const collapseSelectionSN = () => {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+                const range = sel.getRangeAt(0);
+                const collapsed = range.cloneRange();
+                collapsed.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(collapsed);
+            }
+        };
+
+        // Helper to create a toolbar button for sub-note editor
+        const createSNButton = (title, content, command, value = null, action = null) => {
+            const btn = document.createElement('button');
+            btn.className = 'toolbar-btn';
+            btn.title = title;
+            btn.innerHTML = content;
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (command) {
+                    document.execCommand(command, false, value);
+                    collapseSelectionSN();
+                }
+                if (action) {
+                    action();
+                    collapseSelectionSN();
+                }
+                subNoteEditor.focus();
+            });
+            return btn;
+        };
+
+        const createSNSeparator = () => {
+            const sep = document.createElement('div');
+            sep.className = 'toolbar-separator';
+            return sep;
+        };
+
+        // Color palette generator for sub-notes (similar to main editor)
+        const createSNColorPalette = (title, action, mainColors, extraColors, iconSVG) => {
+            const group = document.createElement('div');
+            group.className = 'color-palette-group';
+            mainColors.forEach(color => {
+                const swatch = document.createElement('button');
+                swatch.className = 'color-swatch toolbar-btn';
+                if (color === 'transparent') {
+                    swatch.style.backgroundImage = 'linear-gradient(to top left, transparent calc(50% - 1px), red, transparent calc(50% + 1px))';
+                    swatch.style.backgroundColor = 'var(--bg-secondary)';
+                    swatch.title = 'Sin color';
+                } else {
+                    swatch.style.backgroundColor = color;
+                    swatch.title = color;
+                }
+                swatch.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    action(color);
+                    collapseSelectionSN();
+                    subNoteEditor.focus();
+                });
+                group.appendChild(swatch);
+            });
+            const otherBtn = document.createElement('button');
+            otherBtn.className = 'other-colors-btn toolbar-btn';
+            otherBtn.innerHTML = iconSVG;
+            otherBtn.title = title;
+            group.appendChild(otherBtn);
+            const submenu = document.createElement('div');
+            submenu.className = 'color-submenu';
+            extraColors.forEach(color => {
+                const swatch = document.createElement('button');
+                swatch.className = 'color-swatch';
+                if (color === 'transparent') {
+                    swatch.style.backgroundImage = 'linear-gradient(to top left, transparent calc(50% - 1px), red, transparent calc(50% + 1px))';
+                    swatch.style.backgroundColor = 'var(--bg-secondary)';
+                    swatch.title = 'Sin color';
+                } else {
+                    swatch.style.backgroundColor = color;
+                    swatch.title = color;
+                }
+                swatch.addEventListener('mousedown', (e) => e.preventDefault());
+                swatch.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (savedSubnoteSelection) {
+                        const selection = window.getSelection();
+                        selection.removeAllRanges();
+                        selection.addRange(savedSubnoteSelection);
+                    }
+                    action(color);
+                    collapseSelectionSN();
+                    submenu.classList.remove('visible');
+                    savedSubnoteSelection = null;
+                    subNoteEditor.focus();
+                });
+                submenu.appendChild(swatch);
+            });
+            const customColorLabel = document.createElement('label');
+            customColorLabel.className = 'toolbar-btn';
+            customColorLabel.title = 'Color personalizado';
+            customColorLabel.innerHTML = '🎨';
+            const customColorInput = document.createElement('input');
+            customColorInput.type = 'color';
+            customColorInput.style.width = '0';
+            customColorInput.style.height = '0';
+            customColorInput.style.opacity = '0';
+            customColorInput.style.position = 'absolute';
+            customColorLabel.appendChild(customColorInput);
+            customColorInput.addEventListener('input', (e) => {
+                if (savedSubnoteSelection) {
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(savedSubnoteSelection);
+                }
+                action(e.target.value);
+                collapseSelectionSN();
+                savedSubnoteSelection = null;
+                subNoteEditor.focus();
+            });
+            customColorInput.addEventListener('click', (e) => e.stopPropagation());
+            submenu.appendChild(customColorLabel);
+            group.appendChild(submenu);
+            otherBtn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                const selection = window.getSelection();
+                if (selection.rangeCount > 0 && subNoteEditor.contains(selection.anchorNode)) {
+                    savedSubnoteSelection = selection.getRangeAt(0).cloneRange();
+                } else {
+                    savedSubnoteSelection = null;
+                }
+            });
+            otherBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                    if (d !== submenu) d.classList.remove('visible');
+                });
+                submenu.classList.toggle('visible');
+            });
+            return group;
+        };
+
+        const createSNSymbolDropdown = (symbols, title, icon) => {
+            const dropdown = document.createElement('div');
+            dropdown.className = 'symbol-dropdown';
+            const btn = document.createElement('button');
+            btn.className = 'toolbar-btn';
+            btn.title = title;
+            btn.innerHTML = icon;
+            dropdown.appendChild(btn);
+            const content = document.createElement('div');
+            content.className = 'symbol-dropdown-content';
+            const renderSNSyms = () => {
+                content.innerHTML = '';
+                symbols.forEach((sym) => {
+                    const sBtn = createSNButton(sym, sym, 'insertText', sym);
+                    sBtn.classList.add('symbol-btn');
+                    sBtn.addEventListener('click', () => {
+                        content.classList.remove('visible');
+                    });
+                    content.appendChild(sBtn);
+                });
+            };
+            renderSNSyms();
+            dropdown.appendChild(content);
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                    if (d !== content) d.classList.remove('visible');
+                });
+                content.classList.toggle('visible');
+            });
+            return dropdown;
+        };
+
+        // Dropdown for adjusting line highlight size (vertical padding)
+        const createSNHighlightSizeDropdown = () => {
+            const dropdown = document.createElement('div');
+            dropdown.className = 'symbol-dropdown';
+            const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up-down w-4 h-4"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>`;
+            const btn = createSNButton('Ajustar altura de destacado', iconSVG, null, null, null);
+            dropdown.appendChild(btn);
+            const content = document.createElement('div');
+            content.className = 'symbol-dropdown-content flex-dropdown';
+            content.style.minWidth = '60px';
+            const sizes = { 'N': 0, '+1': 1, '+2': 2, '+3': 3, '+4': 4, '+5': 5 };
+            const applyBlockVerticalPaddingSN = (level) => {
+                const paddingValues = [0, 2, 4, 6, 8, 10];
+                const padding = paddingValues[level] || 0;
+                const blocks = getSelectedBlocksSN();
+                blocks.forEach(block => {
+                    if (block && subNoteEditor.contains(block)) {
+                        block.style.paddingTop = `${padding}px`;
+                        block.style.paddingBottom = `${padding}px`;
+                    }
+                });
+            };
+            for (const [name, value] of Object.entries(sizes)) {
+                const sizeBtn = document.createElement('button');
+                sizeBtn.className = 'toolbar-btn';
+                sizeBtn.textContent = name;
+                sizeBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    applyBlockVerticalPaddingSN(value);
+                    content.classList.remove('visible');
+                    subNoteEditor.focus();
+                });
+                content.appendChild(sizeBtn);
+            }
+            dropdown.appendChild(content);
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                    if (d !== content) d.classList.remove('visible');
+                });
+                content.classList.toggle('visible');
+            });
+            return dropdown;
+        };
+
+        // Begin constructing toolbar
+        // Basic formatting
+        subNoteToolbar.appendChild(createSNButton('Negrita', '<b>B</b>', 'bold'));
+        subNoteToolbar.appendChild(createSNButton('Cursiva', '<i>I</i>', 'italic'));
+        subNoteToolbar.appendChild(createSNButton('Subrayado', '<u>U</u>', 'underline'));
+        subNoteToolbar.appendChild(createSNButton('Tachado', '<s>S</s>', 'strikeThrough'));
+        subNoteToolbar.appendChild(createSNButton('Superíndice', 'X²', 'superscript'));
+        // Erase format
+        const eraserSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eraser w-5 h-5"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21H7Z"/><path d="M22 21H7"/><path d="m5 12 5 5"/></svg>`;
+        subNoteToolbar.appendChild(createSNButton('Borrar formato', eraserSVG, 'removeFormat'));
+        subNoteToolbar.appendChild(createSNSeparator());
+        // Color palettes (text, highlight, line highlight)
+        const textColors = ['#000000'];
+        const extraTextColors = ['#FF0000', '#0000FF', '#008000', '#FFA500', '#FFFF00', '#800080', '#FFC0CB', '#00FFFF', '#00008B', '#8B0000', '#FF8C00', '#FFD700', '#ADFF2F', '#4B0082', '#48D1CC', '#191970', '#A52A2A', '#F0E68C', '#ADD8E6', '#DDA0DD', '#90EE90', '#FA8072'];
+        const highlightColors = ['#FAFAD2'];
+        const extraHighlightColors = ['transparent', '#FFFFFF', '#FFFF00', '#ADD8E6', '#F0FFF0', '#FFF0F5', '#F5FFFA', '#F0F8FF', '#E6E6FA', '#FFF5EE', '#FAEBD7', '#FFE4E1', '#FFFFE0', '#D3FFD3', '#B0E0E6', '#FFB6C1', '#F5DEB3', '#C8A2C8', '#FFDEAD', '#E0FFFF', '#FDF5E6', '#FFFACD', '#F8F8FF'];
+        const applySubnoteForeColor = (color) => document.execCommand('foreColor', false, color);
+        const applySubnoteHiliteColor = (color) => document.execCommand('hiliteColor', false, color);
+        // Helper to get selected block elements within the sub-note editor
+        const getSelectedBlocksSN = () => {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return [];
+            const range = selection.getRangeAt(0);
+            let commonAncestor = range.commonAncestorContainer;
+            if (!subNoteEditor.contains(commonAncestor)) return [];
+            let startNode = range.startContainer;
+            let endNode = range.endContainer;
+            const findBlock = (node) => {
+                while (node && node !== subNoteEditor) {
+                    if (node.nodeType === 1 && getComputedStyle(node).display !== 'inline') {
+                        return node;
+                    }
+                    node = node.parentNode;
+                }
+                return startNode.nodeType === 1 ? startNode : startNode.parentNode;
+            };
+            let startBlock = findBlock(startNode);
+            let endBlock = findBlock(endNode);
+            if (startBlock === endBlock) {
+                return [startBlock];
+            }
+            const allBlocks = Array.from(subNoteEditor.querySelectorAll('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details'));
+            const startIndex = allBlocks.indexOf(startBlock);
+            const endIndex = allBlocks.indexOf(endBlock);
+            if (startIndex !== -1 && endIndex !== -1) {
+                return allBlocks.slice(startIndex, endIndex + 1);
+            }
+            return [startBlock];
+        };
+        const applySubnoteLineHighlight = (color) => {
+            let elements = getSelectedBlocksSN();
+            if (elements.length === 0 || (elements.length === 1 && !elements[0])) {
+                document.execCommand('formatBlock', false, 'p');
+                elements = getSelectedBlocksSN();
+            }
+            elements.forEach((block, index) => {
+                if (block && subNoteEditor.contains(block)) {
+                    if (color === 'transparent') {
+                        block.style.backgroundColor = '';
+                        block.style.paddingLeft = '';
+                        block.style.paddingRight = '';
+                        block.style.borderTopLeftRadius = '';
+                        block.style.borderTopRightRadius = '';
+                        block.style.borderBottomLeftRadius = '';
+                        block.style.borderBottomRightRadius = '';
+                    } else {
+                        block.style.backgroundColor = color;
+                        block.style.paddingLeft = '6px';
+                        block.style.paddingRight = '6px';
+                        const first = index === 0;
+                        const last = index === elements.length - 1;
+                        block.style.borderTopLeftRadius = first ? '6px' : '0';
+                        block.style.borderTopRightRadius = first ? '6px' : '0';
+                        block.style.borderBottomLeftRadius = last ? '6px' : '0';
+                        block.style.borderBottomRightRadius = last ? '6px' : '0';
+                    }
+                }
+            });
+        };
+        const typeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-type w-4 h-4"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>`;
+        const highlighterIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-highlighter w-4 h-4"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>`;
+        const subTextPalette = createSNColorPalette('Color de Texto', applySubnoteForeColor, textColors, extraTextColors, typeIcon);
+        const subHighlightPalette = createSNColorPalette('Color de Resaltado', applySubnoteHiliteColor, highlightColors, extraHighlightColors, highlighterIcon);
+        const subLineHighlightPalette = createSNColorPalette('Color de fondo de línea', applySubnoteLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
+        subNoteToolbar.appendChild(subTextPalette);
+        subNoteToolbar.appendChild(subHighlightPalette);
+        subNoteToolbar.appendChild(subLineHighlightPalette);
+        // Highlight size dropdown
+        subNoteToolbar.appendChild(createSNHighlightSizeDropdown());
+        // Horizontal rule
+        subNoteToolbar.appendChild(createSNButton('Insertar línea separadora', '—', 'insertHorizontalRule'));
+        subNoteToolbar.appendChild(createSNSeparator());
+        // Indent/outdent
+        const outdentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-decrease w-5 h-5"><polyline points="7 8 3 12 7 16"/><line x1="21" x2="3" y1="12" y2="12"/><line x1="21" x2="3" y1="6" y2="6"/><line x1="21" x2="3" y1="18" y2="18"/></svg>`;
+        const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
+        subNoteToolbar.appendChild(createSNButton('Disminuir sangría', outdentSVG, 'outdent'));
+        subNoteToolbar.appendChild(createSNButton('Aumentar sangría', indentSVG, 'indent'));
+        // Collapsible block (accordion)
+        const accordionSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-square w-5 h-5"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>`;
+        const accordionHTML = `<details><summary>Título</summary><div>Contenido...<br></div></details><p><br></p>`;
+        subNoteToolbar.appendChild(createSNButton('Insertar bloque colapsable', accordionSVG, 'insertHTML', accordionHTML));
+        subNoteToolbar.appendChild(createSNSeparator());
+        // Symbols and special characters
+        const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
+        subNoteToolbar.appendChild(createSNSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
+        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
+        subNoteToolbar.appendChild(createSNSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
+        // Image from URL
+        subNoteToolbar.appendChild(createSNButton('Insertar Imagen desde URL', '🖼️', null, null, () => {
+            const url = prompt('Ingresa la URL de la imagen:');
+            if (url) {
+                subNoteEditor.focus();
+                document.execCommand('insertImage', false, url);
+            }
+        }));
+        // Gallery link insertion
+        const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
+        subNoteToolbar.appendChild(createSNButton('Crear Galería de Imágenes', gallerySVG, null, null, () => {
+            // Capture selection for gallery range
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && subNoteEditor.contains(selection.anchorNode)) {
+                activeGalleryRange = selection.getRangeAt(0).cloneRange();
+            } else {
+                activeGalleryRange = null;
+            }
+            openGalleryLinkEditor();
+        }));
+        // Insert hyperlink and remove hyperlink
+        subNoteToolbar.appendChild(createSNButton('Insertar enlace', '🔗', null, null, () => {
+            const url = prompt('Ingresa la URL:');
+            if (url) {
+                document.execCommand('createLink', false, url);
+            }
+        }));
+        subNoteToolbar.appendChild(createSNButton('Quitar enlace', '❌', 'unlink'));
+        // Resize image buttons
+        subNoteToolbar.appendChild(createSNButton('Aumentar tamaño de imagen (+10%)', '➕', null, null, () => resizeSelectedImage(1.1)));
+        subNoteToolbar.appendChild(createSNButton('Disminuir tamaño de imagen (-10%)', '➖', null, null, () => resizeSelectedImage(0.9)));
+        subNoteToolbar.appendChild(createSNSeparator());
+        // Print (save as PDF) within subnote editor
+        subNoteToolbar.appendChild(createSNButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
+            const printArea = getElem('print-area');
+            printArea.innerHTML = `<div>${subNoteEditor.innerHTML}</div>`;
+            window.print();
+        }));
+    }
+    // Initialize sub-note toolbar on load
+    setupSubnoteToolbar();
+
+    // Save and close sub-note
+    if (saveCloseSubnoteBtn) {
+        saveCloseSubnoteBtn.addEventListener('click', () => {
+            if (activeSubnoteLink && currentNotesArray[activeNoteIndex]) {
+                const subnoteId = activeSubnoteLink.dataset.subnoteId || activeSubnoteLink.dataset.postitId;
+                if (!currentNotesArray[activeNoteIndex].postits) {
+                    currentNotesArray[activeNoteIndex].postits = {};
+                }
+                currentNotesArray[activeNoteIndex].postits[subnoteId] = {
+                    title: subNoteTitle.textContent.trim(),
+                    content: subNoteEditor.innerHTML
+                };
+                // Persist changes to note
+                saveCurrentNote();
+            }
+            hideModal(subNoteModal);
+            activeSubnoteLink = null;
+        });
+    }
+
+    // Save sub-note without closing the modal
+    if (saveSubnoteBtn) {
+        saveSubnoteBtn.addEventListener('click', () => {
+            if (activeSubnoteLink && currentNotesArray[activeNoteIndex]) {
+                const subnoteId = activeSubnoteLink.dataset.subnoteId || activeSubnoteLink.dataset.postitId;
+                if (!currentNotesArray[activeNoteIndex].postits) {
+                    currentNotesArray[activeNoteIndex].postits = {};
+                }
+                currentNotesArray[activeNoteIndex].postits[subnoteId] = {
+                    title: subNoteTitle.textContent.trim(),
+                    content: subNoteEditor.innerHTML
+                };
+                saveCurrentNote();
+            }
+            // Do not close the modal, keep editing
+        });
+    }
+
+    // Delete sub-note
+    if (deleteSubnoteBtn) {
+        deleteSubnoteBtn.addEventListener('click', async () => {
+            if (activeSubnoteLink && currentNotesArray[activeNoteIndex]) {
+                const confirmed = await showConfirmation('¿Eliminar esta sub-nota? El texto se mantendrá pero la sub-nota se borrará permanentemente.');
+                if (confirmed) {
+                    const subnoteId = activeSubnoteLink.dataset.subnoteId || activeSubnoteLink.dataset.postitId;
+                    // Remove from data store
+                    if (currentNotesArray[activeNoteIndex].postits) {
+                        delete currentNotesArray[activeNoteIndex].postits[subnoteId];
+                    }
+                    // Unwrap the link in the editor to keep plain text
+                    const parent = activeSubnoteLink.parentNode;
+                    while (activeSubnoteLink.firstChild) {
+                        parent.insertBefore(activeSubnoteLink.firstChild, activeSubnoteLink);
+                    }
+                    parent.removeChild(activeSubnoteLink);
+                    saveCurrentNote();
+                }
+                hideModal(subNoteModal);
+                activeSubnoteLink = null;
+            }
+        });
+    }
+
+    // Attach quick note button handler: opens the sticky note modal for a single note associated with the main note
+    if (quickNoteBtn) {
+        quickNoteBtn.addEventListener('click', () => {
+            // Ensure there is a current note to attach quick note to
+            if (!currentNotesArray || currentNotesArray.length === 0) return;
+            editingQuickNote = true;
+            const noteData = currentNotesArray[activeNoteIndex] || {};
+            postitNoteTextarea.value = noteData.quickNote || '';
+            showModal(postitNoteModal);
+            postitNoteTextarea.focus();
+        });
+    }
 
     // --- State Variables ---
     let activeConfidenceFilter = 'all';
@@ -194,8 +774,532 @@ document.addEventListener('DOMContentLoaded', function () {
     let lightboxImages = [];
     let currentLightboxIndex = 0;
     let currentNoteRow = null;
-    let activePostitLink = null;
+    let activeSubnoteLink = null;
+    let editingQuickNote = false;
     let savedEditorSelection = null;
+
+    // ------------------------------------------------------------------------
+    // Icon Manager and Character Manager Functions
+    //
+    // The icon manager allows users to add or remove emojis from the default
+    // suggested list (EMOJI_CATEGORIES['Sugeridos']).  A plus/gear button in
+    // the icon picker opens this manager.  Icons are displayed without
+    // deletion controls in the normal picker; deletion is only possible
+    // through the manager modal.  Character manager logic is similar but
+    // operates on the globalSpecialChars array.
+
+    /**
+     * Render the current list of icons into the icon manager modal.  Each
+     * entry shows the emoji and a small × button for deletion.  Icons are
+     * sourced from both the default suggested list and the user-defined
+     * customIconsList.
+     */
+    function renderIconManager() {
+        if (!currentIcons) return;
+        currentIcons.innerHTML = '';
+        // Merge default and custom icons; duplicates are not filtered.
+        const icons = EMOJI_CATEGORIES['Sugeridos'];
+        icons.forEach((icon, index) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'relative inline-flex items-center justify-center m-1';
+            const span = document.createElement('span');
+            span.textContent = icon;
+            span.className = 'text-2xl';
+            wrapper.appendChild(span);
+            const delBtn = document.createElement('button');
+            delBtn.textContent = '×';
+            delBtn.title = 'Eliminar icono';
+            delBtn.className = 'absolute -top-1 -right-1 text-red-500 text-xs';
+            delBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Remove this icon from the list
+                EMOJI_CATEGORIES['Sugeridos'].splice(index, 1);
+                renderIconManager();
+                // If the removed icon came from customIconsList, also remove it there
+                const customIndex = customIconsList.indexOf(icon);
+                if (customIndex > -1) customIconsList.splice(customIndex, 1);
+                // Refresh the emoji grid if we are currently on the suggested tab
+                if (selectedIconCategory === 'Sugeridos') {
+                    loadEmojisForCategory('Sugeridos');
+                }
+            });
+            wrapper.appendChild(delBtn);
+            currentIcons.appendChild(wrapper);
+        });
+    }
+
+    /**
+     * Render the current list of special characters into the character
+     * manager modal.  Similar to icon manager but acts on the global
+     * special character array.  Each character can be removed or new
+     * characters can be added.
+     */
+    function renderCharManager() {
+        if (!currentChars) return;
+        currentChars.innerHTML = '';
+        globalSpecialChars.forEach((char, index) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'relative inline-flex items-center justify-center m-1';
+            const span = document.createElement('span');
+            span.textContent = char;
+            span.className = 'text-xl';
+            wrapper.appendChild(span);
+            const delBtn = document.createElement('button');
+            delBtn.textContent = '×';
+            delBtn.title = 'Eliminar carácter';
+            delBtn.className = 'absolute -top-1 -right-1 text-red-500 text-xs';
+            delBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                globalSpecialChars.splice(index, 1);
+                renderCharManager();
+            });
+            wrapper.appendChild(delBtn);
+            currentChars.appendChild(wrapper);
+        });
+    }
+
+    // Open icon manager modal
+    if (openIconManagerBtn) {
+        openIconManagerBtn.addEventListener('click', () => {
+            // Ensure the combined list includes custom icons appended to the default
+            EMOJI_CATEGORIES['Sugeridos'] = defaultSuggestedIcons.concat(customIconsList);
+            renderIconManager();
+            showModal(iconManagerModal);
+        });
+    }
+    // Close icon manager modal
+    if (closeIconManagerBtn) {
+        closeIconManagerBtn.addEventListener('click', () => {
+            hideModal(iconManagerModal);
+            // Update the picker if the suggested tab is active
+            if (selectedIconCategory === 'Sugeridos') {
+                loadEmojisForCategory('Sugeridos');
+            }
+        });
+    }
+    // Add new icon from manager
+    if (addNewIconBtn) {
+        addNewIconBtn.addEventListener('click', () => {
+            const val = newIconInputManager.value.trim();
+            if (!val) return;
+            // Push into custom list and update suggested list
+            customIconsList.push(val);
+            EMOJI_CATEGORIES['Sugeridos'] = defaultSuggestedIcons.concat(customIconsList);
+            newIconInputManager.value = '';
+            renderIconManager();
+            // Refresh the emoji grid if needed
+            if (selectedIconCategory === 'Sugeridos') {
+                loadEmojisForCategory('Sugeridos');
+            }
+        });
+    }
+
+    // Open character manager modal when user clicks the char manager gear.
+    // Currently there is no dedicated open button in the UI; you can create
+    // one if desired.  For demonstration purposes, we bind it to the icon
+    // manager open button when the user holds Shift.
+    if (openIconManagerBtn && charManagerModal) {
+        openIconManagerBtn.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            renderCharManager();
+            showModal(charManagerModal);
+        });
+    }
+    if (closeCharManagerBtn) {
+        closeCharManagerBtn.addEventListener('click', () => hideModal(charManagerModal));
+    }
+    if (addNewCharBtn) {
+        addNewCharBtn.addEventListener('click', () => {
+            const val = newCharInputManager.value.trim();
+            if (!val) return;
+            globalSpecialChars.push(val);
+            newCharInputManager.value = '';
+            renderCharManager();
+        });
+    }
+
+    // ----------------------------------------------------------------------
+    // Floating Image Insertion and Dragging
+    //
+    // These helper functions allow inserting an image into the editor with
+    // floating alignment (left or right).  The image is wrapped in a figure
+    // with a class that sets float and margins so that text flows around it.
+    // The figure is draggable within the bounds of the notes editor but
+    // remains outside of the contenteditable context (contentEditable=false).
+
+    /**
+     * Insert a floating image at the current selection.  The image will be
+     * wrapped in a figure element with classes .float-image and .float-left
+     * or .float-right, depending on the align parameter.  The selection is
+     * collapsed after insertion so that typing resumes after the image.
+     * @param {string} url The URL of the image to insert
+     * @param {string} align Either 'left' or 'right'
+     */
+    function insertFloatingImageAtSelection(url, align = 'left') {
+        const fig = document.createElement('figure');
+        fig.className = `float-image float-${align}`;
+        fig.contentEditable = 'false';
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = '';
+        fig.appendChild(img);
+        // Insert the figure at the current caret position
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(fig);
+            // Insert a paragraph break after the figure so the user can type below
+            const spacer = document.createTextNode('\u00A0');
+            fig.parentNode.insertBefore(spacer, fig.nextSibling);
+            // Move caret after spacer
+            const newRange = document.createRange();
+            newRange.setStartAfter(spacer);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+        }
+        // Focus back to editor
+        notesEditor.focus();
+    }
+
+    /**
+     * Enable dragging for a floating image (figure element).  The figure is
+     * positioned relative to its parent and can be dragged within the
+     * boundaries of the notesEditor.  Dragging is done by mouse events on
+     * the figure itself and the document.
+     * @param {HTMLElement} fig The figure element containing the image
+     */
+    function enableDragForFloatingImage(fig) {
+        let isDragging = false;
+        let offsetX = 0;
+        let offsetY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+        let startMarginLeft = 0;
+        let startMarginTop = 0;
+        // Use relative positioning so that text flows around normally
+        fig.style.position = fig.style.position || 'relative';
+        fig.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            const rect = fig.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            // Record starting positions and margins
+            startLeft = rect.left;
+            startTop = rect.top;
+            const computed = window.getComputedStyle(fig);
+            startMarginLeft = parseFloat(computed.marginLeft) || 0;
+            startMarginTop = parseFloat(computed.marginTop) || 0;
+            // Temporarily absolute to allow free dragging
+            fig.style.position = 'absolute';
+            fig.style.left = rect.left + window.scrollX + 'px';
+            fig.style.top = rect.top + window.scrollY + 'px';
+            fig.style.zIndex = '1000';
+            // Prevent text selection while dragging
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            // Move figure with cursor, bounded to editor container
+            const editorRect = notesEditor.getBoundingClientRect();
+            let left = e.clientX - offsetX;
+            let top = e.clientY - offsetY;
+            // Constrain within editor
+            left = Math.max(editorRect.left, Math.min(left, editorRect.right - fig.offsetWidth));
+            top = Math.max(editorRect.top, Math.min(top, editorRect.bottom - fig.offsetHeight));
+            fig.style.left = `${left}px`;
+            fig.style.top = `${top}px`;
+        });
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                // Calculate delta movement relative to starting position
+                const rect = fig.getBoundingClientRect();
+                const deltaX = (rect.left - startLeft);
+                const deltaY = (rect.top - startTop);
+                // Restore relative positioning and apply margins
+                fig.style.position = 'relative';
+                fig.style.left = '';
+                fig.style.top = '';
+                fig.style.zIndex = '';
+                fig.style.marginLeft = (startMarginLeft + deltaX) + 'px';
+                fig.style.marginTop = (startMarginTop + deltaY) + 'px';
+            }
+        });
+    }
+
+    /**
+     * Envuelve la imagen seleccionada o actualmente seleccionada para redimensionar
+     * dentro de un contenedor figure flotante. Si la imagen ya está envuelta,
+     * simplemente actualiza la alineación. Se inserta un espacio no separable
+     * después de la figura para evitar que el hipervínculo/selección continúe.
+     * @param {string} align 'left' o 'right'
+     */
+    function wrapSelectedImage(align = 'left') {
+        // La imagen puede estar en selectedImageForResize (al ser clicada) o en la selección actual
+        let img = selectedImageForResize;
+        if (!img) {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount) {
+                let node = sel.getRangeAt(0).startContainer;
+                if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+                if (node.tagName === 'IMG') {
+                    img = node;
+                } else if (node.querySelector) {
+                    const found = node.querySelector('img');
+                    if (found) img = found;
+                }
+            }
+        }
+        if (!img) {
+            // Si no se encuentra imagen, mostrar un mensaje sutil usando nuestro modal de alerta
+            alertMessage.textContent = 'Selecciona primero una imagen para aplicar el estilo cuadrado.';
+            alertTitle.textContent = 'Imagen no seleccionada';
+            showModal(alertModal);
+            return;
+        }
+        // Si ya está en un figure flotante, actualiza la clase de alineación
+        const existingFig = img.closest('figure.float-image');
+        if (existingFig) {
+            existingFig.classList.remove('float-left', 'float-right');
+            existingFig.classList.add(`float-${align}`);
+            return;
+        }
+        // Crear figure y mover la imagen dentro
+        const fig = document.createElement('figure');
+        fig.className = `float-image float-${align}`;
+        fig.contentEditable = 'false';
+        img.parentNode.insertBefore(fig, img);
+        fig.appendChild(img);
+        // Insertar espacio NBSP para que el cursor siga después del figure
+        const spacer = document.createTextNode('\u00A0');
+        fig.parentNode.insertBefore(spacer, fig.nextSibling);
+        // Actualizar selección de imagen para redimensionar
+        selectedImageForResize = img;
+    }
+
+    // When loading a note into the editor, ensure any existing floating
+    // images become draggable again.  This runs after setting the editor's
+    // innerHTML in loadNoteIntoEditor().
+    const originalLoadNoteIntoEditor = loadNoteIntoEditor;
+    loadNoteIntoEditor = function(index) {
+        // Reutilizamos la implementación original sin habilitar arrastre para imágenes flotantes
+        originalLoadNoteIntoEditor(index);
+    };
+
+    // ----------------------------------------------------------------------
+    // Table size selector grid
+    //
+    // showTableGrid displays a floating 10x10 grid near the toolbar button
+    // that triggered it.  Hovering over cells highlights a selection of
+    // rows/cols; clicking inserts a table of that size.  The grid hides on
+    // selection or when clicking outside of it.
+
+    /**
+     * Show the table size selection grid near the specified button element.
+     * @param {HTMLElement} buttonEl The toolbar button that triggered the grid
+     */
+    function showTableGrid(buttonEl) {
+        if (!tableGridEl) return;
+        // Si ya estamos insertando una tabla, no mostrar otra vez la cuadrícula
+        if (isInsertingTable) return;
+        // Position the grid below the button
+        const rect = buttonEl.getBoundingClientRect();
+        tableGridEl.style.left = `${rect.left + window.scrollX}px`;
+        tableGridEl.style.top = `${rect.bottom + window.scrollY + 4}px`;
+        // Mostrar la cuadrícula inicializada en la posición adecuada
+        tableGridEl.classList.remove('hidden');
+        // Cuando el usuario haga clic fuera, ocultar la cuadrícula
+        const hideHandler = (ev) => {
+            if (!tableGridEl.contains(ev.target) && !buttonEl.contains(ev.target)) {
+                hideTableGrid();
+                document.removeEventListener('click', hideHandler);
+            }
+        };
+        setTimeout(() => {
+            document.addEventListener('click', hideHandler);
+        }, 0);
+    }
+
+    /**
+     * Hide the table size selection grid and clear highlights.
+     */
+    function hideTableGrid() {
+        if (!tableGridEl) return;
+        tableGridEl.classList.add('hidden');
+        tableGridEl.querySelectorAll('.cell').forEach(cell => cell.classList.remove('highlight'));
+    }
+
+    /**
+     * Insert a table with the specified number of rows and columns.  After
+     * insertion, initialize column resizers and row/column editing controls.
+     * @param {number} rows Number of rows
+     * @param {number} cols Number of columns
+     */
+    function insertTableWithDimensions(rows, cols) {
+        // Establecer flag para evitar inserciones múltiples en cascada
+        if (isInsertingTable) return;
+        isInsertingTable = true;
+        // Construir la tabla como elemento DOM en lugar de usar execCommand.
+        const table = document.createElement('table');
+        table.className = 'resizable-table';
+        table.style.borderCollapse = 'collapse';
+        table.style.width = '100%';
+        for (let r = 0; r < rows; r++) {
+            const tr = document.createElement('tr');
+            for (let c = 0; c < cols; c++) {
+                const td = document.createElement('td');
+                td.style.border = '1px solid var(--border-color)';
+                td.style.padding = '4px';
+                td.style.minWidth = '40px';
+                td.innerHTML = '&nbsp;';
+                td.contentEditable = true;
+                tr.appendChild(td);
+            }
+            table.appendChild(tr);
+        }
+        // Insertar la tabla en la posición actual del cursor mediante Range
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            range.collapse(true);
+            range.deleteContents();
+            range.insertNode(table);
+            // Insertar un salto de línea después de la tabla para permitir continuar escribiendo
+            const br = document.createElement('p');
+            br.innerHTML = '<br>';
+            table.parentNode.insertBefore(br, table.nextSibling);
+            // Colocar el cursor después del nuevo párrafo
+            const newRange = document.createRange();
+            newRange.setStart(br, 0);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+        }
+        // Inicializar redimensionadores y controles tras un breve tiempo
+        setTimeout(() => {
+            initTableResize(table);
+            enableTableEditing(table);
+            // Liberar flag de inserción
+            isInsertingTable = false;
+        }, 50);
+    }
+
+    /**
+     * Enable advanced table editing features on the given table.  When the user
+     * hovers over a cell, controls for inserting or deleting rows/columns
+     * appear.  Resizing columns is handled by initTableResize().
+     * @param {HTMLTableElement} table
+     */
+    function enableTableEditing(table) {
+        if (!table) return;
+        table.addEventListener('mouseover', (e) => {
+            const cell = e.target.closest('td, th');
+            if (!cell || !table.contains(cell)) return;
+            showRowColControls(table, cell);
+        });
+    }
+
+    /**
+     * Remove any existing row/column controls from the document.
+     */
+    function removeTableControls() {
+        document.querySelectorAll('.table-insert-row-btn, .table-insert-col-btn, .table-delete-row-btn, .table-delete-col-btn').forEach(btn => btn.remove());
+    }
+
+    /**
+     * Display controls to insert or delete rows and columns based on the
+     * hovered cell.  Controls are appended to the document body and
+     * absolutely positioned relative to the cell.
+     * @param {HTMLTableElement} table
+     * @param {HTMLTableCellElement} cell
+     */
+    function showRowColControls(table, cell) {
+        removeTableControls();
+        const rowIndex = cell.parentElement.rowIndex;
+        const colIndex = cell.cellIndex;
+        const cellRect = cell.getBoundingClientRect();
+        // Insert row button (+) below the cell
+        const insertRowBtn = document.createElement('button');
+        insertRowBtn.textContent = '+';
+        insertRowBtn.title = 'Insertar fila debajo';
+        insertRowBtn.className = 'table-insert-row-btn toolbar-btn';
+        insertRowBtn.style.position = 'absolute';
+        insertRowBtn.style.left = `${cellRect.left + cellRect.width / 2 - 8 + window.scrollX}px`;
+        insertRowBtn.style.top = `${cellRect.bottom - 8 + window.scrollY}px`;
+        insertRowBtn.addEventListener('click', () => {
+            const newRow = table.insertRow(rowIndex + 1);
+            for (let i = 0; i < table.rows[0].cells.length; i++) {
+                const newCell = newRow.insertCell();
+                newCell.contentEditable = true;
+                newCell.style.border = '1px solid var(--border-color)';
+                newCell.style.padding = '4px';
+            }
+            // After inserting, re-add resizers and controls
+            initTableResize(table);
+            removeTableControls();
+        });
+        document.body.appendChild(insertRowBtn);
+        // Insert column button (+) to the right of the cell
+        const insertColBtn = document.createElement('button');
+        insertColBtn.textContent = '+';
+        insertColBtn.title = 'Insertar columna a la derecha';
+        insertColBtn.className = 'table-insert-col-btn toolbar-btn';
+        insertColBtn.style.position = 'absolute';
+        insertColBtn.style.left = `${cellRect.right - 8 + window.scrollX}px`;
+        insertColBtn.style.top = `${cellRect.top + cellRect.height / 2 - 8 + window.scrollY}px`;
+        insertColBtn.addEventListener('click', () => {
+            Array.from(table.rows).forEach(row => {
+                const newCell = row.insertCell(colIndex + 1);
+                newCell.contentEditable = true;
+                newCell.style.border = '1px solid var(--border-color)';
+                newCell.style.padding = '4px';
+            });
+            initTableResize(table);
+            removeTableControls();
+        });
+        document.body.appendChild(insertColBtn);
+        // Delete row button (×) above the cell
+        const deleteRowBtn = document.createElement('button');
+        deleteRowBtn.textContent = '×';
+        deleteRowBtn.title = 'Eliminar fila';
+        deleteRowBtn.className = 'table-delete-row-btn toolbar-btn';
+        deleteRowBtn.style.position = 'absolute';
+        deleteRowBtn.style.left = `${cellRect.left + cellRect.width / 2 - 8 + window.scrollX}px`;
+        deleteRowBtn.style.top = `${cellRect.top - 16 + window.scrollY}px`;
+        deleteRowBtn.addEventListener('click', () => {
+            table.deleteRow(rowIndex);
+            removeTableControls();
+        });
+        document.body.appendChild(deleteRowBtn);
+        // Delete column button (×) to the left of the cell
+        const deleteColBtn = document.createElement('button');
+        deleteColBtn.textContent = '×';
+        deleteColBtn.title = 'Eliminar columna';
+        deleteColBtn.className = 'table-delete-col-btn toolbar-btn';
+        deleteColBtn.style.position = 'absolute';
+        deleteColBtn.style.left = `${cellRect.left - 16 + window.scrollX}px`;
+        deleteColBtn.style.top = `${cellRect.top + cellRect.height / 2 - 8 + window.scrollY}px`;
+        deleteColBtn.addEventListener('click', () => {
+            Array.from(table.rows).forEach(row => {
+                if (row.cells.length > colIndex) {
+                    row.deleteCell(colIndex);
+                }
+            });
+            initTableResize(table);
+            removeTableControls();
+        });
+        document.body.appendChild(deleteColBtn);
+    }
+
+    // Zoom state for image lightbox
+    let currentZoom = 1;
+    const zoomStep = 0.25;
+    const maxZoom = 3;
+    const minZoom = 0.5;
+    // Keeps track of the gallery link that opened the lightbox so that caption edits can be persisted
+    let activeGalleryLinkForLightbox = null;
 
 
     const grandTotalSpans = {
@@ -226,6 +1330,15 @@ document.addEventListener('DOMContentLoaded', function () {
         'Medicina': ['🩺', '💉', '💊', '🩸', '🧪', '🔬', '🩻', '🦠', '🧬', '🧠', '❤️‍🩹', '🦴', '🫀', '🫁'],
         'Personas': ['🧑‍⚕️', '👨‍⚕️', '👩‍⚕️', '🧑‍🏫', '👨‍🏫', '👩‍🏫', '🤔', '🧐', '👍', '👎', '💪', '👈', '👉', '👆', '👇'],
     };
+
+    // Initialize customizable icon and character lists after EMOJI_CATEGORIES is defined.
+    // At this point EMOJI_CATEGORIES is available, so we can safely copy its
+    // suggested category.  We also set up the array for user-added icons and
+    // default special characters for character insertion.  These variables
+    // were declared earlier with let.
+    defaultSuggestedIcons = Array.isArray(EMOJI_CATEGORIES['Sugeridos']) ? [...EMOJI_CATEGORIES['Sugeridos']] : [];
+    customIconsList = [];
+    globalSpecialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
     
     // --- Core Logic Functions ---
 
@@ -367,6 +1480,19 @@ document.addEventListener('DOMContentLoaded', function () {
     function setupEditorToolbar() {
         editorToolbar.innerHTML = ''; // Clear existing toolbar
 
+        // Utility to collapse the current selection so formatting doesn't persist beyond the selected range
+        const collapseSelection = (editor) => {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+                const range = sel.getRangeAt(0);
+                // Collapse to the end of the current range
+                const collapsed = range.cloneRange();
+                collapsed.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(collapsed);
+            }
+        };
+
         const createButton = (title, content, command, value = null, action = null) => {
             const btn = document.createElement('button');
             btn.className = 'toolbar-btn';
@@ -376,9 +1502,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 e.preventDefault();
                 if (command) {
                     document.execCommand(command, false, value);
+                    // Collapse the selection after applying the command
+                    collapseSelection(notesEditor);
                 }
                 if (action) {
                     action();
+                    // Collapse again after custom actions
+                    collapseSelection(notesEditor);
                 }
                 notesEditor.focus();
             });
@@ -433,7 +1563,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     swatch.title = color;
                 }
                 swatch.addEventListener('mousedown', (e) => e.preventDefault());
-                swatch.addEventListener('click', (e) => {
+            swatch.addEventListener('click', (e) => {
                     e.preventDefault();
                     if (savedEditorSelection) {
                         const selection = window.getSelection();
@@ -441,6 +1571,15 @@ document.addEventListener('DOMContentLoaded', function () {
                         selection.addRange(savedEditorSelection);
                     }
                     action(color);
+                    // Collapse the selection so the color is applied only once
+                    const sel = window.getSelection();
+                    if (sel && sel.rangeCount > 0) {
+                        const range = sel.getRangeAt(0);
+                        const collapsed = range.cloneRange();
+                        collapsed.collapse(false);
+                        sel.removeAllRanges();
+                        sel.addRange(collapsed);
+                    }
                     submenu.classList.remove('visible');
                     savedEditorSelection = null;
                     notesEditor.focus();
@@ -468,6 +1607,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     selection.addRange(savedEditorSelection);
                 }
                 action(e.target.value);
+                // Collapse selection after custom color apply
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount > 0) {
+                    const range = sel.getRangeAt(0);
+                    const collapsed = range.cloneRange();
+                    collapsed.collapse(false);
+                    sel.removeAllRanges();
+                    sel.addRange(collapsed);
+                }
                 savedEditorSelection = null;
                 notesEditor.focus();
             });
@@ -501,35 +1649,38 @@ document.addEventListener('DOMContentLoaded', function () {
         const createSymbolDropdown = (symbols, title, icon) => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
-            
             const btn = document.createElement('button');
             btn.className = 'toolbar-btn';
             btn.title = title;
             btn.innerHTML = icon;
             dropdown.appendChild(btn);
-
             const content = document.createElement('div');
             content.className = 'symbol-dropdown-content';
-            symbols.forEach(symbol => {
-                const symbolBtn = createButton(symbol, symbol, 'insertText', symbol);
-                symbolBtn.classList.add('symbol-btn');
-                symbolBtn.addEventListener('click', () => content.classList.remove('visible'));
-                content.appendChild(symbolBtn);
-            });
+            // Render symbols list without deletion or add buttons.  The
+            // administración de caracteres se gestiona en el panel de
+            // configuración y no desde este menú desplegable.
+            const renderSymbols = () => {
+                content.innerHTML = '';
+                symbols.forEach((sym) => {
+                    const symBtn = createButton(sym, sym, 'insertText', sym);
+                    symBtn.classList.add('symbol-btn');
+                    symBtn.addEventListener('click', () => {
+                        content.classList.remove('visible');
+                    });
+                    content.appendChild(symBtn);
+                });
+            };
+            renderSymbols();
             dropdown.appendChild(content);
-
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const otherOpenDropdowns = document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible');
-                otherOpenDropdowns.forEach(dropdownEl => {
-                    if (dropdownEl !== content) {
-                        dropdownEl.classList.remove('visible');
-                    }
+                const otherOpen = document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible');
+                otherOpen.forEach(d => {
+                    if (d !== content) d.classList.remove('visible');
                 });
                 content.classList.toggle('visible');
             });
-
             return dropdown;
         };
 
@@ -635,19 +1786,33 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.execCommand('formatBlock', false, 'p');
                 elements = getSelectedBlockElements();
             }
-            elements.forEach(block => {
+            elements.forEach((block, index) => {
                 if (block && notesEditor.contains(block)) {
                     if (color === 'transparent') {
+                        // Remove highlight and reset borders and margins on clear
                         block.style.backgroundColor = '';
-                        block.style.borderRadius = '';
                         block.style.paddingLeft = '';
                         block.style.paddingRight = '';
-
+                        block.style.marginTop = '';
+                        block.style.marginBottom = '';
+                        block.style.borderTopLeftRadius = '';
+                        block.style.borderTopRightRadius = '';
+                        block.style.borderBottomLeftRadius = '';
+                        block.style.borderBottomRightRadius = '';
                     } else {
                         block.style.backgroundColor = color;
-                        block.style.borderRadius = '6px';
                         block.style.paddingLeft = '6px';
                         block.style.paddingRight = '6px';
+                        // Remove default margins to fuse adjacent highlighted lines
+                        block.style.marginTop = '0px';
+                        block.style.marginBottom = '0px';
+                        // Set border radius based on position in selection
+                        const first = index === 0;
+                        const last = index === elements.length - 1;
+                        block.style.borderTopLeftRadius = first ? '6px' : '0';
+                        block.style.borderTopRightRadius = first ? '6px' : '0';
+                        block.style.borderBottomLeftRadius = last ? '6px' : '0';
+                        block.style.borderBottomRightRadius = last ? '6px' : '0';
                     }
                 }
             });
@@ -733,8 +1898,9 @@ document.addEventListener('DOMContentLoaded', function () {
         
         editorToolbar.appendChild(createButton('Insertar bloque colapsable', accordionSVG, 'insertHTML', accordionHTML));
         
-        const postitSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
-        editorToolbar.appendChild(createButton('Añadir Nota Post-it', postitSVG, null, null, createPostitLink));
+        const subnoteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
+        // El botón ahora crea una sub-nota en lugar de un Post-it
+        editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
         
         editorToolbar.appendChild(createSeparator());
         
@@ -746,14 +1912,28 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
 
         // Image controls
-        const imageBtn = createButton('Insertar Imagen desde URL', '🖼️', null, null, () => {
-            const url = prompt("Ingresa la URL de la imagen:");
-            if (url) {
-                notesEditor.focus();
-                document.execCommand('insertImage', false, url);
-            }
+        // Floating image insertion: prompt the user for a URL and orientation,
+        // then insert the image as a floating figure (left or right) so that
+        // text wraps around it.  After insertion, enable drag to reposition
+        // the figure within the editor.
+        // Imagen flotante: en lugar de solicitar una URL, este botón aplica
+        // el estilo de imagen flotante "cuadrado" a la imagen seleccionada.
+        // Si la imagen aún no está envuelta en un figure, se envuelve y se
+        // alinea a la izquierda por defecto. En siguientes clics se alterna
+        // entre izquierda y derecha para facilitar el flujo de texto.
+        const floatImageBtn = document.createElement('button');
+        floatImageBtn.className = 'toolbar-btn';
+        floatImageBtn.title = 'Aplicar estilo de imagen cuadrada';
+        floatImageBtn.innerHTML = '🖼️';
+        let lastFloatAlign = 'left';
+        floatImageBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            // Determine next alignment (toggle left/right)
+            lastFloatAlign = lastFloatAlign === 'left' ? 'right' : 'left';
+            wrapSelectedImage(lastFloatAlign);
+            notesEditor.focus();
         });
-        editorToolbar.appendChild(imageBtn);
+        editorToolbar.appendChild(floatImageBtn);
         
         const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
         editorToolbar.appendChild(createButton('Crear Galería de Imágenes', gallerySVG, null, null, openGalleryLinkEditor));
@@ -764,7 +1944,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const resizeMinusBtn = createButton('Disminuir tamaño de imagen (-10%)', '➖', null, null, () => resizeSelectedImage(0.9));
         editorToolbar.appendChild(resizeMinusBtn);
 
-        editorToolbar.appendChild(createSeparator());
+        // Eliminamos el botón de inserción de tablas y el separador asociado
 
         // Print/Save
         const printBtn = createButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
@@ -1104,9 +2284,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 if (matchesSearch && matchesConfidence) {
                     hasVisibleChildren = true;
+                    // Show the row unless the section is collapsed
                     row.style.display = isCollapsed ? 'none' : '';
+                    // If a search query exists, highlight the row when it matches the query
+                    if (query !== '' && topicText.includes(query)) {
+                        row.classList.add('highlight-row');
+                    } else {
+                        row.classList.remove('highlight-row');
+                    }
                 } else {
                     row.style.display = 'none';
+                    // Ensure highlight class is removed when not matching
+                    row.classList.remove('highlight-row');
                 }
             });
 
@@ -1139,27 +2328,42 @@ document.addEventListener('DOMContentLoaded', function () {
         document.documentElement.dataset.iconStyle = styleName;
     }
     
+    let selectedIconCategory = null;
     function populateIconPicker() {
         iconPickerCategories.innerHTML = '';
         emojiGrid.innerHTML = '';
-        
-        Object.keys(EMOJI_CATEGORIES).forEach((category, index) => {
+        const categories = Object.keys(EMOJI_CATEGORIES);
+        // If no category selected, default to first
+        if (!selectedIconCategory && categories.length > 0) {
+            selectedIconCategory = categories[0];
+        }
+        categories.forEach((category) => {
             const btn = document.createElement('button');
             btn.className = 'category-btn';
             btn.textContent = category;
             btn.dataset.category = category;
-            if (index === 0) {
+            if (category === selectedIconCategory) {
+                btn.classList.add('active');
+            }
+            btn.addEventListener('click', () => {
+                selectedIconCategory = category;
+                document.querySelectorAll('#icon-picker-categories .category-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 loadEmojisForCategory(category);
-            }
+            });
             iconPickerCategories.appendChild(btn);
         });
+        // Load icons for currently selected category
+        if (selectedIconCategory) {
+            loadEmojisForCategory(selectedIconCategory);
+        }
     }
 
     function loadEmojisForCategory(category) {
         emojiGrid.innerHTML = '';
+        selectedIconCategory = category;
         const emojis = EMOJI_CATEGORIES[category] || [];
-        emojis.forEach(emoji => {
+        emojis.forEach((emoji) => {
             const btn = document.createElement('button');
             btn.className = 'emoji-btn';
             btn.textContent = emoji;
@@ -1226,13 +2430,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const currentContent = notesEditor.innerHTML;
         const currentTitle = notesModalTitle.textContent.trim();
         
-        // Keep existing postits data
+        // Keep existing postits and quick note data
         const existingPostits = currentNotesArray[activeNoteIndex].postits || {};
+        const existingQuickNote = currentNotesArray[activeNoteIndex].quickNote || '';
         currentNotesArray[activeNoteIndex] = {
             title: currentTitle,
             content: currentContent,
             lastEdited: new Date().toISOString(),
-            postits: existingPostits
+            postits: existingPostits,
+            quickNote: existingQuickNote
         };
 
         const noteType = activeNoteIcon.dataset.noteType;
@@ -1250,6 +2456,111 @@ document.addEventListener('DOMContentLoaded', function () {
         renderNotesList();
         saveState();
         updateNoteInfo();
+    }
+
+    /**
+     * Create a table by prompting the user for the number of rows and columns and insert it
+     * into the main notes editor. The inserted table is made resizable by adding column
+     * resizer handles to the first row. After insertion, the selection is collapsed to
+     * avoid persisting hyperlink styles.
+     */
+    function createTable() {
+        let rows = parseInt(prompt('Número de filas:', '2'), 10);
+        let cols = parseInt(prompt('Número de columnas:', '2'), 10);
+        if (!rows || !cols || rows < 1 || cols < 1) return;
+        let html = '<table class="resizable-table" style="border-collapse: collapse; width: 100%;">';
+        for (let i = 0; i < rows; i++) {
+            html += '<tr>';
+            for (let j = 0; j < cols; j++) {
+                html += '<td style="border: 1px solid var(--border-color); padding: 4px; min-width:40px;">&nbsp;</td>';
+            }
+            html += '</tr>';
+        }
+        html += '</table><p><br></p>';
+        document.execCommand('insertHTML', false, html);
+        // collapse selection after insertion
+        const sel = window.getSelection();
+        if (sel.rangeCount) {
+            const range = sel.getRangeAt(0);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+        // initialize resizers on newly inserted tables (defer to allow DOM insertion)
+        setTimeout(() => {
+            const tables = notesEditor.querySelectorAll('table.resizable-table');
+            tables.forEach(t => initTableResize(t));
+        }, 50);
+    }
+
+    // Variables used during column resizing
+    let currentResizer = null;
+    let startX = 0;
+    let startWidth = 0;
+    let resizingTable = null;
+
+    /**
+     * Initialize column resizing for a given table. Adds resizer handles to the first row
+     * of the table. Only applies if the table does not already have resizer handles.
+     * @param {HTMLTableElement} table
+     */
+    function initTableResize(table) {
+        // Avoid adding duplicate resizers
+        const firstRow = table.rows[0];
+        if (!firstRow) return;
+        for (let i = 0; i < firstRow.cells.length - 1; i++) {
+            const cell = firstRow.cells[i];
+            if (cell.querySelector('.col-resizer')) continue;
+            // ensure cell has relative positioning
+            cell.style.position = 'relative';
+            const resizer = document.createElement('div');
+            resizer.className = 'col-resizer';
+            resizer.addEventListener('mousedown', startResize);
+            cell.appendChild(resizer);
+        }
+    }
+
+    /**
+     * Handler for mousedown on a column resizer. Prepares for resizing by storing
+     * the starting X coordinate and width of the column. Attaches mousemove and
+     * mouseup listeners to the document to handle resizing.
+     */
+    function startResize(e) {
+        e.preventDefault();
+        currentResizer = e.target;
+        const cell = currentResizer.parentElement;
+        resizingTable = cell.closest('table');
+        startX = e.pageX;
+        startWidth = cell.offsetWidth;
+        document.addEventListener('mousemove', resizeColumn);
+        document.addEventListener('mouseup', stopResize);
+    }
+
+    /**
+     * Handler for mousemove during column resizing. Calculates the new width based on
+     * the horizontal mouse movement and applies it to all cells in the same column.
+     */
+    function resizeColumn(e) {
+        if (!currentResizer || !resizingTable) return;
+        const dx = e.pageX - startX;
+        const newWidth = Math.max(30, startWidth + dx);
+        const cell = currentResizer.parentElement;
+        const colIndex = Array.prototype.indexOf.call(cell.parentElement.children, cell);
+        for (let r = 0; r < resizingTable.rows.length; r++) {
+            const rowCell = resizingTable.rows[r].cells[colIndex];
+            rowCell.style.width = newWidth + 'px';
+        }
+    }
+
+    /**
+     * Handler for mouseup after resizing. Cleans up event listeners and resets
+     * temporary variables.
+     */
+    function stopResize() {
+        document.removeEventListener('mousemove', resizeColumn);
+        document.removeEventListener('mouseup', stopResize);
+        currentResizer = null;
+        resizingTable = null;
     }
 
     function renderNotesList() {
@@ -1320,7 +2631,8 @@ document.addEventListener('DOMContentLoaded', function () {
             title: `Nota ${newIndex + 1}`,
             content: '<p><br></p>',
             lastEdited: new Date().toISOString(),
-            postits: {}
+            postits: {},
+            quickNote: ''
         });
         
         loadNoteIntoEditor(newIndex);
@@ -1359,40 +2671,39 @@ document.addEventListener('DOMContentLoaded', function () {
         infoLastEdited.textContent = note.lastEdited ? new Date(note.lastEdited).toLocaleString() : 'N/A';
     }
 
-    function createPostitLink() {
+    function createSubnoteLink() {
         const selection = window.getSelection();
         if (!selection.rangeCount || selection.isCollapsed) {
-            showAlert("Por favor, selecciona el texto que quieres convertir en una nota.");
+            showAlert("Por favor, selecciona el texto que quieres convertir en una sub-nota.");
             return;
         }
-
         const range = selection.getRangeAt(0);
-        const uniqueId = `postit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-        const span = document.createElement('span');
-        span.className = 'postit-link';
-        span.dataset.postitId = uniqueId;
-        
-        // Use the selected content for the span
+        const uniqueId = `subnote-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        // Create an anchor to wrap the selected content
+        const anchor = document.createElement('a');
+        anchor.className = 'subnote-link';
+        anchor.dataset.subnoteId = uniqueId;
+        anchor.href = '#';
+        // Extract selected content and append
         const selectedContent = range.extractContents();
-        span.appendChild(selectedContent);
-
-        range.insertNode(span);
-
-        // Move cursor after the inserted span to avoid "sticky style"
+        anchor.appendChild(selectedContent);
+        range.insertNode(anchor);
+        // Insert a non-breaking space after the anchor to exit the hyperlink context
+        const spacer = document.createTextNode('\u00A0');
+        anchor.parentNode.insertBefore(spacer, anchor.nextSibling);
+        // Move cursor after inserted spacer
         const newRange = document.createRange();
-        newRange.setStartAfter(span);
+        newRange.setStartAfter(spacer);
         newRange.collapse(true);
         selection.removeAllRanges();
         selection.addRange(newRange);
         notesEditor.focus();
-
-        // Ensure the new note is saved to the current note object
+        // Save a placeholder subnote entry
         if (currentNotesArray[activeNoteIndex]) {
             if (!currentNotesArray[activeNoteIndex].postits) {
                 currentNotesArray[activeNoteIndex].postits = {};
             }
-            currentNotesArray[activeNoteIndex].postits[uniqueId] = '';
+            currentNotesArray[activeNoteIndex].postits[uniqueId] = { title: '', content: '' };
             saveCurrentNote();
         }
     }
@@ -1474,12 +2785,23 @@ document.addEventListener('DOMContentLoaded', function () {
             if (existingLink) {
                 existingLink.dataset.images = JSON.stringify(images);
             } else {
+                 // Remove formatting on the selected range before wrapping it
                  document.execCommand('removeFormat');
                  const span = document.createElement('span');
                  span.className = 'gallery-link';
                  span.dataset.images = JSON.stringify(images);
                  span.appendChild(activeGalleryRange.extractContents());
                  activeGalleryRange.insertNode(span);
+                 // Insert a non-breaking space after the span to break out of the hyperlink context
+                 const spacer = document.createTextNode('\u00A0');
+                 span.parentNode.insertBefore(spacer, span.nextSibling);
+                 // After inserting the gallery span and spacer, collapse the selection so formatting does not persist
+                 const newRange = document.createRange();
+                 newRange.setStartAfter(spacer);
+                 newRange.collapse(true);
+                 const sel = window.getSelection();
+                 sel.removeAllRanges();
+                 sel.addRange(newRange);
             }
             hideModal(imageGalleryLinkModal);
             activeGalleryRange = null;
@@ -1491,6 +2813,11 @@ document.addEventListener('DOMContentLoaded', function () {
             lightboxImages = JSON.parse(imagesData);
             if (!Array.isArray(lightboxImages) || lightboxImages.length === 0) return;
             currentLightboxIndex = startIndex;
+            // Reset zoom when opening a new gallery
+            currentZoom = 1;
+            lightboxImage.style.transform = 'scale(1)';
+            // Ensure the transform origin is centered for better zooming
+            lightboxImage.style.transformOrigin = 'center center';
             updateLightboxView();
             showModal(imageLightboxModal);
         } catch(e) {
@@ -1499,17 +2826,41 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Apply the current zoom level to the lightbox image. Defined outside of openImageLightbox so it is always available.
+    function applyZoom() {
+        if (!lightboxImage) return;
+        lightboxImage.style.transform = `scale(${currentZoom})`;
+        lightboxImage.style.transformOrigin = 'center center';
+    }
+
     function updateLightboxView() {
         if (lightboxImages.length === 0) return;
         const image = lightboxImages[currentLightboxIndex];
         lightboxImage.src = image.url;
         
-        const captionText = `${image.caption || ''} (${currentLightboxIndex + 1} / ${lightboxImages.length})`;
-        lightboxCaption.textContent = captionText.trim();
-        lightboxCaption.style.display = captionText.trim() === `(${currentLightboxIndex + 1} / ${lightboxImages.length})` ? 'none' : 'block';
+        // Build caption with numbering
+        const caption = image.caption || '';
+        const numbering = `(${currentLightboxIndex + 1} / ${lightboxImages.length})`;
+        lightboxCaptionText.textContent = caption.trim();
+        // Show or hide the caption and delete button based on caption existence
+        if (caption.trim() === '') {
+            lightboxCaption.style.display = 'none';
+        } else {
+            lightboxCaption.style.display = 'flex';
+        }
+        // Append numbering after the caption within the caption element
+        if (caption.trim()) {
+            lightboxCaptionText.textContent = `${caption.trim()} ${numbering}`;
+        } else {
+            lightboxCaptionText.textContent = numbering;
+        }
+        // Show delete caption button only if there's a caption to delete
+        deleteCaptionBtn.style.display = caption.trim() ? 'inline-block' : 'none';
 
         prevLightboxBtn.style.display = currentLightboxIndex > 0 ? 'block' : 'none';
         nextLightboxBtn.style.display = currentLightboxIndex < lightboxImages.length - 1 ? 'block' : 'none';
+        // Apply current zoom after updating image
+        applyZoom();
     }
     
     async function handlePrintSection(sectionHeaderRow) {
@@ -1530,7 +2881,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     const noteContent = document.createElement('div');
                     noteContent.innerHTML = note.content;
                     // Sanitize links for printing
-                    noteContent.querySelectorAll('a.postit-link, a.gallery-link').forEach(link => {
+                    // Convert sub-note and post-it links back to plain text for printing
+                    noteContent.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
                         link.outerHTML = `<span>${link.innerHTML}</span>`;
                     });
                     topicWrapper.appendChild(noteContent);
@@ -1807,9 +3159,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Note content import/export
         exportNoteBtn.addEventListener('click', () => {
-            const noteContent = notesEditor.innerHTML;
+            // Clone the editor content so we can strip sub-note links before exporting
+            const clone = notesEditor.cloneNode(true);
+            // Remove any sub-note or legacy post-it links entirely from the exported HTML
+            clone.querySelectorAll('a.subnote-link, a.postit-link').forEach(link => {
+                const parent = link.parentNode;
+                while (link.firstChild) {
+                    parent.insertBefore(link.firstChild, link);
+                }
+                parent.removeChild(link);
+            });
+            const noteContent = clone.innerHTML;
             const noteTitle = (notesModalTitle.textContent || 'nota').trim().replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            const blob = new Blob([`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${notesModalTitle.textContent}</title></head><body>${noteContent}</body></html>`], { type: 'text/html' });
+            const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${notesModalTitle.textContent}</title></head><body>${noteContent}</body></html>`;
+            const blob = new Blob([html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -1868,56 +3231,60 @@ document.addEventListener('DOMContentLoaded', function () {
              const galleryLink = e.target.closest('.gallery-link');
              if (galleryLink) {
                  e.preventDefault();
+                 // Persist the link so that caption edits and image updates can be saved back
+                 activeGalleryLinkForLightbox = galleryLink;
                  openImageLightbox(galleryLink.dataset.images);
                  return;
              }
              
-             // Handle post-it link clicks
-             const postitLink = e.target.closest('.postit-link');
-             if (postitLink) {
+             // Handle sub-note link clicks (supports legacy post-it links)
+             const subnoteLink = e.target.closest('.subnote-link, .postit-link');
+             if (subnoteLink) {
                  e.preventDefault();
-                 activePostitLink = postitLink;
-                 const postitId = postitLink.dataset.postitId;
+                 activeSubnoteLink = subnoteLink;
+                 editingQuickNote = false;
+                 // Determine the identifier attribute (subnoteId or legacy postitId)
+                 const subnoteId = subnoteLink.dataset.subnoteId || subnoteLink.dataset.postitId;
                  const noteData = currentNotesArray[activeNoteIndex];
-                 const postitContent = (noteData && noteData.postits) ? noteData.postits[postitId] : '';
-                 postitNoteTextarea.value = postitContent || '';
-                 showModal(postitNoteModal);
-                 postitNoteTextarea.focus();
+                 let subnoteData = { title: '', content: '' };
+                 if (noteData && noteData.postits) {
+                     const existing = noteData.postits[subnoteId];
+                     // Support legacy string format where value was a plain string
+                     if (typeof existing === 'string') {
+                         subnoteData = { title: '', content: existing };
+                     } else if (existing) {
+                         subnoteData = existing;
+                     }
+                 }
+                 // Populate sub-note modal fields
+                 subNoteTitle.textContent = subnoteData.title || '';
+                 subNoteEditor.innerHTML = subnoteData.content || '<p><br></p>';
+                 showModal(subNoteModal);
+                 subNoteEditor.focus();
                  return;
              }
         });
 
-        // --- Post-it Modal Listeners ---
+        // --- Quick Note Modal Listeners ---
         savePostitBtn.addEventListener('click', () => {
-            if (activePostitLink && currentNotesArray[activeNoteIndex]) {
-                const postitId = activePostitLink.dataset.postitId;
-                if (!currentNotesArray[activeNoteIndex].postits) {
-                    currentNotesArray[activeNoteIndex].postits = {};
-                }
-                currentNotesArray[activeNoteIndex].postits[postitId] = postitNoteTextarea.value;
+            // When editing a quick note, save its content and close modal
+            if (editingQuickNote && currentNotesArray[activeNoteIndex]) {
+                currentNotesArray[activeNoteIndex].quickNote = postitNoteTextarea.value;
                 hideModal(postitNoteModal);
-                activePostitLink = null;
-                saveCurrentNote(); // Save the main note to persist post-it changes
+                editingQuickNote = false;
+                saveCurrentNote();
+                return;
             }
         });
 
         deletePostitBtn.addEventListener('click', async () => {
-            if (activePostitLink) {
-                const confirmed = await showConfirmation("¿Eliminar esta nota? El texto se mantendrá pero la nota se borrará permanentemente.");
+            // Delete quick note content if editing
+            if (editingQuickNote && currentNotesArray[activeNoteIndex]) {
+                const confirmed = await showConfirmation("¿Eliminar esta nota rápida? El contenido se borrará permanentemente.");
                 if (confirmed) {
-                    // Remove postit data from note object
-                    if (currentNotesArray[activeNoteIndex] && currentNotesArray[activeNoteIndex].postits) {
-                        delete currentNotesArray[activeNoteIndex].postits[activePostitLink.dataset.postitId];
-                    }
-                    // Unwrap the span
-                    const parent = activePostitLink.parentNode;
-                    while (activePostitLink.firstChild) {
-                        parent.insertBefore(activePostitLink.firstChild, activePostitLink);
-                    }
-                    parent.removeChild(activePostitLink);
-                    
+                    currentNotesArray[activeNoteIndex].quickNote = '';
                     hideModal(postitNoteModal);
-                    activePostitLink = null;
+                    editingQuickNote = false;
                     saveCurrentNote();
                 }
             }
@@ -1925,7 +3292,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         closePostitBtn.addEventListener('click', () => {
             hideModal(postitNoteModal);
-            activePostitLink = null;
+            editingQuickNote = false;
         });
         
         // Image Gallery Modal Listeners
@@ -1955,6 +3322,60 @@ document.addEventListener('DOMContentLoaded', function () {
                  hideModal(imageLightboxModal);
             }
         });
+
+        // Additional Lightbox controls
+        if (zoomInLightboxBtn) {
+            zoomInLightboxBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                currentZoom = Math.min(maxZoom, currentZoom + zoomStep);
+                applyZoom();
+            });
+        }
+        if (zoomOutLightboxBtn) {
+            zoomOutLightboxBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                currentZoom = Math.max(minZoom, currentZoom - zoomStep);
+                applyZoom();
+            });
+        }
+        if (downloadLightboxBtn) {
+            downloadLightboxBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                try {
+                    const imageObj = lightboxImages[currentLightboxIndex];
+                    if (!imageObj || !imageObj.url) return;
+                    const link = document.createElement('a');
+                    link.href = imageObj.url;
+                    // Extract filename from URL or default to image
+                    const parts = imageObj.url.split('/');
+                    link.download = parts[parts.length - 1] || 'imagen';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } catch(err) {
+                    console.error('Error downloading image:', err);
+                }
+            });
+        }
+        if (deleteCaptionBtn) {
+            deleteCaptionBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                // Remove the caption for the current image
+                const imgObj = lightboxImages[currentLightboxIndex];
+                if (imgObj) {
+                    imgObj.caption = '';
+                    updateLightboxView();
+                    // Persist the updated images data back to the link and save note
+                    if (activeGalleryLinkForLightbox) {
+                        activeGalleryLinkForLightbox.dataset.images = JSON.stringify(lightboxImages);
+                        // Save state of current note when modifying gallery captions
+                        if (currentNotesArray && currentNotesArray[activeNoteIndex]) {
+                            saveCurrentNote();
+                        }
+                    }
+                }
+            });
+        }
 
         // References Modal Listeners
         addReferenceSlotBtn.addEventListener('click', (e) => {
@@ -2000,6 +3421,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 activeIconPickerButton = null;
             }
         });
+
+        // Listener for adding custom icons
+        if (addIconBtn) {
+            addIconBtn.addEventListener('click', () => {
+                if (!newIconInput) return;
+                const icon = newIconInput.value.trim();
+                if (!icon) return;
+                const category = selectedIconCategory || Object.keys(EMOJI_CATEGORIES)[0];
+                if (!EMOJI_CATEGORIES[category]) {
+                    EMOJI_CATEGORIES[category] = [];
+                }
+                EMOJI_CATEGORIES[category].push(icon);
+                newIconInput.value = '';
+                loadEmojisForCategory(category);
+            });
+        }
         cancelIconPickerBtn.addEventListener('click', () => hideModal(iconPickerModal));
 
         // --- Confirmation Modal Listeners ---
