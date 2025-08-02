@@ -8,6 +8,7 @@ import { GoogleGenAI } from "@google/genai";
 // Import the database helper from a separate module.  This replaces the
 // inline IndexedDB implementation and keeps the rest of the code unchanged.
 import db from './db.js';
+import { makeTableResizable } from './table-resize.js';
 
 // API Key for Google Gemini.  For simplicity and to avoid relying on build
 // environment variables, insert your key directly here.  Replace the
@@ -1138,7 +1139,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const td = document.createElement('td');
                 td.style.border = '1px solid var(--border-color)';
                 td.style.padding = '4px';
-                td.style.minWidth = '40px';
+                td.style.minWidth = '30px';
                 td.innerHTML = '&nbsp;';
                 td.contentEditable = true;
                 tr.appendChild(td);
@@ -2478,132 +2479,8 @@ document.addEventListener('DOMContentLoaded', function () {
             tables.forEach(t => initTableResize(t));
         }, 50);
     }
-
-    // Variables used during column resizing
-    let currentResizer = null;
-    let startX = 0;
-    let startWidth = 0;
-    let resizingTable = null;
-
-    // Variables used during row resizing
-    let currentRow = null;
-    let startY = 0;
-    let startHeight = 0;
-    let rowResizing = false;
-    let rowTable = null;
-
-    /**
-     * Initialize column resizing for a given table. Adds resizer handles to the first row
-     * of the table. Only applies if the table does not already have resizer handles.
-     * @param {HTMLTableElement} table
-     */
     function initTableResize(table) {
-        // Avoid adding duplicate resizers
-        const firstRow = table.rows[0];
-        if (!firstRow) return;
-        for (let i = 0; i < firstRow.cells.length - 1; i++) {
-            const cell = firstRow.cells[i];
-            if (cell.querySelector('.col-resizer')) continue;
-            // ensure cell has relative positioning
-            cell.style.position = 'relative';
-            const resizer = document.createElement('div');
-            resizer.className = 'col-resizer';
-            resizer.addEventListener('mousedown', startResize);
-            cell.appendChild(resizer);
-        }
-
-        // Row resizing detection
-        table.addEventListener('mousemove', (e) => {
-            if (currentResizer || rowResizing) return;
-            const row = e.target.closest('tr');
-            if (!row || !table.contains(row)) return;
-            const rect = row.getBoundingClientRect();
-            if (rect.bottom - e.clientY < 4) {
-                table.style.cursor = 'row-resize';
-                currentRow = row;
-            } else {
-                if (!rowResizing) table.style.cursor = '';
-                currentRow = null;
-            }
-        });
-
-        table.addEventListener('mousedown', (e) => {
-            if (table.style.cursor === 'row-resize' && currentRow) {
-                e.preventDefault();
-                rowResizing = true;
-                startY = e.pageY;
-                startHeight = currentRow.offsetHeight;
-                rowTable = table;
-                document.addEventListener('mousemove', resizeRow);
-                document.addEventListener('mouseup', stopRowResize);
-            }
-        });
-    }
-
-    /**
-     * Handler for mousedown on a column resizer. Prepares for resizing by storing
-     * the starting X coordinate and width of the column. Attaches mousemove and
-     * mouseup listeners to the document to handle resizing.
-     */
-    function startResize(e) {
-        e.preventDefault();
-        currentResizer = e.target;
-        const cell = currentResizer.parentElement;
-        resizingTable = cell.closest('table');
-        startX = e.pageX;
-        startWidth = cell.offsetWidth;
-        document.addEventListener('mousemove', resizeColumn);
-        document.addEventListener('mouseup', stopResize);
-    }
-
-    /**
-     * Handler for mousemove during column resizing. Calculates the new width based on
-     * the horizontal mouse movement and applies it to all cells in the same column.
-     */
-    function resizeColumn(e) {
-        if (!currentResizer || !resizingTable) return;
-        const dx = e.pageX - startX;
-        const newWidth = Math.max(30, startWidth + dx);
-        const cell = currentResizer.parentElement;
-        const colIndex = Array.prototype.indexOf.call(cell.parentElement.children, cell);
-        for (let r = 0; r < resizingTable.rows.length; r++) {
-            const rowCell = resizingTable.rows[r].cells[colIndex];
-            rowCell.style.width = newWidth + 'px';
-        }
-    }
-
-    /**
-     * Handler for mouseup after resizing. Cleans up event listeners and resets
-     * temporary variables.
-     */
-    function stopResize() {
-        document.removeEventListener('mousemove', resizeColumn);
-        document.removeEventListener('mouseup', stopResize);
-        currentResizer = null;
-        resizingTable = null;
-    }
-
-    /**
-     * Handler for mousemove during row resizing. Calculates new height based on
-     * vertical mouse movement and applies it to the active row.
-     */
-    function resizeRow(e) {
-        if (!rowResizing || !currentRow) return;
-        const dy = e.pageY - startY;
-        const newHeight = Math.max(20, startHeight + dy);
-        currentRow.style.height = newHeight + 'px';
-    }
-
-    /**
-     * Handler for mouseup after row resizing. Cleans up listeners and resets state.
-     */
-    function stopRowResize() {
-        document.removeEventListener('mousemove', resizeRow);
-        document.removeEventListener('mouseup', stopRowResize);
-        rowResizing = false;
-        currentRow = null;
-        if (rowTable) rowTable.style.cursor = '';
-        rowTable = null;
+        makeTableResizable(table);
     }
 
     function renderNotesList() {
