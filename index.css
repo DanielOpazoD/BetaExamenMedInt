@@ -1,8 +1,4 @@
-
-
-
-
-
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
         :root {
             --progress-ring-radius: 16;
@@ -68,7 +64,6 @@
 
 
         body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); }
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         
         .fillable-cell, .lectura-cell { cursor: pointer; user-select: none; transition: background-color 0.2s; position: relative; text-align: center; }
         .fillable-cell.filled { background-color: var(--filled-bg); }
@@ -333,22 +328,10 @@ html.dark .highlight-row td {
             padding: 3px;
         }
 
-/* Styles for resizable tables */
-table.resizable-table td, table.resizable-table th {
+/* Basic styles for resizable tables */
+table.resizable-table td,
+table.resizable-table th {
     position: relative;
-}
-table.resizable-table .col-resizer {
-    position: absolute;
-    right: 0;
-    top: 0;
-    width: 4px;
-    height: 100%;
-    cursor: col-resize;
-    user-select: none;
-    background: transparent;
-}
-table.resizable-table .col-resizer:hover {
-    background: rgba(0, 0, 0, 0.1);
 }
 
 /* Floating image styles */
