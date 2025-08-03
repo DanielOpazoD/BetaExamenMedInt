@@ -118,6 +118,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const aiQuestionInput = getElem('ai-question-input');
     const cancelAiQaBtn = getElem('cancel-ai-qa-btn');
     const sendAiQaBtn = getElem('send-ai-qa-btn');
+    const aiToolsModal = getElem('ai-tools-modal');
+    const aiToolsResponse = getElem('ai-tools-response');
+    const aiToolsLoader = getElem('ai-tools-loader');
+    const aiToolsInput = getElem('ai-tools-input');
+    const cancelAiToolsBtn = getElem('cancel-ai-tools-btn');
+    const sendAiToolsBtn = getElem('send-ai-tools-btn');
+    const insertAiToolsBtn = getElem('insert-ai-tools-btn');
     const exportBtn = getElem('export-btn');
     const importBtn = getElem('import-btn');
     const importFileInput = getElem('import-file-input');
@@ -764,6 +771,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeSubnoteLink = null;
     let editingQuickNote = false;
     let savedEditorSelection = null;
+    let aiToolsGeneratedText = '';
 
     // ------------------------------------------------------------------------
     // Icon Manager and Character Manager Functions
@@ -1898,6 +1906,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
         editorToolbar.appendChild(createSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
 
+        const aiBtn = createButton('Asistente de IA', '🤖', null, null, openAiToolsModal);
+        editorToolbar.appendChild(aiBtn);
+        editorToolbar.appendChild(createSeparator());
+
         // Image controls
         // Floating image insertion: prompt the user for a URL and orientation,
         // then insert the image as a floating figure (left or right) so that
@@ -1940,6 +1952,20 @@ document.addEventListener('DOMContentLoaded', function () {
              window.print();
         });
         editorToolbar.appendChild(printBtn);
+    }
+
+    function openAiToolsModal() {
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
+            savedEditorSelection = selection.getRangeAt(0).cloneRange();
+        } else {
+            savedEditorSelection = null;
+        }
+        aiToolsInput.value = '';
+        aiToolsResponse.textContent = 'Escribe tu instrucción a continuación...';
+        aiToolsGeneratedText = '';
+        insertAiToolsBtn.classList.add('hidden');
+        showModal(aiToolsModal);
     }
 
     function resizeSelectedImage(multiplier) {
@@ -3429,6 +3455,51 @@ document.addEventListener('DOMContentLoaded', function () {
                 aiQaLoader.style.display = 'none';
                 sendAiQaBtn.disabled = false;
             }
+        });
+
+        cancelAiToolsBtn.addEventListener('click', () => hideModal(aiToolsModal));
+        sendAiToolsBtn.addEventListener('click', async () => {
+            const instruction = aiToolsInput.value.trim();
+            if (!instruction) {
+                showAlert("Por favor, escribe una instrucción.");
+                return;
+            }
+            if (!API_KEY) {
+                showAlert("La API Key de Gemini no está configurada.");
+                return;
+            }
+            aiToolsLoader.classList.remove('hidden');
+            aiToolsResponse.textContent = '';
+            sendAiToolsBtn.disabled = true;
+            try {
+                const context = savedEditorSelection ? savedEditorSelection.toString() : '';
+                const prompt = context ? `${instruction}\n\n${context}` : instruction;
+                const ai = new GoogleGenAI({ apiKey: API_KEY });
+                const response = await ai.models.generateContent({
+                    model: 'gemini-1.5-flash',
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                });
+                aiToolsGeneratedText = response.text;
+                aiToolsResponse.innerHTML = response.text.replace(/\n/g, '<br>');
+                insertAiToolsBtn.classList.remove('hidden');
+            } catch (error) {
+                console.error('AI Error:', error);
+                aiToolsResponse.textContent = 'Error al contactar a la IA: ' + error.message;
+            } finally {
+                aiToolsLoader.classList.add('hidden');
+                sendAiToolsBtn.disabled = false;
+            }
+        });
+        insertAiToolsBtn.addEventListener('click', () => {
+            if (!aiToolsGeneratedText) return;
+            if (savedEditorSelection) {
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(savedEditorSelection);
+            }
+            document.execCommand('insertText', false, aiToolsGeneratedText);
+            hideModal(aiToolsModal);
+            notesEditor.focus();
         });
         
         // Close dropdowns when clicking outside
