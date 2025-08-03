@@ -137,6 +137,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveConfirmation = getElem('save-confirmation');
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
+
+    const openAiPanelBtn = getElem('open-ai-panel');
+    const aiPanel = getElem('ai-panel');
+    const closeAiPanelBtn = getElem('close-ai-panel');
+    const aiMessages = getElem('ai-messages');
+    const aiInput = getElem('ai-input');
+    const sendAiPanelBtn = getElem('send-ai-btn');
+    const aiStatus = getElem('ai-status');
+    const aiToolSelect = getElem('ai-tool-select');
+    const toneSelect = getElem('tone-select');
+    const lengthRange = getElem('length-range');
+    const langSelect = getElem('lang-select');
     
     // References modal elements
     const referencesModal = getElem('references-modal');
@@ -2277,6 +2289,41 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 2000);
     }
 
+    function gatherNotesContext() {
+        const allRows = document.querySelectorAll('tr[data-topic-id]');
+        let notesContext = '';
+        allRows.forEach(row => {
+            const notes = JSON.parse(row.dataset.notes || '[]');
+            if (notes.length > 0) {
+                const topicTitle = row.querySelector('.topic-text')?.textContent || `Tema ${row.dataset.topicId}`;
+                notes.forEach(note => {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = note.content;
+                    notesContext += `Tema: ${topicTitle}\nNota: ${note.title}\nContenido:\n${tempDiv.textContent}\n\n---\n\n`;
+                });
+            }
+        });
+        return notesContext;
+    }
+
+    function createMessageElement(role) {
+        const wrapper = document.createElement('div');
+        wrapper.className = role === 'user' ? 'text-right' : 'text-left';
+        const bubble = document.createElement('div');
+        bubble.className = role === 'user'
+            ? 'inline-block bg-indigo-600 text-white p-2 rounded-lg'
+            : 'inline-block bg-gray-200 dark:bg-gray-700 p-2 rounded-lg';
+        wrapper.appendChild(bubble);
+        aiMessages.appendChild(wrapper);
+        aiMessages.scrollTop = aiMessages.scrollHeight;
+        return bubble;
+    }
+
+    function appendMessage(role, text) {
+        const el = createMessageElement(role);
+        el.textContent = text;
+    }
+
     function filterTable() {
         const query = searchBar.value.toLowerCase().trim();
         const isFiltering = query !== '' || activeConfidenceFilter !== 'all';
@@ -3501,7 +3548,70 @@ document.addEventListener('DOMContentLoaded', function () {
             hideModal(aiToolsModal);
             notesEditor.focus();
         });
-        
+
+        openAiPanelBtn.addEventListener('click', () => {
+            aiPanel.classList.remove('translate-x-full');
+            aiInput.focus();
+        });
+        closeAiPanelBtn.addEventListener('click', () => {
+            aiPanel.classList.add('translate-x-full');
+        });
+        sendAiPanelBtn.addEventListener('click', async () => {
+            const userText = aiInput.value.trim();
+            if (!userText && aiToolSelect.value === 'qa') {
+                showAlert("Por favor, escribe un mensaje.");
+                return;
+            }
+            if (!API_KEY) {
+                showAlert("La API Key de Gemini no está configurada.");
+                return;
+            }
+            const tone = toneSelect.value;
+            const length = lengthRange.value;
+            const lang = langSelect.value;
+            const notesContext = gatherNotesContext();
+            let prompt = '';
+            switch (aiToolSelect.value) {
+                case 'summary':
+                    prompt = `En ${lang} y con un tono ${tone}, resume el siguiente contenido en no más de ${length} palabras:\n${notesContext}`;
+                    break;
+                case 'flashcards':
+                    prompt = `En ${lang} y con un tono ${tone}, crea tarjetas de estudio (pregunta: respuesta) basadas en el siguiente contenido. Limita cada tarjeta a ${length} palabras:\n${notesContext}`;
+                    break;
+                case 'translate':
+                    prompt = `Traduce al ${lang} con un tono ${tone} el siguiente contenido:\n${notesContext}`;
+                    break;
+                case 'questions':
+                    prompt = `En ${lang} y con un tono ${tone}, genera preguntas tipo examen con respuestas breves basadas en este contenido. Limita cada respuesta a ${length} palabras:\n${notesContext}`;
+                    break;
+                default:
+                    prompt = `Responde en ${lang} con un tono ${tone} y no más de ${length} palabras a la siguiente consulta del usuario utilizando el contexto.\n\nContexto:\n${notesContext}\n\nPregunta: ${userText}`;
+            }
+            appendMessage('user', userText || aiToolSelect.options[aiToolSelect.selectedIndex].textContent);
+            aiInput.value = '';
+            aiStatus.classList.remove('hidden');
+            sendAiPanelBtn.disabled = true;
+            try {
+                const ai = new GoogleGenAI({ apiKey: API_KEY });
+                const stream = await ai.models.generateContentStream({
+                    model: 'gemini-2.5-flash',
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                });
+                const assistantBubble = createMessageElement('assistant');
+                for await (const chunk of stream) {
+                    assistantBubble.textContent += chunk.text || '';
+                    aiMessages.scrollTop = aiMessages.scrollHeight;
+                }
+            } catch (error) {
+                console.error("AI Error:", error);
+                const errBubble = createMessageElement('assistant');
+                errBubble.textContent = "Error al contactar a la IA: " + error.message;
+            } finally {
+                aiStatus.classList.add('hidden');
+                sendAiPanelBtn.disabled = false;
+            }
+        });
+
         // Close dropdowns when clicking outside
         window.addEventListener('click', (e) => {
             if (!settingsBtn.contains(e.target) && !settingsDropdown.contains(e.target)) {
