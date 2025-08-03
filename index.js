@@ -10,6 +10,11 @@ import { GoogleGenAI } from "@google/genai";
 import db from './db.js';
 import { makeTableResizable } from './table-resize.js';
 
+const pdfjsLib = typeof window !== 'undefined' ? window['pdfjsLib'] : null;
+if (pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
 // API Key for Google Gemini.  For simplicity and to avoid relying on build
 // environment variables, insert your key directly here.  Replace the
 // placeholder string below with your actual Gemini API key.  Note: embedding
@@ -149,6 +154,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const toneSelect = getElem('tone-select');
     const lengthRange = getElem('length-range');
     const langSelect = getElem('lang-select');
+    const pdfUploadInput = getElem('pdf-upload');
+    let uploadedPdfText = '';
     
     // References modal elements
     const referencesModal = getElem('references-modal');
@@ -2306,22 +2313,49 @@ document.addEventListener('DOMContentLoaded', function () {
         return notesContext;
     }
 
+    async function extractTextFromPDF(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let text = '';
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const content = await page.getTextContent();
+            const pageText = content.items.map(item => item.str).join(' ');
+            text += pageText + '\n';
+        }
+        return text;
+    }
+
     function createMessageElement(role) {
         const wrapper = document.createElement('div');
         wrapper.className = role === 'user' ? 'text-right' : 'text-left';
         const bubble = document.createElement('div');
         bubble.className = role === 'user'
             ? 'inline-block bg-indigo-600 text-white p-2 rounded-lg'
-            : 'inline-block bg-gray-200 dark:bg-gray-700 p-2 rounded-lg';
+            : 'inline-block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 p-2 rounded-lg';
         wrapper.appendChild(bubble);
         aiMessages.appendChild(wrapper);
         aiMessages.scrollTop = aiMessages.scrollHeight;
         return bubble;
     }
 
+    function formatAiResponse(text) {
+        if (!text) return '';
+        const escaped = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        const bolded = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        return bolded.replace(/\n/g, '<br>');
+    }
+
     function appendMessage(role, text) {
         const el = createMessageElement(role);
-        el.textContent = text;
+        if (role === 'assistant') {
+            el.innerHTML = formatAiResponse(text);
+        } else {
+            el.textContent = text;
+        }
     }
 
     function filterTable() {
@@ -3556,6 +3590,16 @@ document.addEventListener('DOMContentLoaded', function () {
         closeAiPanelBtn.addEventListener('click', () => {
             aiPanel.classList.add('translate-x-full');
         });
+        pdfUploadInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file && pdfjsLib) {
+                try {
+                    uploadedPdfText = await extractTextFromPDF(file);
+                } catch (err) {
+                    console.error('Error al leer el PDF:', err);
+                }
+            }
+        });
         sendAiPanelBtn.addEventListener('click', async () => {
             const userText = aiInput.value.trim();
             if (!userText && aiToolSelect.value === 'qa') {
@@ -3570,22 +3614,24 @@ document.addEventListener('DOMContentLoaded', function () {
             const length = lengthRange.value;
             const lang = langSelect.value;
             const notesContext = gatherNotesContext();
+            const pdfContext = uploadedPdfText ? `\n\nContenido PDF:\n${uploadedPdfText}` : '';
+            const combinedContext = notesContext + pdfContext;
             let prompt = '';
             switch (aiToolSelect.value) {
                 case 'summary':
-                    prompt = `En ${lang} y con un tono ${tone}, resume el siguiente contenido en no más de ${length} palabras:\n${notesContext}`;
+                    prompt = `En ${lang} y con un tono ${tone}, resume el siguiente contenido en no más de ${length} palabras:\n${combinedContext}`;
                     break;
                 case 'flashcards':
-                    prompt = `En ${lang} y con un tono ${tone}, crea tarjetas de estudio (pregunta: respuesta) basadas en el siguiente contenido. Limita cada tarjeta a ${length} palabras:\n${notesContext}`;
+                    prompt = `En ${lang} y con un tono ${tone}, crea tarjetas de estudio (pregunta: respuesta) basadas en el siguiente contenido. Limita cada tarjeta a ${length} palabras:\n${combinedContext}`;
                     break;
                 case 'translate':
-                    prompt = `Traduce al ${lang} con un tono ${tone} el siguiente contenido:\n${notesContext}`;
+                    prompt = `Traduce al ${lang} con un tono ${tone} el siguiente contenido:\n${combinedContext}`;
                     break;
                 case 'questions':
-                    prompt = `En ${lang} y con un tono ${tone}, genera preguntas tipo examen con respuestas breves basadas en este contenido. Limita cada respuesta a ${length} palabras:\n${notesContext}`;
+                    prompt = `En ${lang} y con un tono ${tone}, genera preguntas tipo examen con respuestas breves basadas en este contenido. Limita cada respuesta a ${length} palabras:\n${combinedContext}`;
                     break;
                 default:
-                    prompt = `Responde en ${lang} con un tono ${tone} y no más de ${length} palabras a la siguiente consulta del usuario utilizando el contexto.\n\nContexto:\n${notesContext}\n\nPregunta: ${userText}`;
+                    prompt = `Responde en ${lang} con un tono ${tone} y no más de ${length} palabras a la siguiente consulta del usuario utilizando el contexto.\n\nContexto:\n${combinedContext}\n\nPregunta: ${userText}`;
             }
             appendMessage('user', userText || aiToolSelect.options[aiToolSelect.selectedIndex].textContent);
             aiInput.value = '';
@@ -3598,8 +3644,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     contents: [{ role: 'user', parts: [{ text: prompt }] }],
                 });
                 const assistantBubble = createMessageElement('assistant');
+                let assistantText = '';
                 for await (const chunk of stream) {
-                    assistantBubble.textContent += chunk.text || '';
+                    assistantText += chunk.text || '';
+                    assistantBubble.innerHTML = formatAiResponse(assistantText);
                     aiMessages.scrollTop = aiMessages.scrollHeight;
                 }
             } catch (error) {
