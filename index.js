@@ -124,6 +124,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const cancelAiQaBtn = getElem('cancel-ai-qa-btn');
     const sendAiQaBtn = getElem('send-ai-qa-btn');
     const aiToolsModal = getElem('ai-tools-modal');
+    const aiToolsThinking = getElem('ai-tools-thinking');
     const aiToolsResponse = getElem('ai-tools-response');
     const aiToolsLoader = getElem('ai-tools-loader');
     const aiToolsInput = getElem('ai-tools-input');
@@ -154,8 +155,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const toneSelect = getElem('tone-select');
     const lengthRange = getElem('length-range');
     const langSelect = getElem('lang-select');
-    const pdfUploadInput = getElem('pdf-upload');
-    let uploadedPdfText = '';
+    const fileUploadInput = getElem('file-upload');
+    const generateCanvasBtn = getElem('generate-canvas-btn');
+    const aiCanvas = getElem('ai-canvas');
+    const aiCanvasReasoning = getElem('ai-canvas-reasoning');
+    let uploadedFileText = '';
     
     // References modal elements
     const referencesModal = getElem('references-modal');
@@ -1927,6 +1931,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const aiBtn = createButton('Asistente de IA', '🤖', null, null, openAiToolsModal);
         editorToolbar.appendChild(aiBtn);
+        const aiImproveBtn = createButton('Mejorar redacción', '✨', null, null, () => openAiToolsModalWithInstruction('Mejora la redacción del siguiente texto y corrige errores gramaticales'));
+        editorToolbar.appendChild(aiImproveBtn);
+        const aiSummarizeBtn = createButton('Resumir texto', '📝', null, null, () => openAiToolsModalWithInstruction('Resume el siguiente texto'));
+        editorToolbar.appendChild(aiSummarizeBtn);
+        const aiExpandBtn = createButton('Expandir contenido', '➕', null, null, () => openAiToolsModalWithInstruction('Amplía el contenido del siguiente texto utilizando tu conocimiento'));
+        editorToolbar.appendChild(aiExpandBtn);
         editorToolbar.appendChild(createSeparator());
 
         // Image controls
@@ -1982,9 +1992,16 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         aiToolsInput.value = '';
         aiToolsResponse.textContent = 'Escribe tu instrucción a continuación...';
+        aiToolsThinking.textContent = '';
         aiToolsGeneratedText = '';
         insertAiToolsBtn.classList.add('hidden');
         showModal(aiToolsModal);
+    }
+
+    function openAiToolsModalWithInstruction(instr) {
+        openAiToolsModal();
+        aiToolsInput.value = instr;
+        aiToolsInput.focus();
     }
 
     function resizeSelectedImage(multiplier) {
@@ -2326,6 +2343,32 @@ document.addEventListener('DOMContentLoaded', function () {
         return text;
     }
 
+    async function readTextFile(file) {
+        return await file.text();
+    }
+
+    function drawCanvasFromDescription(desc) {
+        if (!aiCanvas) return;
+        let shapes;
+        try {
+            shapes = JSON.parse(desc);
+        } catch {
+            return;
+        }
+        const ctx = aiCanvas.getContext('2d');
+        ctx.clearRect(0, 0, aiCanvas.width, aiCanvas.height);
+        shapes.forEach(s => {
+            ctx.fillStyle = s.color || '#000';
+            if (s.type === 'circle') {
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (s.type === 'rect') {
+                ctx.fillRect(s.x, s.y, s.w, s.h);
+            }
+        });
+    }
+
     function createMessageElement(role) {
         const wrapper = document.createElement('div');
         wrapper.className = role === 'user' ? 'text-right' : 'text-left';
@@ -2345,8 +2388,46 @@ document.addEventListener('DOMContentLoaded', function () {
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
-        const bolded = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        return bolded.replace(/\n/g, '<br>');
+        const formatted = escaped
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>');
+        const lines = formatted.split(/\n/);
+        let html = '';
+        let inList = false;
+        for (const line of lines) {
+            const match = line.match(/^[-*]\s+(.*)/);
+            if (match) {
+                if (!inList) {
+                    html += '<ul>';
+                    inList = true;
+                }
+                html += `<li>${match[1]}</li>`;
+            } else {
+                if (inList) {
+                    html += '</ul>';
+                    inList = false;
+                }
+                html += line + '<br>';
+            }
+        }
+        if (inList) html += '</ul>';
+        return html;
+    }
+
+    function splitReasoning(text) {
+        const match = text.match(/Razonamiento:\s*([\s\S]*?)\nRespuesta:\s*([\s\S]*)/i);
+        if (match) {
+            return { reasoning: match[1].trim(), answer: match[2].trim() };
+        }
+        return { reasoning: '', answer: text.trim() };
+    }
+
+    function buildReasoningHTML(reasoning, answer) {
+        const answerHtml = formatAiResponse(answer);
+        if (reasoning) {
+            return `<details><summary>Pensamiento</summary>${formatAiResponse(reasoning)}</details>${answerHtml}`;
+        }
+        return answerHtml;
     }
 
     function appendMessage(role, text) {
@@ -3520,14 +3601,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 const ai = new GoogleGenAI({ apiKey: API_KEY });
-                const fullPrompt = `Basado en las siguientes notas de estudio, responde la pregunta del usuario. Contenido de las notas:\n\n${notesContext}\n\nPregunta: ${question}`;
+                const extraContext = uploadedFileText ? `\n\nArchivo:\n${uploadedFileText}` : '';
+                const fullPrompt = `Basado en las siguientes notas de estudio${extraContext ? ' y archivo proporcionado' : ''}, responde la pregunta del usuario. Proporciona primero "Razonamiento:" y luego "Respuesta:". Contenido:\n\n${notesContext}${extraContext}\n\nPregunta: ${question}`;
 
                 const response = await ai.models.generateContent({
                   model: 'gemini-2.5-flash',
                   contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
                 });
-                
-                aiResponseArea.innerHTML = response.text.replace(/\n/g, '<br>');
+
+                const { reasoning, answer } = splitReasoning(response.text);
+                aiResponseArea.innerHTML = buildReasoningHTML(reasoning, answer);
 
             } catch (error) {
                 console.error("AI Error:", error);
@@ -3551,17 +3634,21 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             aiToolsLoader.classList.remove('hidden');
             aiToolsResponse.textContent = '';
+            aiToolsThinking.textContent = '';
             sendAiToolsBtn.disabled = true;
             try {
-                const context = savedEditorSelection ? savedEditorSelection.toString() : '';
-                const prompt = context ? `${instruction}\n\n${context}` : instruction;
+                const selectionText = savedEditorSelection ? savedEditorSelection.toString() : '';
+                const context = [selectionText, uploadedFileText].filter(Boolean).join('\n\n');
+                const prompt = `Proporciona primero "Razonamiento:" con máximo tres frases y luego "Respuesta:". Instrucción: ${instruction}${context ? `\n\nTexto:\n${context}` : ''}`;
                 const ai = new GoogleGenAI({ apiKey: API_KEY });
                 const response = await ai.models.generateContent({
                     model: 'gemini-1.5-flash',
                     contents: [{ role: 'user', parts: [{ text: prompt }] }],
                 });
-                aiToolsGeneratedText = response.text;
-                aiToolsResponse.innerHTML = response.text.replace(/\n/g, '<br>');
+                const { reasoning, answer } = splitReasoning(response.text);
+                aiToolsGeneratedText = answer;
+                aiToolsThinking.innerHTML = formatAiResponse(reasoning);
+                aiToolsResponse.innerHTML = formatAiResponse(answer);
                 insertAiToolsBtn.classList.remove('hidden');
             } catch (error) {
                 console.error('AI Error:', error);
@@ -3578,7 +3665,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 selection.removeAllRanges();
                 selection.addRange(savedEditorSelection);
             }
-            document.execCommand('insertText', false, aiToolsGeneratedText);
+            document.execCommand('insertHTML', false, formatAiResponse(aiToolsGeneratedText));
             hideModal(aiToolsModal);
             notesEditor.focus();
         });
@@ -3590,13 +3677,17 @@ document.addEventListener('DOMContentLoaded', function () {
         closeAiPanelBtn.addEventListener('click', () => {
             aiPanel.classList.add('translate-x-full');
         });
-        pdfUploadInput.addEventListener('change', async (e) => {
+        fileUploadInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
-            if (file && pdfjsLib) {
+            if (file) {
                 try {
-                    uploadedPdfText = await extractTextFromPDF(file);
+                    if (file.type === 'application/pdf' && pdfjsLib) {
+                        uploadedFileText = await extractTextFromPDF(file);
+                    } else {
+                        uploadedFileText = await readTextFile(file);
+                    }
                 } catch (err) {
-                    console.error('Error al leer el PDF:', err);
+                    console.error('Error al leer el archivo:', err);
                 }
             }
         });
@@ -3614,24 +3705,24 @@ document.addEventListener('DOMContentLoaded', function () {
             const length = lengthRange.value;
             const lang = langSelect.value;
             const notesContext = gatherNotesContext();
-            const pdfContext = uploadedPdfText ? `\n\nContenido PDF:\n${uploadedPdfText}` : '';
-            const combinedContext = notesContext + pdfContext;
+            const fileContext = uploadedFileText ? `\n\nContenido del archivo:\n${uploadedFileText}` : '';
+            const combinedContext = notesContext + fileContext;
             let prompt = '';
             switch (aiToolSelect.value) {
                 case 'summary':
-                    prompt = `En ${lang} y con un tono ${tone}, resume el siguiente contenido en no más de ${length} palabras:\n${combinedContext}`;
+                    prompt = `En ${lang} y con un tono ${tone}, resume el siguiente contenido en no más de ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
                     break;
                 case 'flashcards':
-                    prompt = `En ${lang} y con un tono ${tone}, crea tarjetas de estudio (pregunta: respuesta) basadas en el siguiente contenido. Limita cada tarjeta a ${length} palabras:\n${combinedContext}`;
+                    prompt = `En ${lang} y con un tono ${tone}, crea tarjetas de estudio (pregunta: respuesta) basadas en el siguiente contenido. Limita cada tarjeta a ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
                     break;
                 case 'translate':
-                    prompt = `Traduce al ${lang} con un tono ${tone} el siguiente contenido:\n${combinedContext}`;
+                    prompt = `Traduce al ${lang} con un tono ${tone} el siguiente contenido. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
                     break;
                 case 'questions':
-                    prompt = `En ${lang} y con un tono ${tone}, genera preguntas tipo examen con respuestas breves basadas en este contenido. Limita cada respuesta a ${length} palabras:\n${combinedContext}`;
+                    prompt = `En ${lang} y con un tono ${tone}, genera preguntas tipo examen con respuestas breves basadas en este contenido. Limita cada respuesta a ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
                     break;
                 default:
-                    prompt = `Responde en ${lang} con un tono ${tone} y no más de ${length} palabras a la siguiente consulta del usuario utilizando el contexto.\n\nContexto:\n${combinedContext}\n\nPregunta: ${userText}`;
+                    prompt = `Responde en ${lang} con un tono ${tone} y no más de ${length} palabras a la siguiente consulta del usuario utilizando el contexto. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n\nContexto:\n${combinedContext}\n\nPregunta: ${userText}`;
             }
             appendMessage('user', userText || aiToolSelect.options[aiToolSelect.selectedIndex].textContent);
             aiInput.value = '';
@@ -3639,17 +3730,14 @@ document.addEventListener('DOMContentLoaded', function () {
             sendAiPanelBtn.disabled = true;
             try {
                 const ai = new GoogleGenAI({ apiKey: API_KEY });
-                const stream = await ai.models.generateContentStream({
+                const response = await ai.models.generateContent({
                     model: 'gemini-2.5-flash',
                     contents: [{ role: 'user', parts: [{ text: prompt }] }],
                 });
+                const { reasoning, answer } = splitReasoning(response.text);
                 const assistantBubble = createMessageElement('assistant');
-                let assistantText = '';
-                for await (const chunk of stream) {
-                    assistantText += chunk.text || '';
-                    assistantBubble.innerHTML = formatAiResponse(assistantText);
-                    aiMessages.scrollTop = aiMessages.scrollHeight;
-                }
+                assistantBubble.innerHTML = buildReasoningHTML(reasoning, answer);
+                aiMessages.scrollTop = aiMessages.scrollHeight;
             } catch (error) {
                 console.error("AI Error:", error);
                 const errBubble = createMessageElement('assistant');
@@ -3657,6 +3745,33 @@ document.addEventListener('DOMContentLoaded', function () {
             } finally {
                 aiStatus.classList.add('hidden');
                 sendAiPanelBtn.disabled = false;
+            }
+        });
+
+        generateCanvasBtn.addEventListener('click', async () => {
+            if (!API_KEY) {
+                showAlert("La API Key de Gemini no está configurada.");
+                return;
+            }
+            aiCanvasReasoning.innerHTML = '';
+            aiStatus.classList.remove('hidden');
+            generateCanvasBtn.disabled = true;
+            try {
+                const ai = new GoogleGenAI({ apiKey: API_KEY });
+                const prompt = 'Genera una lista JSON de hasta cinco figuras simples (rect o circle) para dibujar en un canvas de 300x300. Proporciona primero "Razonamiento:" y luego "Respuesta:".';
+                const response = await ai.models.generateContent({
+                    model: 'gemini-1.5-flash',
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                });
+                const { reasoning, answer } = splitReasoning(response.text);
+                aiCanvasReasoning.innerHTML = formatAiResponse(reasoning);
+                drawCanvasFromDescription(answer);
+            } catch (err) {
+                console.error('AI Canvas Error:', err);
+                showAlert('Error al generar canvas.');
+            } finally {
+                aiStatus.classList.add('hidden');
+                generateCanvasBtn.disabled = false;
             }
         });
 
