@@ -404,6 +404,7 @@
     <div id="ai-tools-modal" class="modal-overlay">
         <div class="modal-content w-full max-w-2xl">
             <h3 class="text-xl font-bold mb-4">Asistente de IA</h3>
+            <div id="ai-tools-thinking" class="w-full p-2 text-sm text-gray-600"></div>
             <div id="ai-tools-response" class="w-full h-40 p-3 bg-bg-tertiary rounded-lg overflow-y-auto mb-4 border border-border-color">Escribe tu instrucción a continuación...</div>
             <div id="ai-tools-loader" class="hidden text-center my-2">
                 <p>Pensando...</p>
@@ -578,7 +579,10 @@
                     </select>
                 </label>
             </div>
-            <input id="pdf-upload" type="file" accept="application/pdf" class="w-full border rounded p-1" />
+            <input id="file-upload" type="file" accept="application/pdf,text/plain" class="w-full border rounded p-1" />
+            <button id="generate-canvas-btn" class="w-full px-4 py-2 bg-green-600 text-white rounded mt-2">Canvas IA</button>
+            <canvas id="ai-canvas" width="300" height="300" class="w-full border rounded mt-2"></canvas>
+            <div id="ai-canvas-reasoning" class="text-sm text-gray-600 mt-1"></div>
             <textarea id="ai-input" rows="2" class="w-full border rounded p-1" placeholder="Escribe tu mensaje..."></textarea>
             <div id="ai-status" class="text-sm text-gray-500 hidden">Pensando...</div>
         </div>
