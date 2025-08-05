@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const importNoteFileInput = getElem('import-note-file-input');
     const settingsBtn = getElem('settings-btn');
     const settingsDropdown = getElem('settings-dropdown');
-    const confidenceFiltersContainer = getElem('confidence-filters');
+    const statusFiltersContainer = getElem('status-filters');
     const saveConfirmation = getElem('save-confirmation');
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
@@ -779,7 +779,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // --- State Variables ---
-    let activeConfidenceFilter = 'all';
+    let activeStatusFilter = 'all';
     let activeNoteIcon = null;
     let selectedImageForResize = null;
     let saveTimeout;
@@ -2444,7 +2444,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function filterTable() {
-        const isFiltering = activeConfidenceFilter !== 'all';
+        const isFiltering = activeStatusFilter !== 'all';
 
         document.querySelectorAll('.section-header-row').forEach(headerRow => {
             const sectionName = headerRow.dataset.sectionHeader;
@@ -2455,9 +2455,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
             document.querySelectorAll(`tr[data-section="${sectionName}"]`).forEach(row => {
                 const confidence = row.querySelector('.confidence-dot')?.dataset.confidenceLevel || '0';
-                const matchesConfidence = activeConfidenceFilter === 'all' || confidence === activeConfidenceFilter;
+                const matchesStatus = activeStatusFilter === 'all' || confidence === activeStatusFilter;
 
-                if (matchesConfidence) {
+                if (matchesStatus) {
                     hasVisibleChildren = true;
                     row.style.display = isCollapsed ? 'none' : '';
                 } else {
@@ -3116,13 +3116,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // Filter by confidence level
-        confidenceFiltersContainer.addEventListener('click', e => {
+        // Filter by status
+        statusFiltersContainer.addEventListener('click', e => {
             const filterBtn = e.target.closest('.filter-btn');
             if (filterBtn) {
-                confidenceFiltersContainer.querySelector('.active')?.classList.remove('active', 'bg-sky-500', 'text-white', 'dark:bg-sky-500');
-                filterBtn.classList.add('active', 'bg-sky-500', 'text-white', 'dark:bg-sky-500');
-                activeConfidenceFilter = filterBtn.dataset.filter;
+                statusFiltersContainer.querySelector('.active')?.classList.remove('active', 'ring-2', 'ring-offset-2', 'ring-sky-500', 'bg-sky-500', 'text-white', 'dark:bg-sky-500');
+                filterBtn.classList.add('active', 'ring-2', 'ring-offset-2', 'ring-sky-500', 'bg-sky-500', 'text-white', 'dark:bg-sky-500');
+                activeStatusFilter = filterBtn.dataset.filter;
                 filterTable();
             }
         });
