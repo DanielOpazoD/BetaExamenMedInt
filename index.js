@@ -114,7 +114,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveAndCloseNoteBtn = getElem('save-and-close-note-btn');
     const cancelNoteBtn = getElem('cancel-note-btn');
     const unmarkNoteBtn = getElem('unmark-note-btn');
-    const searchBar = getElem('search-bar');
     const progressBar = getElem('progress-bar');
     const askAiBtn = getElem('ask-ai-btn');
     const aiQaModal = getElem('ai-qa-modal');
@@ -2442,8 +2441,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function filterTable() {
-        const query = searchBar.value.toLowerCase().trim();
-        const isFiltering = query !== '' || activeConfidenceFilter !== 'all';
+        const isFiltering = activeConfidenceFilter !== 'all';
 
         document.querySelectorAll('.section-header-row').forEach(headerRow => {
             const sectionName = headerRow.dataset.sectionHeader;
@@ -2453,26 +2451,14 @@ document.addEventListener('DOMContentLoaded', function () {
             let hasVisibleChildren = false;
 
             document.querySelectorAll(`tr[data-section="${sectionName}"]`).forEach(row => {
-                const topicText = row.querySelector('.topic-text')?.textContent.toLowerCase() || '';
                 const confidence = row.querySelector('.confidence-dot')?.dataset.confidenceLevel || '0';
-                
-                const matchesSearch = query === '' || topicText.includes(query);
                 const matchesConfidence = activeConfidenceFilter === 'all' || confidence === activeConfidenceFilter;
-                
-                if (matchesSearch && matchesConfidence) {
+
+                if (matchesConfidence) {
                     hasVisibleChildren = true;
-                    // Show the row unless the section is collapsed
                     row.style.display = isCollapsed ? 'none' : '';
-                    // If a search query exists, highlight the row when it matches the query
-                    if (query !== '' && topicText.includes(query)) {
-                        row.classList.add('highlight-row');
-                    } else {
-                        row.classList.remove('highlight-row');
-                    }
                 } else {
                     row.style.display = 'none';
-                    // Ensure highlight class is removed when not matching
-                    row.classList.remove('highlight-row');
                 }
             });
 
@@ -3127,8 +3113,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // Search and filter
-        searchBar.addEventListener('input', filterTable);
+        // Filter by confidence level
         confidenceFiltersContainer.addEventListener('click', e => {
             const filterBtn = e.target.closest('.filter-btn');
             if (filterBtn) {

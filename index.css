@@ -208,16 +208,6 @@
         html[data-icon-style="outline"] .solid-icon { display: none; }
         html[data-icon-style="outline"] .outline-icon { display: inline-block; }
 
-/* Highlighted search result rows */
-.highlight-row td {
-    /* Light yellow background to indicate a match when searching */
-    background-color: #FEF3C7;
-}
-html.dark .highlight-row td {
-    /* Darker highlight for dark mode */
-    background-color: #5B4D2A;
-}
-
 /* Enlaces de sub-notas: estilo distintivo con subrayado punteado */
 .subnote-link {
     text-decoration: underline dotted;
