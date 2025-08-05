@@ -9,6 +9,9 @@ import { GoogleGenAI } from "@google/genai";
 // inline IndexedDB implementation and keeps the rest of the code unchanged.
 import db from './db.js';
 import { makeTableResizable } from './table-resize.js';
+import { setupAdvancedSearchReplace } from './search-replace.js';
+import { setupKeyboardShortcuts } from './shortcuts.js';
+import { setupCloudIntegration } from './cloud-sync.js';
 
 const pdfjsLib = typeof window !== 'undefined' ? window['pdfjsLib'] : null;
 if (pdfjsLib) {
@@ -3787,6 +3790,9 @@ document.addEventListener('DOMContentLoaded', function () {
         setupEventListeners();
         document.querySelectorAll('table.resizable-table').forEach(initTableResize);
         applyTheme(document.documentElement.dataset.theme || 'default');
+        setupAdvancedSearchReplace();
+        setupKeyboardShortcuts();
+        setupCloudIntegration();
     }
 
     init();
