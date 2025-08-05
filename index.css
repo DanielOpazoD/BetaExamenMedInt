@@ -198,6 +198,22 @@
 
         .notes-modal-content.readonly-mode .editor-toolbar { display: none; }
         .notes-modal-content.readonly-mode #notes-modal-actions { display: none; }
+
+        /* --- IA Panel Styles --- */
+        .ai-card {
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            background-color: var(--bg-secondary);
+        }
+        .ai-message-reasoning {
+            background-color: var(--lectura-filled-bg);
+            color: var(--lectura-filled-text);
+        }
+        .ai-message-answer {
+            background-color: var(--filled-bg);
+            color: var(--filled-text);
+        }
         .notes-modal-content.readonly-mode #add-note-panel-btn { display: none; }
         .notes-modal-content.readonly-mode .delete-note-btn { display: none; }
         .notes-modal-content.readonly-mode #notes-modal-title { pointer-events: none; }

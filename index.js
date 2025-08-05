@@ -4,7 +4,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { GoogleGenAI } from "@google/genai";
+import aiService from './aiTools.js';
 // Import the database helper from a separate module.  This replaces the
 // inline IndexedDB implementation and keeps the rest of the code unchanged.
 import db from './db.js';
@@ -15,12 +15,8 @@ if (pdfjsLib) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
-// API Key for Google Gemini.  For simplicity and to avoid relying on build
-// environment variables, insert your key directly here.  Replace the
-// placeholder string below with your actual Gemini API key.  Note: embedding
-// secrets in client-side code exposes them to anyone who can view your
-// website, so only use this approach in personal or non-sensitive projects.
-const API_KEY = 'AIzaSyA9-VXmB8QyNS_wt5WclUlMVfXgbPuaLj4';
+// El manejo de la API de Gemini se realiza ahora a través de aiTools.js,
+// donde puede configurarse la API Key de forma centralizada y segura.
 
 // --- IndexedDB Helper ---
 // NOTE: The IndexedDB helper has been moved into db.js.  The following
@@ -2375,7 +2371,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const bubble = document.createElement('div');
         bubble.className = role === 'user'
             ? 'inline-block bg-indigo-600 text-white p-2 rounded-lg'
-            : 'inline-block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 p-2 rounded-lg';
+            : 'space-y-2';
         wrapper.appendChild(bubble);
         aiMessages.appendChild(wrapper);
         aiMessages.scrollTop = aiMessages.scrollHeight;
@@ -2414,20 +2410,13 @@ document.addEventListener('DOMContentLoaded', function () {
         return html;
     }
 
-    function splitReasoning(text) {
-        const match = text.match(/Razonamiento:\s*([\s\S]*?)\nRespuesta:\s*([\s\S]*)/i);
-        if (match) {
-            return { reasoning: match[1].trim(), answer: match[2].trim() };
-        }
-        return { reasoning: '', answer: text.trim() };
-    }
-
     function buildReasoningHTML(reasoning, answer) {
-        const answerHtml = formatAiResponse(answer);
+        const parts = [];
         if (reasoning) {
-            return `<details><summary>Pensamiento</summary>${formatAiResponse(reasoning)}</details>${answerHtml}`;
+            parts.push(`<div class="ai-card ai-message-reasoning"><strong>Pensamiento:</strong> ${formatAiResponse(reasoning)}</div>`);
         }
-        return answerHtml;
+        parts.push(`<div class="ai-card ai-message-answer"><strong>Respuesta:</strong> ${formatAiResponse(answer)}</div>`);
+        return parts.join('');
     }
 
     function appendMessage(role, text) {
@@ -3571,7 +3560,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 showAlert("Por favor, escribe una pregunta.");
                 return;
             }
-            if (!API_KEY) {
+            if (!aiService.isConfigured()) {
                 showAlert("La API Key de Gemini no está configurada.");
                 return;
             }
@@ -3600,16 +3589,9 @@ document.addEventListener('DOMContentLoaded', function () {
                      throw new Error("No hay notas disponibles para analizar.");
                 }
 
-                const ai = new GoogleGenAI({ apiKey: API_KEY });
                 const extraContext = uploadedFileText ? `\n\nArchivo:\n${uploadedFileText}` : '';
-                const fullPrompt = `Basado en las siguientes notas de estudio${extraContext ? ' y archivo proporcionado' : ''}, responde la pregunta del usuario. Proporciona primero "Razonamiento:" y luego "Respuesta:". Contenido:\n\n${notesContext}${extraContext}\n\nPregunta: ${question}`;
-
-                const response = await ai.models.generateContent({
-                  model: 'gemini-2.5-flash',
-                  contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-                });
-
-                const { reasoning, answer } = splitReasoning(response.text);
+                const context = notesContext + extraContext;
+                const { reasoning, answer } = await aiService.ask('qa', question, { context, model: 'gemini-2.5-flash' });
                 aiResponseArea.innerHTML = buildReasoningHTML(reasoning, answer);
 
             } catch (error) {
@@ -3628,7 +3610,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 showAlert("Por favor, escribe una instrucción.");
                 return;
             }
-            if (!API_KEY) {
+            if (!aiService.isConfigured()) {
                 showAlert("La API Key de Gemini no está configurada.");
                 return;
             }
@@ -3640,12 +3622,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const selectionText = savedEditorSelection ? savedEditorSelection.toString() : '';
                 const context = [selectionText, uploadedFileText].filter(Boolean).join('\n\n');
                 const prompt = `Proporciona primero "Razonamiento:" con máximo tres frases y luego "Respuesta:". Instrucción: ${instruction}${context ? `\n\nTexto:\n${context}` : ''}`;
-                const ai = new GoogleGenAI({ apiKey: API_KEY });
-                const response = await ai.models.generateContent({
-                    model: 'gemini-1.5-flash',
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                });
-                const { reasoning, answer } = splitReasoning(response.text);
+                const text = await aiService.generate(prompt, { model: 'gemini-1.5-flash' });
+                const { reasoning, answer } = aiService.splitReasoning(text);
                 aiToolsGeneratedText = answer;
                 aiToolsThinking.innerHTML = formatAiResponse(reasoning);
                 aiToolsResponse.innerHTML = formatAiResponse(answer);
@@ -3697,7 +3675,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 showAlert("Por favor, escribe un mensaje.");
                 return;
             }
-            if (!API_KEY) {
+            if (!aiService.isConfigured()) {
                 showAlert("La API Key de Gemini no está configurada.");
                 return;
             }
@@ -3707,41 +3685,30 @@ document.addEventListener('DOMContentLoaded', function () {
             const notesContext = gatherNotesContext();
             const fileContext = uploadedFileText ? `\n\nContenido del archivo:\n${uploadedFileText}` : '';
             const combinedContext = notesContext + fileContext;
-            let prompt = '';
-            switch (aiToolSelect.value) {
-                case 'summary':
-                    prompt = `En ${lang} y con un tono ${tone}, resume el siguiente contenido en no más de ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
-                    break;
-                case 'flashcards':
-                    prompt = `En ${lang} y con un tono ${tone}, crea tarjetas de estudio (pregunta: respuesta) basadas en el siguiente contenido. Limita cada tarjeta a ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
-                    break;
-                case 'translate':
-                    prompt = `Traduce al ${lang} con un tono ${tone} el siguiente contenido. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
-                    break;
-                case 'questions':
-                    prompt = `En ${lang} y con un tono ${tone}, genera preguntas tipo examen con respuestas breves basadas en este contenido. Limita cada respuesta a ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
-                    break;
-                default:
-                    prompt = `Responde en ${lang} con un tono ${tone} y no más de ${length} palabras a la siguiente consulta del usuario utilizando el contexto. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n\nContexto:\n${combinedContext}\n\nPregunta: ${userText}`;
-            }
+            const tool = aiToolSelect.value;
+            const inputText = tool === 'qa' ? userText : combinedContext;
             appendMessage('user', userText || aiToolSelect.options[aiToolSelect.selectedIndex].textContent);
             aiInput.value = '';
             aiStatus.classList.remove('hidden');
             sendAiPanelBtn.disabled = true;
+            const assistantBubble = createMessageElement('assistant');
             try {
-                const ai = new GoogleGenAI({ apiKey: API_KEY });
-                const response = await ai.models.generateContent({
+                const { reasoning, answer } = await aiService.ask(tool, inputText, {
+                    tone,
+                    length,
+                    lang,
+                    context: combinedContext,
                     model: 'gemini-2.5-flash',
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    onStream: chunk => {
+                        assistantBubble.textContent += chunk;
+                        aiMessages.scrollTop = aiMessages.scrollHeight;
+                    }
                 });
-                const { reasoning, answer } = splitReasoning(response.text);
-                const assistantBubble = createMessageElement('assistant');
                 assistantBubble.innerHTML = buildReasoningHTML(reasoning, answer);
                 aiMessages.scrollTop = aiMessages.scrollHeight;
             } catch (error) {
                 console.error("AI Error:", error);
-                const errBubble = createMessageElement('assistant');
-                errBubble.textContent = "Error al contactar a la IA: " + error.message;
+                assistantBubble.textContent = "Error al contactar a la IA: " + error.message;
             } finally {
                 aiStatus.classList.add('hidden');
                 sendAiPanelBtn.disabled = false;
@@ -3749,7 +3716,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         generateCanvasBtn.addEventListener('click', async () => {
-            if (!API_KEY) {
+            if (!aiService.isConfigured()) {
                 showAlert("La API Key de Gemini no está configurada.");
                 return;
             }
@@ -3757,13 +3724,9 @@ document.addEventListener('DOMContentLoaded', function () {
             aiStatus.classList.remove('hidden');
             generateCanvasBtn.disabled = true;
             try {
-                const ai = new GoogleGenAI({ apiKey: API_KEY });
                 const prompt = 'Genera una lista JSON de hasta cinco figuras simples (rect o circle) para dibujar en un canvas de 300x300. Proporciona primero "Razonamiento:" y luego "Respuesta:".';
-                const response = await ai.models.generateContent({
-                    model: 'gemini-1.5-flash',
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                });
-                const { reasoning, answer } = splitReasoning(response.text);
+                const text = await aiService.generate(prompt, { model: 'gemini-1.5-flash' });
+                const { reasoning, answer } = aiService.splitReasoning(text);
                 aiCanvasReasoning.innerHTML = formatAiResponse(reasoning);
                 drawCanvasFromDescription(answer);
             } catch (err) {
