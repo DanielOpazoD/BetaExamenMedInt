@@ -3031,7 +3031,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const notes = t.notes.map(n => n.content).join('');
             return `<section id="topic-${t.id}"><h2>${t.title}</h2>${notes}</section>`;
         }).join('')).join('');
-        return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${docTitle}</title><style>body{margin:0;font-family:sans-serif;}#sidebar{position:fixed;top:0;left:0;bottom:0;width:250px;background:#f4f4f4;overflow:auto;transition:transform .3s;}#sidebar.hidden{transform:translateX(-100%);}#content{margin-left:250px;padding:20px;transition:margin-left .3s;}#sidebar.hidden + #content{margin-left:0;}#toggle-sidebar{position:fixed;top:10px;left:10px;z-index:1000;}</style><script>function toggleSidebar(){var s=document.getElementById('sidebar');s.classList.toggle('hidden');}</script></head><body><div id="sidebar"><h1>${docTitle}</h1><ul>${navSections}</ul></div><div id="content"><button id="toggle-sidebar" onclick="toggleSidebar()">☰</button>${contentSections}</div></body></html>`;
+        return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${docTitle}</title><style>body{margin:0;font-family:system-ui,sans-serif;background:#f9fafb;color:#0f172a;line-height:1.6;}#sidebar{position:fixed;top:0;left:0;bottom:0;width:260px;background:#1e293b;color:#f1f5f9;overflow:auto;transform:translateX(0);transition:transform .3s ease;box-shadow:2px 0 8px rgba(0,0,0,.15);}#sidebar.hidden{transform:translateX(-100%);}#sidebar h1{font-size:1.25rem;margin:1rem;}#sidebar ul{list-style:none;padding:0;margin:0;}#sidebar li{margin-bottom:.5rem;}#sidebar a{color:#f1f5f9;text-decoration:none;}#sidebar strong{display:block;margin-top:1rem;}#content{margin-left:260px;padding:40px;transition:margin-left .3s ease;}#content .content-inner{max-width:900px;margin:0 auto;}#sidebar.hidden + #content{margin-left:0;}#toggle-sidebar{position:fixed;top:15px;left:15px;background:#1e293b;color:#f1f5f9;border:none;border-radius:4px;padding:8px 12px;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,.1);}section{margin-bottom:40px;}h2{margin-top:0;color:#1e293b;}@media (max-width:768px){#content{margin-left:0;padding:20px;}#sidebar{width:200px;}#toggle-sidebar{top:10px;left:10px;}}</style><script>function toggleSidebar(){var s=document.getElementById('sidebar');s.classList.toggle('hidden');}</script></head><body><div id="sidebar"><h1>${docTitle}</h1><ul>${navSections}</ul></div><div id="content"><button id="toggle-sidebar" onclick="toggleSidebar()">☰</button><div class="content-inner">${contentSections}</div></div></body></html>`;
     }
 
     async function handleExportSectionHtml(sectionHeaderRow) {
@@ -3083,6 +3083,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const secLi = document.createElement('li');
             secLi.textContent = sec.title;
             const topicsOl = document.createElement('ol');
+
+            const secWrapper = document.createElement('div');
+            secWrapper.className = 'section-print-wrapper';
+            secWrapper.innerHTML = `<h1>${sec.title}</h1>`;
+
             sec.topics.forEach(topic => {
                 const anchorId = `print-topic-${topic.id}`;
                 const li = document.createElement('li');
@@ -3104,8 +3109,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     wrapper.appendChild(nc);
                 });
-                contentFragment.appendChild(wrapper);
+                secWrapper.appendChild(wrapper);
             });
+
+            contentFragment.appendChild(secWrapper);
             secLi.appendChild(topicsOl);
             tocList.appendChild(secLi);
         });

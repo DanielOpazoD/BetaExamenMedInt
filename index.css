@@ -671,8 +671,26 @@ table.resizable-table th {
             }
             .topic-print-wrapper {
                 page-break-before: always;
+                margin: 1rem 0;
             }
             .topic-print-wrapper:first-child {
                 page-break-before: auto;
+            }
+            .section-print-wrapper {
+                background: #f3f4f6;
+                padding: 20px;
+                margin: 20px 0;
+                border-radius: 8px;
+            }
+            .section-print-wrapper h1 {
+                margin-top: 0;
+                font-size: 1.5rem;
+                border-bottom: 1px solid #e5e7eb;
+                padding-bottom: 0.5rem;
+            }
+            .topic-print-wrapper h2 {
+                margin-top: 1rem;
+                font-size: 1.2rem;
+                color: #374151;
             }
         }
