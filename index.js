@@ -133,6 +133,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const cancelAiToolsBtn = getElem('cancel-ai-tools-btn');
     const sendAiToolsBtn = getElem('send-ai-tools-btn');
     const insertAiToolsBtn = getElem('insert-ai-tools-btn');
+    const printAllBtn = getElem('print-all-btn');
     const exportBtn = getElem('export-btn');
     const importBtn = getElem('import-btn');
     const importFileInput = getElem('import-file-input');
@@ -2962,6 +2963,86 @@ document.addEventListener('DOMContentLoaded', function () {
         applyZoom();
     }
     
+    async function handlePrintAll() {
+        await db.connect();
+        const printArea = getElem('print-area');
+        printArea.innerHTML = '';
+
+        const indexContainer = document.createElement('div');
+        indexContainer.id = 'print-index';
+        printArea.appendChild(indexContainer);
+
+        const rows = document.querySelectorAll('tr.section-header-row, tr[data-topic-id]');
+        let currentOl = null;
+        let counter = 1;
+
+        for (const row of rows) {
+            if (row.classList.contains('section-header-row')) {
+                const sectionTitle = row.querySelector('.section-title')?.textContent || '';
+                const header = document.createElement('h2');
+                header.textContent = sectionTitle;
+                indexContainer.appendChild(header);
+                currentOl = document.createElement('ol');
+                currentOl.start = counter;
+                indexContainer.appendChild(currentOl);
+            } else {
+                const topicId = row.dataset.topicId;
+                const title = row.cells[1]?.textContent.trim() || '';
+                const topicData = await db.get('topics', topicId);
+                const hasNotes = topicData && Array.isArray(topicData.notes) && topicData.notes.length > 0;
+
+                if (currentOl) {
+                    const li = document.createElement('li');
+                    const link = document.createElement('a');
+                    link.href = `#print-${topicId}`;
+                    link.textContent = title;
+                    link.className = hasNotes ? 'topic-developed' : 'topic-pending';
+                    li.appendChild(link);
+                    currentOl.appendChild(li);
+                }
+
+                const topicWrapper = document.createElement('div');
+                topicWrapper.id = `print-${topicId}`;
+                topicWrapper.className = 'topic-print-wrapper';
+
+                const backLink = document.createElement('a');
+                backLink.href = '#print-index';
+                backLink.textContent = '↩ Volver al índice';
+                backLink.className = 'back-to-index';
+                topicWrapper.appendChild(backLink);
+
+                const titleEl = document.createElement('h2');
+                titleEl.textContent = `${counter}. ${title}`;
+                topicWrapper.appendChild(titleEl);
+
+                if (hasNotes) {
+                    topicData.notes.forEach(note => {
+                        const noteContent = document.createElement('div');
+                        noteContent.innerHTML = note.content;
+                        noteContent.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
+                            link.outerHTML = `<span>${link.innerHTML}</span>`;
+                        });
+                        topicWrapper.appendChild(noteContent);
+                    });
+                } else {
+                    const placeholder = document.createElement('p');
+                    placeholder.textContent = 'Tema no desarrollado.';
+                    topicWrapper.appendChild(placeholder);
+                }
+
+                printArea.appendChild(topicWrapper);
+                counter++;
+            }
+        }
+
+        if (!indexContainer.querySelector('li')) {
+            await showAlert("No hay temas que imprimir.");
+            return;
+        }
+
+        window.print();
+    }
+
     async function handlePrintSection(sectionHeaderRow) {
         const sectionId = sectionHeaderRow.dataset.sectionHeader;
         const topicRows = document.querySelectorAll(`tr[data-section="${sectionId}"]`);
@@ -3146,16 +3227,18 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         toggleAllSectionsBtn.addEventListener('click', () => {
-             const allHeaders = document.querySelectorAll('.section-header-row');
-             // If any is not collapsed, collapse all. Otherwise, expand all.
-             const shouldCollapse = Array.from(allHeaders).some(h => !h.classList.contains('collapsed'));
-             allHeaders.forEach(headerRow => {
-                 const isCurrentlyCollapsed = headerRow.classList.contains('collapsed');
+            const allHeaders = document.querySelectorAll('.section-header-row');
+            // If any is not collapsed, collapse all. Otherwise, expand all.
+            const shouldCollapse = Array.from(allHeaders).some(h => !h.classList.contains('collapsed'));
+            allHeaders.forEach(headerRow => {
+                const isCurrentlyCollapsed = headerRow.classList.contains('collapsed');
                  if ((shouldCollapse && !isCurrentlyCollapsed) || (!shouldCollapse && isCurrentlyCollapsed)) {
                      headerRow.click(); // Simulate a click to toggle
                  }
              });
         });
+
+        printAllBtn.addEventListener('click', () => handlePrintAll());
 
         // Import/Export
         exportBtn.addEventListener('click', () => {
