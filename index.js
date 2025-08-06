@@ -134,6 +134,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const sendAiToolsBtn = getElem('send-ai-tools-btn');
     const insertAiToolsBtn = getElem('insert-ai-tools-btn');
     const exportBtn = getElem('export-btn');
+    const exportPdfBtn = getElem('export-pdf-btn');
     const importBtn = getElem('import-btn');
     const importFileInput = getElem('import-file-input');
     const exportNoteBtn = getElem('export-note-btn');
@@ -2998,6 +2999,84 @@ document.addEventListener('DOMContentLoaded', function () {
         window.print();
     }
 
+    async function exportAllSectionsPDF() {
+        const { jsPDF } = window.jspdf || {};
+        if (!jsPDF) {
+            await showAlert('Biblioteca jsPDF no disponible.');
+            return;
+        }
+
+        const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+        const margin = 40;
+        const lineHeight = 14;
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+
+        // Reserve two pages for index and title
+        pdf.addPage();
+        const tocEntries = [];
+
+        const topicRows = Array.from(document.querySelectorAll('tr[data-topic-id]'));
+        for (const row of topicRows) {
+            pdf.addPage();
+            const pageNumber = pdf.getNumberOfPages();
+            const topicId = row.dataset.topicId;
+            const title = row.children[1].textContent.trim();
+            tocEntries.push({ title, page: pageNumber });
+
+            pdf.setFontSize(12);
+            pdf.textWithLink('🔝', pageWidth - margin, margin, { pageNumber: 1 });
+            pdf.setFillColor(230, 230, 230);
+            pdf.rect(margin, margin + 20, pageWidth - margin * 2, 24, 'F');
+            pdf.setTextColor(0, 0, 0);
+            pdf.setFontSize(14);
+            pdf.text(title, margin + 10, margin + 37);
+
+            const topicData = await db.get('topics', topicId);
+            let y = margin + 60;
+            if (topicData && topicData.notes) {
+                for (const note of topicData.notes) {
+                    const text = stripHtml(note.content);
+                    const lines = pdf.splitTextToSize(text, pageWidth - margin * 2);
+                    if (y + lines.length * lineHeight > pageHeight - margin) {
+                        pdf.addPage();
+                        y = margin;
+                    }
+                    pdf.text(lines, margin, y);
+                    y += lines.length * lineHeight + lineHeight;
+                }
+            }
+        }
+
+        // Write title and index on first pages
+        pdf.setPage(1);
+        pdf.setFontSize(20);
+        pdf.text('Temario Examen Medicina Interna 2025', margin, margin);
+        pdf.setFontSize(12);
+        pdf.text('Dr. Daniel Opazo · Medicina Interna · Universidad de Valparaíso · Chile · 2025', margin, margin + 20);
+
+        let currentPage = 1;
+        let y = margin + 60;
+        const maxY = pageHeight - margin;
+        tocEntries.forEach((entry, idx) => {
+            if (y > maxY) {
+                currentPage++;
+                pdf.setPage(currentPage);
+                y = margin;
+            }
+            pdf.textWithLink(`${idx + 1}. ${entry.title}`, margin, y, { pageNumber: entry.page });
+            y += lineHeight;
+        });
+
+        pdf.save('Temario_MedInt_2025.pdf');
+
+        function stripHtml(html) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            return tmp.textContent || tmp.innerText || '';
+        }
+    }
+
 
     // --- Event Listeners Setup ---
     function setupEventListeners() {
@@ -3169,6 +3248,8 @@ document.addEventListener('DOMContentLoaded', function () {
             a.click();
             URL.revokeObjectURL(url);
         });
+
+        exportPdfBtn.addEventListener('click', exportAllSectionsPDF);
 
         importBtn.addEventListener('click', () => importFileInput.click());
         importFileInput.addEventListener('change', (event) => {
