@@ -564,6 +564,65 @@ document.addEventListener('DOMContentLoaded', function () {
         // Erase format
         const eraserSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eraser w-5 h-5"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21H7Z"/><path d="M22 21H7"/><path d="m5 12 5 5"/></svg>`;
         subNoteToolbar.appendChild(createSNButton('Borrar formato', eraserSVG, 'removeFormat'));
+        // Font size selector
+        const selectSNSize = document.createElement('select');
+        selectSNSize.className = 'toolbar-select';
+        selectSNSize.title = 'Tamaño de letra';
+        const sizePlaceholder = document.createElement('option');
+        sizePlaceholder.value = "";
+        sizePlaceholder.textContent = 'Ajustar tamaño';
+        sizePlaceholder.disabled = true;
+        sizePlaceholder.selected = true;
+        selectSNSize.appendChild(sizePlaceholder);
+        const sizeValues = { 'Muy Pequeño': '1', 'Pequeño': '2', 'Normal': '3', 'Grande': '5', 'Muy Grande': '6' };
+        for (const [name, value] of Object.entries(sizeValues)) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = name;
+            selectSNSize.appendChild(option);
+        }
+        selectSNSize.addEventListener('change', () => {
+            if (selectSNSize.value) {
+                document.execCommand('fontSize', false, selectSNSize.value);
+                selectSNSize.selectedIndex = 0;
+                subNoteEditor.focus();
+            }
+        });
+        subNoteToolbar.appendChild(selectSNSize);
+
+        // Line height selector
+        const selectSNLineHeight = document.createElement('select');
+        selectSNLineHeight.className = 'toolbar-select';
+        selectSNLineHeight.title = 'Interlineado';
+        const lhPlaceholder = document.createElement('option');
+        lhPlaceholder.value = "";
+        lhPlaceholder.textContent = 'Interlineado';
+        lhPlaceholder.disabled = true;
+        lhPlaceholder.selected = true;
+        selectSNLineHeight.appendChild(lhPlaceholder);
+        const lineHeights = { 'Grande': '2.0', 'Normal': '', 'Pequeño': '1.4', 'Muy Pequeño': '1.2', 'Extremo Pequeño': '1.0' };
+        for (const [name, value] of Object.entries(lineHeights)) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = name;
+            selectSNLineHeight.appendChild(option);
+        }
+        selectSNLineHeight.addEventListener('change', () => {
+            const value = selectSNLineHeight.value;
+            if (value !== null) {
+                const elements = getSelectedBlocksSN();
+                if (elements.length > 0) {
+                    elements.forEach(block => {
+                        if (block && subNoteEditor.contains(block)) {
+                            block.style.lineHeight = value;
+                        }
+                    });
+                }
+                selectSNLineHeight.selectedIndex = 0;
+                subNoteEditor.focus();
+            }
+        });
+        subNoteToolbar.appendChild(selectSNLineHeight);
         subNoteToolbar.appendChild(createSNSeparator());
         // Color palettes (text, highlight, line highlight)
         const textColors = ['#000000'];
@@ -798,6 +857,20 @@ document.addEventListener('DOMContentLoaded', function () {
     let editingQuickNote = false;
     let savedEditorSelection = null;
     let aiToolsGeneratedText = '';
+
+    // Image selection handling within the sub-note editor
+    if (subNoteEditor) {
+        subNoteEditor.addEventListener('click', (e) => {
+            if (e.target.tagName === 'IMG') {
+                subNoteEditor.querySelectorAll('img').forEach(img => img.classList.remove('selected-for-resize'));
+                e.target.classList.add('selected-for-resize');
+                selectedImageForResize = e.target;
+            } else {
+                subNoteEditor.querySelectorAll('img').forEach(img => img.classList.remove('selected-for-resize'));
+                selectedImageForResize = null;
+            }
+        });
+    }
 
     // ------------------------------------------------------------------------
     // Icon Manager and Character Manager Functions
