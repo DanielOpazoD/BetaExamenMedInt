@@ -3269,7 +3269,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             const noteContent = clone.innerHTML;
             const noteTitle = (notesModalTitle.textContent || 'nota').trim().replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${notesModalTitle.textContent}</title></head><body>${noteContent}</body></html>`;
+            const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${notesModalTitle.textContent}</title><style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap'); body { font-family: 'Inter', sans-serif; line-height: 1.6; padding: 1rem; }</style></head><body>${noteContent}</body></html>`;
             const blob = new Blob([html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
