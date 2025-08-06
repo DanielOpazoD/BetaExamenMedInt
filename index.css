@@ -643,6 +643,33 @@ table.resizable-table th {
             width: 100%;
         }
 
+        /* Print-all index styles */
+        #print-index {
+            margin-bottom: 2rem;
+        }
+        #print-index h2 {
+            margin-top: 1rem;
+            font-size: 1.25rem;
+        }
+        #print-index ol {
+            margin-left: 1.5rem;
+        }
+        #print-index a {
+            text-decoration: none;
+        }
+        #print-index a.topic-developed {
+            font-weight: 600;
+            color: #000;
+        }
+        #print-index a.topic-pending {
+            color: #9ca3af;
+        }
+        .back-to-index {
+            display: inline-block;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+
 
         @media print {
             html, body {
@@ -674,5 +701,8 @@ table.resizable-table th {
             }
             .topic-print-wrapper:first-child {
                 page-break-before: auto;
+            }
+            #print-index {
+                page-break-after: always;
             }
         }
