@@ -669,10 +669,14 @@ table.resizable-table th {
                 background: none !important;
                 cursor: default !important;
             }
-            .topic-print-wrapper {
+            .topic-print-wrapper:not(:first-of-type) {
                 page-break-before: always;
             }
-            .topic-print-wrapper:first-child {
-                page-break-before: auto;
+            .print-index {
+                page-break-after: always;
+            }
+            .print-index a {
+                text-decoration: none;
+                color: inherit;
             }
         }

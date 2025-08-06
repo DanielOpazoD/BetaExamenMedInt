@@ -136,6 +136,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const exportBtn = getElem('export-btn');
     const importBtn = getElem('import-btn');
     const importFileInput = getElem('import-file-input');
+    const printAllBtn = getElem('print-all-btn');
     const exportNoteBtn = getElem('export-note-btn');
     const importNoteBtn = getElem('import-note-btn');
     const importNoteFileInput = getElem('import-note-file-input');
@@ -2962,6 +2963,54 @@ document.addEventListener('DOMContentLoaded', function () {
         applyZoom();
     }
     
+    async function handlePrintAll() {
+        const topicRows = document.querySelectorAll('tr[data-topic-id]');
+        const printArea = getElem('print-area');
+        printArea.innerHTML = '';
+
+        // Build index
+        const indexDiv = document.createElement('div');
+        indexDiv.className = 'print-index';
+        let indexHtml = `<h1 class="text-2xl font-bold text-center mb-4">Temario Examen Medicina Interna 2025</h1>`;
+        indexHtml += `<p class="text-center mb-4">Dr Daniel Opazo, Medicina Interna, Universidad de Valparaíso, Chile, 2025</p>`;
+        indexHtml += '<ol class="list-decimal pl-6 space-y-1">';
+        topicRows.forEach(row => {
+            const topicId = row.dataset.topicId;
+            const title = row.querySelector('td:nth-child(2)').textContent.trim();
+            indexHtml += `<li><a href="#print-${topicId}">${title}</a></li>`;
+        });
+        indexHtml += '</ol>';
+        indexDiv.innerHTML = indexHtml;
+        printArea.appendChild(indexDiv);
+
+        for (const row of topicRows) {
+            const topicId = row.dataset.topicId;
+            const number = row.querySelector('td:first-child').textContent.trim();
+            const title = row.querySelector('td:nth-child(2)').textContent.trim();
+            const topicData = await db.get('topics', topicId);
+
+            const topicWrapper = document.createElement('div');
+            topicWrapper.className = 'topic-print-wrapper';
+            topicWrapper.id = `print-${topicId}`;
+            topicWrapper.innerHTML = `<h2 class="text-xl font-bold mb-2">${number}. ${title}</h2>`;
+
+            if (topicData && topicData.notes && topicData.notes.length > 0) {
+                topicData.notes.forEach(note => {
+                    const noteContent = document.createElement('div');
+                    noteContent.innerHTML = note.content;
+                    noteContent.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
+                        link.outerHTML = `<span>${link.innerHTML}</span>`;
+                    });
+                    topicWrapper.appendChild(noteContent);
+                });
+            }
+
+            printArea.appendChild(topicWrapper);
+        }
+
+        window.print();
+    }
+
     async function handlePrintSection(sectionHeaderRow) {
         const sectionId = sectionHeaderRow.dataset.sectionHeader;
         const topicRows = document.querySelectorAll(`tr[data-section="${sectionId}"]`);
@@ -3198,7 +3247,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 reader.readAsText(file);
             }
         });
-        
+
+        printAllBtn.addEventListener('click', handlePrintAll);
+
         // --- Notes Modal Listeners ---
         notesModal.addEventListener('click', (e) => {
             if (e.target === notesModal) {
