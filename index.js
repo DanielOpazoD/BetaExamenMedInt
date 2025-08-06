@@ -136,6 +136,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const exportBtn = getElem('export-btn');
     const importBtn = getElem('import-btn');
     const importFileInput = getElem('import-file-input');
+    const printAllNotesBtn = getElem('print-all-notes-btn');
+    const exportAllHtmlBtn = getElem('export-all-html-btn');
     const exportNoteBtn = getElem('export-note-btn');
     const importNoteBtn = getElem('import-note-btn');
     const importNoteFileInput = getElem('import-note-file-input');
@@ -2962,6 +2964,53 @@ document.addEventListener('DOMContentLoaded', function () {
         applyZoom();
     }
     
+    async function generateNotesHtml(sectionId = null) {
+        const headers = Array.from(document.querySelectorAll('.section-header-row')).filter(h => !sectionId || h.dataset.sectionHeader === sectionId);
+        let tocHtml = '';
+        let contentHtml = '';
+
+        for (const header of headers) {
+            const secId = header.dataset.sectionHeader;
+            const secTitle = header.querySelector('.section-title').textContent.trim();
+            const topicRows = document.querySelectorAll(`tr[data-section="${secId}"]`);
+            let topicLinks = '';
+            let sectionContent = `<h1>${secTitle}</h1>`;
+
+            for (const row of topicRows) {
+                const topicId = row.dataset.topicId;
+                const topicTitle = row.cells[1].textContent.trim();
+                const topicData = await db.get('topics', topicId);
+                if (topicData && topicData.notes && topicData.notes.length > 0) {
+                    topicLinks += `<li><a href="#${topicId}">${topicTitle}</a></li>`;
+                    let notesHtml = '';
+                    topicData.notes.forEach(note => {
+                        const div = document.createElement('div');
+                        div.innerHTML = note.content;
+                        div.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
+                            const span = document.createElement('span');
+                            span.innerHTML = link.innerHTML;
+                            link.replaceWith(span);
+                        });
+                        notesHtml += div.innerHTML;
+                    });
+                    sectionContent += `<section id="${topicId}"><h2>${topicTitle}</h2>${notesHtml}</section>`;
+                }
+            }
+
+            if (topicLinks) {
+                tocHtml += `<li><strong>${secTitle}</strong><ul>${topicLinks}</ul></li>`;
+                contentHtml += `<article id="section-${secId}">${sectionContent}</article>`;
+            }
+        }
+
+        if (!tocHtml) return null;
+
+        const css = `body{margin:0;font-family:Arial,sans-serif;display:flex;}#sidebar{width:250px;background:#f4f4f4;padding:1rem;overflow-y:auto;transition:transform .3s;}#sidebar.hidden{transform:translateX(-100%);}#content{flex:1;padding:1rem;}#toggle-sidebar{position:fixed;top:10px;left:10px;z-index:1000;}@media(max-width:768px){#sidebar{position:fixed;height:100%;z-index:1000;}#content{padding-top:3rem;}} h1{margin-top:1.5rem;font-size:1.5rem;} h2{margin-top:1rem;font-size:1.2rem;}`;
+        const js = `document.getElementById('toggle-sidebar').addEventListener('click',function(){document.getElementById('sidebar').classList.toggle('hidden');});`;
+
+        return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Notas</title><style>${css}</style></head><body><button id="toggle-sidebar">☰</button><nav id="sidebar"><h2>Índice</h2><ul>${tocHtml}</ul></nav><main id="content">${contentHtml}</main><script>${js}<\/script></body></html>`;
+    }
+
     async function handlePrintSection(sectionHeaderRow) {
         const sectionId = sectionHeaderRow.dataset.sectionHeader;
         const topicRows = document.querySelectorAll(`tr[data-section="${sectionId}"]`);
@@ -2996,6 +3045,62 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         window.print();
+    }
+
+    async function handleExportSection(sectionHeaderRow) {
+        const html = await generateNotesHtml(sectionHeaderRow.dataset.sectionHeader);
+        if (!html) {
+            await showAlert("No hay notas que exportar en esta sección.");
+            return;
+        }
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const title = sectionHeaderRow.querySelector('.section-title').textContent.trim().replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        a.href = url;
+        a.download = `seccion_${title}.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    async function handleExportAllNotesHtml() {
+        const html = await generateNotesHtml();
+        if (!html) {
+            await showAlert("No hay notas para exportar.");
+            return;
+        }
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'notas_completas.html';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    async function handlePrintAllNotes() {
+        const html = await generateNotesHtml();
+        if (!html) {
+            await showAlert("No hay notas para imprimir.");
+            return;
+        }
+        const w = window.open('', '_blank');
+        w.document.write(html);
+        w.document.close();
+        w.focus();
+        w.print();
+    }
+
+    function addExportButtonsToSections() {
+        document.querySelectorAll('.section-header-row').forEach(header => {
+            const container = header.querySelector('.flex.items-center.gap-2');
+            const printBtn = container.querySelector('.print-section-btn');
+            const exportBtn = document.createElement('button');
+            exportBtn.className = 'export-section-btn toolbar-btn no-print';
+            exportBtn.title = 'Exportar sección a HTML';
+            exportBtn.textContent = '🌐';
+            container.insertBefore(exportBtn, printBtn.nextSibling);
+        });
     }
 
 
@@ -3087,7 +3192,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!headerRow) return;
 
             // Prevent toggle when clicking on note or print icons
-            if(e.target.closest('.note-icon') || e.target.closest('.print-section-btn')) {
+            if(e.target.closest('.note-icon') || e.target.closest('.print-section-btn') || e.target.closest('.export-section-btn')) {
                 return;
             }
             
@@ -3113,6 +3218,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 e.stopPropagation();
                 const sectionHeaderRow = printBtn.closest('.section-header-row');
                 handlePrintSection(sectionHeaderRow);
+                return;
+            }
+            const exportBtn = e.target.closest('.export-section-btn');
+            if (exportBtn) {
+                e.stopPropagation();
+                const sectionHeaderRow = exportBtn.closest('.section-header-row');
+                handleExportSection(sectionHeaderRow);
             }
         });
 
@@ -3198,6 +3310,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 reader.readAsText(file);
             }
         });
+
+        printAllNotesBtn.addEventListener('click', () => handlePrintAllNotes());
+        exportAllHtmlBtn.addEventListener('click', () => handleExportAllNotesHtml());
         
         // --- Notes Modal Listeners ---
         notesModal.addEventListener('click', (e) => {
@@ -3787,6 +3902,7 @@ document.addEventListener('DOMContentLoaded', function () {
         setupEditorToolbar();
         populateIconPicker();
         loadState();
+        addExportButtonsToSections();
         setupEventListeners();
         document.querySelectorAll('table.resizable-table').forEach(initTableResize);
         applyTheme(document.documentElement.dataset.theme || 'default');
