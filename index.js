@@ -145,6 +145,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveConfirmation = getElem('save-confirmation');
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
+    const printAllBtn = getElem('print-all-btn');
+    const exportAllHtmlBtn = getElem('export-all-html-btn');
 
     const openAiPanelBtn = getElem('open-ai-panel');
     const aiPanel = getElem('ai-panel');
@@ -162,6 +164,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const aiCanvas = getElem('ai-canvas');
     const aiCanvasReasoning = getElem('ai-canvas-reasoning');
     let uploadedFileText = '';
+
+    // Insert export HTML button for each section next to the print button
+    document.querySelectorAll('.section-header-row').forEach(row => {
+        const printBtn = row.querySelector('.print-section-btn');
+        if (printBtn && !row.querySelector('.export-section-btn')) {
+            const exportBtn = document.createElement('button');
+            exportBtn.className = 'export-section-btn toolbar-btn no-print';
+            exportBtn.title = 'Exportar notas de la sección en HTML';
+            exportBtn.textContent = '🌐';
+            printBtn.insertAdjacentElement('afterend', exportBtn);
+        }
+    });
     
     // References modal elements
     const referencesModal = getElem('references-modal');
@@ -2998,6 +3012,137 @@ document.addEventListener('DOMContentLoaded', function () {
         window.print();
     }
 
+    function sanitizeNoteContent(container) {
+        container.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
+            link.outerHTML = `<span>${link.innerHTML}</span>`;
+        });
+    }
+
+    async function handleExportSectionHTML(sectionHeaderRow) {
+        const sectionId = sectionHeaderRow.dataset.sectionHeader;
+        const sectionTitle = sectionHeaderRow.querySelector('.section-title').textContent.trim();
+        const topicRows = document.querySelectorAll(`tr[data-section="${sectionId}"][data-topic-id]`);
+        let indexItems = [];
+        let contentHtml = '';
+        for (const row of topicRows) {
+            const topicId = row.dataset.topicId;
+            const topicTitle = row.children[1].textContent.trim();
+            const topicData = await db.get('topics', topicId);
+            if (topicData && topicData.notes && topicData.notes.length > 0) {
+                indexItems.push(`<li><a href="#${topicId}">${topicTitle}</a></li>`);
+                let notesHtml = '';
+                topicData.notes.forEach(note => {
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = note.content;
+                    sanitizeNoteContent(wrapper);
+                    notesHtml += wrapper.innerHTML;
+                });
+                contentHtml += `<h2 id="${topicId}">${topicTitle}</h2>${notesHtml}`;
+            }
+        }
+        if (indexItems.length === 0) {
+            await showAlert("No hay notas que exportar en esta sección.");
+            return;
+        }
+        const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${sectionTitle}</title><style>body{margin:0;font-family:sans-serif;}#sidebar{position:fixed;top:0;left:0;bottom:0;width:250px;background:#f3f4f6;padding:1rem;overflow-y:auto;transform:translateX(-250px);transition:transform .3s;}#sidebar.open{transform:translateX(0);}#content{margin-left:0;padding:1rem;transition:margin-left .3s;}#sidebar.open + #content{margin-left:250px;}#toggle{position:fixed;top:10px;left:10px;z-index:1000;}@media(max-width:640px){#sidebar{width:200px;transform:translateX(-200px);}#sidebar.open + #content{margin-left:0;}}h2{margin-top:2rem;}</style></head><body><button id="toggle">☰</button><div id="sidebar"><h2>Índice</h2><ul>${indexItems.join('')}</ul></div><div id="content">${contentHtml}</div><script>const s=document.getElementById('sidebar');document.getElementById('toggle').addEventListener('click',()=>s.classList.toggle('open'));</script></body></html>`;
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const safeTitle = sectionTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        a.href = url;
+        a.download = `${safeTitle}.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    async function handlePrintAllPdf() {
+        const sections = document.querySelectorAll('.section-header-row');
+        const printArea = getElem('print-area');
+        printArea.innerHTML = '';
+        let indexHtml = '<div class="print-index"><h1>Índice</h1><ul>';
+        let contentHtml = '';
+        for (const section of sections) {
+            const sectionId = section.dataset.sectionHeader;
+            const sectionTitle = section.querySelector('.section-title').textContent.trim();
+            const topicRows = document.querySelectorAll(`tr[data-section="${sectionId}"][data-topic-id]`);
+            let sectionIndexItems = [];
+            let sectionContent = `<h1>${sectionTitle}</h1>`;
+            for (const row of topicRows) {
+                const topicId = row.dataset.topicId;
+                const topicTitle = row.children[1].textContent.trim();
+                const topicData = await db.get('topics', topicId);
+                if (topicData && topicData.notes && topicData.notes.length > 0) {
+                    sectionIndexItems.push(`<li><a href="#${topicId}">${topicTitle}</a></li>`);
+                    let notesHtml = '';
+                    topicData.notes.forEach(note => {
+                        const wrapper = document.createElement('div');
+                        wrapper.innerHTML = note.content;
+                        sanitizeNoteContent(wrapper);
+                        notesHtml += wrapper.innerHTML;
+                    });
+                    sectionContent += `<h2 id="${topicId}">${topicTitle}</h2>${notesHtml}`;
+                }
+            }
+            if (sectionIndexItems.length > 0) {
+                indexHtml += `<li><strong>${sectionTitle}</strong><ul>${sectionIndexItems.join('')}</ul></li>`;
+                contentHtml += sectionContent;
+            }
+        }
+        indexHtml += '</ul></div>';
+        if (!contentHtml) {
+            await showAlert("No hay notas que imprimir.");
+            return;
+        }
+        printArea.innerHTML = indexHtml + contentHtml;
+        window.print();
+    }
+
+    async function handleExportAllHTML() {
+        const sections = document.querySelectorAll('.section-header-row');
+        let indexHtml = '<ul>';
+        let contentHtml = '';
+        for (const section of sections) {
+            const sectionId = section.dataset.sectionHeader;
+            const sectionTitle = section.querySelector('.section-title').textContent.trim();
+            const topicRows = document.querySelectorAll(`tr[data-section="${sectionId}"][data-topic-id]`);
+            let sectionIndexItems = [];
+            let sectionContent = `<h1 id="${sectionId}">${sectionTitle}</h1>`;
+            for (const row of topicRows) {
+                const topicId = row.dataset.topicId;
+                const topicTitle = row.children[1].textContent.trim();
+                const topicData = await db.get('topics', topicId);
+                if (topicData && topicData.notes && topicData.notes.length > 0) {
+                    sectionIndexItems.push(`<li><a href="#${topicId}">${topicTitle}</a></li>`);
+                    let notesHtml = '';
+                    topicData.notes.forEach(note => {
+                        const wrapper = document.createElement('div');
+                        wrapper.innerHTML = note.content;
+                        sanitizeNoteContent(wrapper);
+                        notesHtml += wrapper.innerHTML;
+                    });
+                    sectionContent += `<h2 id="${topicId}">${topicTitle}</h2>${notesHtml}`;
+                }
+            }
+            if (sectionIndexItems.length > 0) {
+                indexHtml += `<li><strong><a href="#${sectionId}">${sectionTitle}</a></strong><ul>${sectionIndexItems.join('')}</ul></li>`;
+                contentHtml += sectionContent;
+            }
+        }
+        indexHtml += '</ul>';
+        if (!contentHtml) {
+            await showAlert("No hay notas que exportar.");
+            return;
+        }
+        const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Notas</title><style>body{margin:0;font-family:sans-serif;}#sidebar{position:fixed;top:0;left:0;bottom:0;width:250px;background:#f3f4f6;padding:1rem;overflow-y:auto;transform:translateX(-250px);transition:transform .3s;}#sidebar.open{transform:translateX(0);}#content{margin-left:0;padding:1rem;transition:margin-left .3s;}#sidebar.open + #content{margin-left:250px;}#toggle{position:fixed;top:10px;left:10px;z-index:1000;}@media(max-width:640px){#sidebar{width:200px;transform:translateX(-200px);}#sidebar.open + #content{margin-left:0;}}h1{margin-top:2rem;}h2{margin-top:1.5rem;}</style></head><body><button id="toggle">☰</button><div id="sidebar"><h2>Índice</h2>${indexHtml}</div><div id="content">${contentHtml}</div><script>const s=document.getElementById('sidebar');document.getElementById('toggle').addEventListener('click',()=>s.classList.toggle('open'));</script></body></html>`;
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'todas_las_notas.html';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
 
     // --- Event Listeners Setup ---
     function setupEventListeners() {
@@ -3116,6 +3261,16 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
+        // Section export to HTML button
+        tableBody.addEventListener('click', (e) => {
+            const exportBtn = e.target.closest('.export-section-btn');
+            if (exportBtn) {
+                e.stopPropagation();
+                const sectionHeaderRow = exportBtn.closest('.section-header-row');
+                handleExportSectionHTML(sectionHeaderRow);
+            }
+        });
+
         // Filter by status
         statusFiltersContainer.addEventListener('click', e => {
             const filterBtn = e.target.closest('.filter-btn');
@@ -3126,6 +3281,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 filterTable();
             }
         });
+
+        // Global print and export buttons
+        if (printAllBtn) {
+            printAllBtn.addEventListener('click', handlePrintAllPdf);
+        }
+        if (exportAllHtmlBtn) {
+            exportAllHtmlBtn.addEventListener('click', handleExportAllHTML);
+        }
 
         // Settings
         settingsBtn.addEventListener('click', (e) => {
