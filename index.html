@@ -27,24 +27,25 @@
                     <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a.75.75 0 01.75.75v.518a3.75 3.75 0 013.232 4.025l-1.82 1.82a.75.75 0 101.06 1.06l1.82-1.82A5.25 5.25 0 0010.75 2.52V2.75A.75.75 0 0110 2zM3.483 4.49A5.23 5.23 0 002.5 7.25v.518a3.75 3.75 0 014.025-3.232l-1.82-1.82a.75.75 0 10-1.06 1.06l1.82 1.82zM10 18a.75.75 0 01-.75-.75v-.518a3.75 3.75 0 01-3.232-4.025l1.82-1.82a.75.75 0 10-1.06-1.06l-1.82 1.82A5.25 5.25 0 009.25 17.48v.77a.75.75 0 01.75.75zM16.517 15.51a5.23 5.23 0 00.983-2.76v-.518a3.75 3.75 0 01-4.025 3.232l1.82 1.82a.75.75 0 101.06-1.06l-1.82-1.82zM10 12a2 2 0 100-4 2 2 0 000 4z"/></svg>
                     <span>Preguntar a la IA</span>
                 </button>
-                <div id="status-filters" class="order-2 flex items-center space-x-1 bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
+                  <div id="status-filters" class="order-2 flex items-center space-x-1 bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
                     <span class="mr-2">Filtrar por estado de avance</span>
                     <button data-filter="all" class="filter-btn active px-3 py-1 rounded-md text-sm font-medium" aria-label="Todos">Todos</button>
                     <button data-filter="1" class="filter-btn p-1.5 rounded-md" title="Completo" aria-label="Completo"><span class="w-4 h-4 rounded-full bg-green-400 border-2 border-green-600 inline-block"></span></button>
                     <button data-filter="2" class="filter-btn p-1.5 rounded-md" title="En progreso" aria-label="En progreso"><span class="w-4 h-4 rounded-full bg-yellow-400 border-2 border-yellow-600 inline-block"></span></button>
                     <button data-filter="3" class="filter-btn p-1.5 rounded-md" title="Pendiente" aria-label="Pendiente"><span class="w-4 h-4 rounded-full bg-red-400 border-2 border-red-600 inline-block"></span></button>
-                </div>
-                <div class="order-3 flex items-center gap-2">
-                    <button id="export-btn" class="px-3 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 flex items-center" title="Exportar todo" aria-label="Exportar todo">
-                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v3.75A2.25 2.25 0 0117.25 20.25H6.75A2.25 2.25 0 014.5 17.25V6.75A2.25 2.25 0 016.75 4.5H12l4.5 4.5v2.25" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 15l3 3 3-3m-3 3V10.5" /></svg>
-                    </button>
-                    <button id="import-btn" class="px-3 py-2 bg-sky-600 text-white font-semibold rounded-lg shadow-md hover:bg-sky-700 flex items-center" title="Importar desde archivo" aria-label="Importar desde archivo">
-                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v3.75A2.25 2.25 0 0117.25 20.25H6.75A2.25 2.25 0 014.5 17.25V6.75A2.25 2.25 0 016.75 4.5H12l4.5 4.5v2.25" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l3-3 3 3m-3-3v10.5" /></svg>
-                    </button>
-                    <input type="file" id="import-file-input" accept=".json" class="hidden">
-                    <div class="h-6 border-l mx-2"></div>
-                    <div class="relative">
-                        <button id="settings-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="Configuración del tema/apariencia" aria-label="Configuración del tema/apariencia">
+                  </div>
+                  <div class="order-3 flex items-center gap-2">
+                      <button id="export-btn" class="px-3 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 flex items-center" title="Exportar todo" aria-label="Exportar todo">
+                          <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v3.75A2.25 2.25 0 0117.25 20.25H6.75A2.25 2.25 0 014.5 17.25V6.75A2.25 2.25 0 016.75 4.5H12l4.5 4.5v2.25" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 15l3 3 3-3m-3 3V10.5" /></svg>
+                      </button>
+                      <button id="import-btn" class="px-3 py-2 bg-sky-600 text-white font-semibold rounded-lg shadow-md hover:bg-sky-700 flex items-center" title="Importar desde archivo" aria-label="Importar desde archivo">
+                          <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v3.75A2.25 2.25 0 0117.25 20.25H6.75A2.25 2.25 0 014.5 17.25V6.75A2.25 2.25 0 016.75 4.5H12l4.5 4.5v2.25" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l3-3 3 3m-3-3v10.5" /></svg>
+                      </button>
+                      <button id="print-all-btn" class="px-3 py-2 bg-purple-600 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 flex items-center no-print" title="Imprimir todo" aria-label="Imprimir todo">🖨️</button>
+                      <input type="file" id="import-file-input" accept=".json" class="hidden">
+                      <div class="h-6 border-l mx-2"></div>
+                      <div class="relative">
+                          <button id="settings-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="Configuración del tema/apariencia" aria-label="Configuración del tema/apariencia">
                            <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.438.995s.145.755.438.995l1.003.827c.48.398.668 1.054.26 1.431l-1.296 2.247a1.125 1.125 0 01-1.37.49l-1.217-.456c-.355-.133-.75-.072-1.075.124a6.57 6.57 0 01-.22.127c-.332.183-.582.495-.645.87l-.213 1.281c-.09.542-.56.94-1.11-.94h-2.593c-.55 0-1.02-.398-1.11.94l-.213-1.281c-.063-.374-.313.686-.645.87a6.52 6.52 0 01-.22-.127c-.324-.196-.72-.257-1.075.124l-1.217.456a1.125 1.125 0 01-1.37-.49l-1.296-2.247a1.125 1.125 0 01.26-1.431l1.003-.827c.293.24.438.613-.438.995s-.145-.755-.438-.995l-1.003-.827a1.125 1.125 0 01-.26-1.431l1.296-2.247a1.125 1.125 0 011.37.49l1.217.456c.355.133.75.072 1.075.124.073-.044.146-.087.22-.127.332-.183.582.495.645.87l.213-1.281z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                         </button>
                         <div id="settings-dropdown" class="hidden absolute right-0 mt-2 w-56 origin-top-right bg-white dark:bg-slate-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
