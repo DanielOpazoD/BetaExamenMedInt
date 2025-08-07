@@ -140,6 +140,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const exportNoteBtn = getElem('export-note-btn');
     const importNoteBtn = getElem('import-note-btn');
     const importNoteFileInput = getElem('import-note-file-input');
+    const floatImageInput = getElem('float-image-input');
     const settingsBtn = getElem('settings-btn');
     const settingsDropdown = getElem('settings-dropdown');
     const statusFiltersContainer = getElem('status-filters');
@@ -1029,7 +1030,7 @@ document.addEventListener('DOMContentLoaded', function () {
      * @param {string} url The URL of the image to insert
      * @param {string} align Either 'left' or 'right'
      */
-    function insertFloatingImageAtSelection(url, align = 'left') {
+    function insertFloatingImageAtSelection(url, align = 'right') {
         const fig = document.createElement('figure');
         fig.className = `float-image float-${align}`;
         fig.contentEditable = 'false';
@@ -1053,8 +1054,10 @@ document.addEventListener('DOMContentLoaded', function () {
             sel.removeAllRanges();
             sel.addRange(newRange);
         }
+        enableDragForFloatingImage(fig);
         // Focus back to editor
         notesEditor.focus();
+        return fig;
     }
 
     /**
@@ -1065,6 +1068,8 @@ document.addEventListener('DOMContentLoaded', function () {
      * @param {HTMLElement} fig The figure element containing the image
      */
     function enableDragForFloatingImage(fig) {
+        if (!fig || fig.dataset.dragEnabled) return;
+        fig.dataset.dragEnabled = 'true';
         let isDragging = false;
         let offsetX = 0;
         let offsetY = 0;
@@ -1074,6 +1079,7 @@ document.addEventListener('DOMContentLoaded', function () {
         let startMarginTop = 0;
         // Use relative positioning so that text flows around normally
         fig.style.position = fig.style.position || 'relative';
+        fig.style.cursor = 'move';
         fig.addEventListener('mousedown', (e) => {
             isDragging = true;
             const rect = fig.getBoundingClientRect();
@@ -1158,6 +1164,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (existingFig) {
             existingFig.classList.remove('float-left', 'float-right');
             existingFig.classList.add(`float-${align}`);
+            enableDragForFloatingImage(existingFig);
             return;
         }
         // Crear figure y mover la imagen dentro
@@ -1171,6 +1178,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fig.parentNode.insertBefore(spacer, fig.nextSibling);
         // Actualizar selección de imagen para redimensionar
         selectedImageForResize = img;
+        enableDragForFloatingImage(fig);
     }
 
     // When loading a note into the editor, ensure any existing floating
@@ -1178,8 +1186,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // innerHTML in loadNoteIntoEditor().
     const originalLoadNoteIntoEditor = loadNoteIntoEditor;
     loadNoteIntoEditor = function(index) {
-        // Reutilizamos la implementación original sin habilitar arrastre para imágenes flotantes
         originalLoadNoteIntoEditor(index);
+        notesEditor.querySelectorAll('figure.float-image').forEach(enableDragForFloatingImage);
     };
 
     // ----------------------------------------------------------------------
@@ -2018,26 +2026,16 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createSeparator());
 
         // Image controls
-        // Floating image insertion: prompt the user for a URL and orientation,
-        // then insert the image as a floating figure (left or right) so that
-        // text wraps around it.  After insertion, enable drag to reposition
-        // the figure within the editor.
-        // Imagen flotante: en lugar de solicitar una URL, este botón aplica
-        // el estilo de imagen flotante "cuadrado" a la imagen seleccionada.
-        // Si la imagen aún no está envuelta en un figure, se envuelve y se
-        // alinea a la izquierda por defecto. En siguientes clics se alterna
-        // entre izquierda y derecha para facilitar el flujo de texto.
+        // Insert a "cuadro" style image from the user's device. The image is
+        // floated (right by default) so text wraps around it and the figure can
+        // be repositioned via drag & drop for fine adjustments.
         const floatImageBtn = document.createElement('button');
         floatImageBtn.className = 'toolbar-btn';
-        floatImageBtn.title = 'Aplicar estilo de imagen cuadrada';
+        floatImageBtn.title = 'Imagen tipo cuadro';
         floatImageBtn.innerHTML = '🖼️';
-        let lastFloatAlign = 'left';
         floatImageBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            // Determine next alignment (toggle left/right)
-            lastFloatAlign = lastFloatAlign === 'left' ? 'right' : 'left';
-            wrapSelectedImage(lastFloatAlign);
-            notesEditor.focus();
+            if (floatImageInput) floatImageInput.click();
         });
         editorToolbar.appendChild(floatImageBtn);
         
@@ -3453,6 +3451,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 event.target.value = '';
             }
         });
+
+        if (floatImageInput) {
+            floatImageInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        insertFloatingImageAtSelection(e.target.result, 'right');
+                    };
+                    reader.readAsDataURL(file);
+                }
+                event.target.value = '';
+            });
+        }
 
         // Note Title Editing
         notesModalTitle.addEventListener('blur', () => {
