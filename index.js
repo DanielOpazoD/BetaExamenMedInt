@@ -2059,6 +2059,12 @@ document.addEventListener('DOMContentLoaded', function () {
              window.print();
         });
         editorToolbar.appendChild(printBtn);
+
+        const printAllBtn = createButton('Imprimir todas las notas en PDF con índice', '🖨️', null, null, handlePrintAllWithIndex);
+        editorToolbar.appendChild(printAllBtn);
+
+        const exportAllBtn = createButton('Exportar todas las notas como HTML', '🌐', null, null, handleExportAllHTML);
+        editorToolbar.appendChild(exportAllBtn);
     }
 
     function openAiToolsModal() {
@@ -3152,6 +3158,133 @@ document.addEventListener('DOMContentLoaded', function () {
         window.print();
     }
 
+    async function handlePrintAllWithIndex() {
+        const topicRows = document.querySelectorAll('tr[data-topic-id]');
+        const printArea = getElem('print-area');
+        printArea.innerHTML = '';
+
+        const tocList = document.createElement('ol');
+        const contentWrapper = document.createElement('div');
+
+        for (const row of topicRows) {
+            const topicId = row.dataset.topicId;
+            const title = row.cells[1]?.textContent.trim();
+            const topicData = await db.get('topics', topicId);
+
+            if (topicData && topicData.notes && topicData.notes.length > 0) {
+                const anchorId = `topic-${topicId}`;
+                const li = document.createElement('li');
+                li.innerHTML = `<a href="#${anchorId}">${title}</a>`;
+                tocList.appendChild(li);
+
+                const topicDiv = document.createElement('div');
+                topicDiv.id = anchorId;
+                topicDiv.className = 'topic-print-wrapper';
+
+                const titleEl = document.createElement('h2');
+                titleEl.textContent = title;
+                topicDiv.appendChild(titleEl);
+
+                topicData.notes.forEach(note => {
+                    const noteDiv = document.createElement('div');
+                    noteDiv.innerHTML = note.content;
+                    noteDiv.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
+                        link.outerHTML = `<span>${link.innerHTML}</span>`;
+                    });
+                    topicDiv.appendChild(noteDiv);
+                });
+
+                contentWrapper.appendChild(topicDiv);
+            }
+        }
+
+        if (!tocList.childElementCount) {
+            await showAlert("No hay notas para imprimir.");
+            return;
+        }
+
+        const tocContainer = document.createElement('div');
+        tocContainer.innerHTML = '<h2>Índice</h2>';
+        tocContainer.appendChild(tocList);
+        printArea.appendChild(tocContainer);
+        printArea.appendChild(contentWrapper);
+        window.print();
+    }
+
+    async function exportTopicsToHTML(filename, docTitle, topicRows) {
+        const topics = [];
+        for (const row of topicRows) {
+            const topicId = row.dataset.topicId;
+            const title = row.cells[1]?.textContent.trim();
+            const topicData = await db.get('topics', topicId);
+            if (topicData && topicData.notes && topicData.notes.length > 0) {
+                const parts = [];
+                topicData.notes.forEach(note => {
+                    const noteDiv = document.createElement('div');
+                    noteDiv.innerHTML = note.content;
+                    noteDiv.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
+                        link.outerHTML = `<span>${link.innerHTML}</span>`;
+                    });
+                    parts.push(noteDiv.innerHTML);
+                });
+                topics.push({ id: `topic-${topicId}`, title, content: parts.join('') });
+            }
+        }
+
+        if (topics.length === 0) {
+            await showAlert('No hay notas para exportar.');
+            return;
+        }
+
+        const navItems = topics.map(t => `<li><a href="#${t.id}">${t.title}</a></li>`).join('');
+        const sectionsHTML = topics.map(t => `<section id="${t.id}"><h2>${t.title}</h2>${t.content}</section>`).join('');
+
+        const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>${docTitle}</title><style>
+body{margin:0;display:flex;font-family:sans-serif;}
+#sidebar{width:250px;background:#f5f5f5;padding:1em;overflow-y:auto;transition:transform .3s;}
+#sidebar.hidden{transform:translateX(-250px);}
+#content{flex:1;padding:1em;}
+#toggleSidebar{position:fixed;top:10px;left:10px;z-index:1000;}
+nav ul{list-style:none;padding:0;}
+nav a{text-decoration:none;color:#000;}
+</style></head><body><nav id="sidebar"><h2>${docTitle}</h2><ul>${navItems}</ul></nav><div id="content">${sectionsHTML}</div><button id="toggleSidebar">☰</button><script>
+document.getElementById('toggleSidebar').addEventListener('click',function(){document.getElementById('sidebar').classList.toggle('hidden');});
+</script></body></html>`;
+
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    async function handleExportSectionHTML(sectionHeaderRow) {
+        const sectionId = sectionHeaderRow.dataset.sectionHeader;
+        const sectionTitle = sectionHeaderRow.querySelector('.section-title').textContent.trim();
+        const topicRows = document.querySelectorAll(`tr[data-section="${sectionId}"]`);
+        await exportTopicsToHTML(`${sectionId}.html`, sectionTitle, topicRows);
+    }
+
+    async function handleExportAllHTML() {
+        const topicRows = document.querySelectorAll('tr[data-topic-id]');
+        await exportTopicsToHTML('todas-las-notas.html', 'Todas las notas', topicRows);
+    }
+
+    function addSectionExportButtons() {
+        document.querySelectorAll('.section-header-row').forEach(row => {
+            const printBtn = row.querySelector('.print-section-btn');
+            if (printBtn && !row.querySelector('.export-section-btn')) {
+                const exportBtn = document.createElement('button');
+                exportBtn.className = 'export-section-btn toolbar-btn no-print';
+                exportBtn.title = 'Guardar sección como HTML';
+                exportBtn.textContent = '🌐';
+                printBtn.insertAdjacentElement('afterend', exportBtn);
+            }
+        });
+    }
+
 
     // --- Event Listeners Setup ---
     function setupEventListeners() {
@@ -3267,6 +3400,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 e.stopPropagation();
                 const sectionHeaderRow = printBtn.closest('.section-header-row');
                 handlePrintSection(sectionHeaderRow);
+            }
+        });
+
+        // Section export button
+        tableBody.addEventListener('click', (e) => {
+            const exportBtn = e.target.closest('.export-section-btn');
+            if (exportBtn) {
+                e.stopPropagation();
+                const sectionHeaderRow = exportBtn.closest('.section-header-row');
+                handleExportSectionHTML(sectionHeaderRow);
             }
         });
 
@@ -3943,6 +4086,7 @@ document.addEventListener('DOMContentLoaded', function () {
         setupEditorToolbar();
         populateIconPicker();
         loadState();
+        addSectionExportButtons();
         setupEventListeners();
         document.querySelectorAll('table.resizable-table').forEach(initTableResize);
         applyTheme(document.documentElement.dataset.theme || 'default');
