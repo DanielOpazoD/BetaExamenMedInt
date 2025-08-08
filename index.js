@@ -715,11 +715,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const accordionHTML = `<details><summary>Título</summary><div>Contenido...<br></div></details><p><br></p>`;
         subNoteToolbar.appendChild(createSNButton('Insertar bloque colapsable', accordionSVG, 'insertHTML', accordionHTML));
         subNoteToolbar.appendChild(createSNSeparator());
-        // Symbols and special characters
-        const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
-        subNoteToolbar.appendChild(createSNSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
-        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
-        subNoteToolbar.appendChild(createSNSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
         // Image from URL
         subNoteToolbar.appendChild(createSNButton('Insertar Imagen desde URL', '🖼️', null, null, () => {
             const url = prompt('Ingresa la URL de la imagen:');
@@ -758,6 +753,13 @@ document.addEventListener('DOMContentLoaded', function () {
             printArea.innerHTML = `<div>${subNoteEditor.innerHTML}</div>`;
             window.print();
         }));
+
+        subNoteToolbar.appendChild(createSNSeparator());
+        // Symbols and special characters
+        const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
+        subNoteToolbar.appendChild(createSNSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
+        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
+        subNoteToolbar.appendChild(createSNSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
     }
     // Initialize sub-note toolbar on load
     setupSubnoteToolbar();
@@ -1999,13 +2001,6 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
         
         editorToolbar.appendChild(createSeparator());
-        
-        // Symbols
-        const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
-        editorToolbar.appendChild(createSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
-
-        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
-        editorToolbar.appendChild(createSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
 
         const aiBtn = createButton('Asistente de IA', '🤖', null, null, openAiToolsModal);
         editorToolbar.appendChild(aiBtn);
@@ -2059,6 +2054,15 @@ document.addEventListener('DOMContentLoaded', function () {
              window.print();
         });
         editorToolbar.appendChild(printBtn);
+
+        editorToolbar.appendChild(createSeparator());
+
+        // Symbols
+        const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
+        editorToolbar.appendChild(createSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
+
+        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
+        editorToolbar.appendChild(createSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
     }
 
     function openAiToolsModal() {
