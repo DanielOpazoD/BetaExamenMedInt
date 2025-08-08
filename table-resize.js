@@ -7,6 +7,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
 
   table.addEventListener('mousemove', onHover);
   table.addEventListener('mousedown', startResize);
+  table.addEventListener('dblclick', autoResize);
   document.addEventListener('mousemove', onDrag);
   document.addEventListener('mouseup', stopResize);
   document.addEventListener('keydown', cancelOnEsc);
@@ -69,6 +70,40 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
     }
     activeResize = null;
     table.style.cursor = '';
+  }
+
+  function autoResize(e) {
+    if (!hoverEdge) return;
+    e.preventDefault();
+    if (hoverEdge.type === 'col') {
+      autoFitCol(hoverEdge.index);
+    } else {
+      autoFitRow(hoverEdge.index);
+    }
+  }
+
+  function autoFitCol(index) {
+    let maxWidth = minSize;
+    for (const row of table.rows) {
+      const cell = row.cells[index];
+      if (!cell) continue;
+      const prev = cell.style.width;
+      cell.style.width = 'auto';
+      const width = cell.offsetWidth;
+      cell.style.width = prev;
+      if (width > maxWidth) maxWidth = width;
+    }
+    setColWidth(index, maxWidth);
+  }
+
+  function autoFitRow(index) {
+    const row = table.rows[index];
+    if (!row) return;
+    const prev = row.style.height;
+    row.style.height = 'auto';
+    const height = row.offsetHeight;
+    row.style.height = prev;
+    setRowHeight(index, Math.max(minSize, height));
   }
 
   function findColEdge(x) {
