@@ -250,12 +250,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // --- Customizable Icon and Character Lists ---
-    // These variables will be initialized later, after EMOJI_CATEGORIES is
-    // defined.  Using let allows us to assign values subsequently without
-    // triggering temporal dead zone errors.  See below for initialization.
+    // `defaultSuggestedIcons` and `customIconsList` are assigned after
+    // `EMOJI_CATEGORIES` is defined. `globalSpecialChars` is initialized here so
+    // the character dropdowns can render immediately.
     let defaultSuggestedIcons;
     let customIconsList;
-    let globalSpecialChars;
+    let globalSpecialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
     const specialCharRenderers = [];
 
     // Multi-note panel elements
@@ -1447,12 +1447,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Initialize customizable icon and character lists after EMOJI_CATEGORIES is defined.
     // At this point EMOJI_CATEGORIES is available, so we can safely copy its
-    // suggested category.  We also set up the array for user-added icons and
-    // default special characters for character insertion.  These variables
-    // were declared earlier with let.
+    // suggested category.  We also set up the array for user-added icons.
+    // `globalSpecialChars` was initialized earlier.
     defaultSuggestedIcons = Array.isArray(EMOJI_CATEGORIES['Sugeridos']) ? [...EMOJI_CATEGORIES['Sugeridos']] : [];
     customIconsList = [];
-    globalSpecialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
     
     // --- Core Logic Functions ---
 
