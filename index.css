@@ -278,7 +278,7 @@
         .color-submenu.visible { display: grid; }
 
         .symbol-dropdown { position: relative; display: inline-block; }
-        .symbol-dropdown-content { display: none; position: absolute; right: 0; background-color: var(--bg-secondary); min-width: 280px; max-height: 200px; overflow-y: auto; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 10; border-radius: 8px; border: 1px solid var(--border-color); padding: 8px; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 4px; }
+        .symbol-dropdown-content { display: none; position: absolute; left: 100%; top: 0; background-color: var(--bg-secondary); min-width: 280px; max-height: 200px; overflow-y: auto; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 10; border-radius: 8px; border: 1px solid var(--border-color); padding: 8px; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 4px; }
         .symbol-dropdown-content.visible { display: grid; }
         .symbol-btn {
             font-size: 18px;
