@@ -107,11 +107,11 @@
         
         .notes-modal-content { max-width: 900px; height: 95vh; max-height: 95vh; padding: 0; }
         
-        .note-icon, .link-anchor, .edit-link-icon, .print-section-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; transition: background-color 0.2s, color 0.2s, opacity 0.2s, filter 0.2s; cursor: pointer; }
+        .note-icon, .link-anchor, .edit-link-icon, .print-section-btn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; transition: background-color 0.2s, color 0.2s, opacity 0.2s, filter 0.2s; cursor: pointer; }
         .note-icon:hover, .link-anchor:hover, .edit-link-icon:hover, .print-section-btn:hover { background-color: rgba(0,0,0,0.1); }
         
-        .link-icon { width: 1.1em; height: 1.1em; }
-        .note-icon svg, .print-section-btn { width: 1.1em; height: 1.1em; }
+        .link-icon { width: 1em; height: 1em; }
+        .note-icon svg, .print-section-btn { width: 1em; height: 1em; }
         .note-icon.section-note-icon, .print-section-btn { color: var(--section-header-text); opacity: 0.8; }
         
         .note-icon.has-note {
@@ -329,6 +329,8 @@
 table.resizable-table td,
 table.resizable-table th {
     position: relative;
+    padding: 0.125rem 0.5rem;
+    line-height: 1.2;
 }
 
 /* Floating image styles */
