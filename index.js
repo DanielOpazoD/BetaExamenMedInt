@@ -256,6 +256,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let defaultSuggestedIcons;
     let customIconsList;
     let globalSpecialChars;
+    const specialCharRenderers = [];
 
     // Multi-note panel elements
     const notesPanelToggle = getElem('notes-panel-toggle');
@@ -474,7 +475,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return group;
         };
 
-        const createSNSymbolDropdown = (symbols, title, icon) => {
+        const createSNSymbolDropdown = (symbols, title, icon, manage = false) => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
             const btn = document.createElement('button');
@@ -494,8 +495,24 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     content.appendChild(sBtn);
                 });
+                if (manage) {
+                    const gearBtn = document.createElement('button');
+                    gearBtn.className = 'toolbar-btn symbol-btn';
+                    gearBtn.title = 'Administrar caracteres';
+                    gearBtn.textContent = '⚙️';
+                    gearBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        content.classList.remove('visible');
+                        renderCharManager();
+                        showModal(charManagerModal);
+                    });
+                    content.appendChild(gearBtn);
+                }
             };
             renderSNSyms();
+            if (manage) {
+                specialCharRenderers.push(renderSNSyms);
+            }
             dropdown.appendChild(content);
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -718,8 +735,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Symbols and special characters
         const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
         subNoteToolbar.appendChild(createSNSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
-        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
-        subNoteToolbar.appendChild(createSNSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
+        subNoteToolbar.appendChild(createSNSymbolDropdown(globalSpecialChars, 'Caracteres Especiales', 'Ω', true));
         // Image from URL
         subNoteToolbar.appendChild(createSNButton('Insertar Imagen desde URL', '🖼️', null, null, () => {
             const url = prompt('Ingresa la URL de la imagen:');
@@ -881,7 +897,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // deletion controls in the normal picker; deletion is only possible
     // through the manager modal.  Character manager logic is similar but
     // operates on the globalSpecialChars array.
-
+    function refreshSpecialCharDropdowns() {
+        specialCharRenderers.forEach(fn => fn());
+    }
     /**
      * Render the current list of icons into the icon manager modal.  Each
      * entry shows the emoji and a small × button for deletion.  Icons are
@@ -946,6 +964,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 e.stopPropagation();
                 globalSpecialChars.splice(index, 1);
                 renderCharManager();
+                refreshSpecialCharDropdowns();
             });
             wrapper.appendChild(delBtn);
             currentChars.appendChild(wrapper);
@@ -1009,6 +1028,7 @@ document.addEventListener('DOMContentLoaded', function () {
             globalSpecialChars.push(val);
             newCharInputManager.value = '';
             renderCharManager();
+            refreshSpecialCharDropdowns();
         });
     }
 
@@ -1740,7 +1760,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return group;
         };
 
-        const createSymbolDropdown = (symbols, title, icon) => {
+        const createSymbolDropdown = (symbols, title, icon, manage = false) => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
             const btn = document.createElement('button');
@@ -1750,9 +1770,6 @@ document.addEventListener('DOMContentLoaded', function () {
             dropdown.appendChild(btn);
             const content = document.createElement('div');
             content.className = 'symbol-dropdown-content';
-            // Render symbols list without deletion or add buttons.  The
-            // administración de caracteres se gestiona en el panel de
-            // configuración y no desde este menú desplegable.
             const renderSymbols = () => {
                 content.innerHTML = '';
                 symbols.forEach((sym) => {
@@ -1763,8 +1780,24 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     content.appendChild(symBtn);
                 });
+                if (manage) {
+                    const gearBtn = document.createElement('button');
+                    gearBtn.className = 'toolbar-btn symbol-btn';
+                    gearBtn.title = 'Administrar caracteres';
+                    gearBtn.textContent = '⚙️';
+                    gearBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        content.classList.remove('visible');
+                        renderCharManager();
+                        showModal(charManagerModal);
+                    });
+                    content.appendChild(gearBtn);
+                }
             };
             renderSymbols();
+            if (manage) {
+                specialCharRenderers.push(renderSymbols);
+            }
             dropdown.appendChild(content);
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -2004,8 +2037,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
         editorToolbar.appendChild(createSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
 
-        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
-        editorToolbar.appendChild(createSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
+        editorToolbar.appendChild(createSymbolDropdown(globalSpecialChars, 'Caracteres Especiales', 'Ω', true));
 
         const aiBtn = createButton('Asistente de IA', '🤖', null, null, openAiToolsModal);
         editorToolbar.appendChild(aiBtn);
