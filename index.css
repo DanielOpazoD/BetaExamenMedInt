@@ -196,7 +196,15 @@
             color: var(--btn-primary-bg);
         }
         
-        .progress-ring-circle { transition: stroke-dashoffset 0.5s ease-out; }
+.progress-ring-circle { transition: stroke-dashoffset 0.5s ease-out; }
+
+/* Compact table styling for denser topic list */
+.compact-table th,
+.compact-table td {
+    padding: 0.125rem 0.25rem !important;
+    font-size: 0.75rem;
+    line-height: 1.25;
+}
         
         #icon-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 1rem; max-height: 300px; overflow-y: auto; padding: 1rem 0; }
         .icon-picker-item { cursor: pointer; padding: 8px; border-radius: 8px; transition: background-color 0.2s; }
