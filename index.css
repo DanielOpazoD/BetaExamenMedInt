@@ -329,6 +329,9 @@
 table.resizable-table td,
 table.resizable-table th {
     position: relative;
+    padding: 0.25rem 0.25rem;
+    font-size: 0.75rem;
+    line-height: 1.1;
 }
 
 /* Floating image styles */
