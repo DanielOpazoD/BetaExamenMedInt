@@ -336,19 +336,22 @@ table.resizable-table th {
     display: block;
     max-width: 250px;
     margin: 0 1rem 1rem 0;
-    cursor: default;
+    cursor: move;
 }
 .float-image.float-left {
     float: left;
+    margin: 0 1rem 1rem 0;
 }
 .float-image.float-right {
     float: right;
+    margin: 0 0 1rem 1rem;
 }
 .float-image img {
     width: 100%;
     height: auto;
     display: block;
     border-radius: 0.25rem;
+    cursor: move;
 }
 
 /* Table size selection grid */
