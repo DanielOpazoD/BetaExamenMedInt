@@ -2983,8 +2983,17 @@ document.addEventListener('DOMContentLoaded', function () {
     
     function openImageLightbox(imagesData, startIndex = 0) {
         try {
-            lightboxImages = JSON.parse(imagesData);
-            if (!Array.isArray(lightboxImages) || lightboxImages.length === 0) return;
+            if (typeof imagesData === 'string') {
+                lightboxImages = JSON.parse(imagesData);
+                if (!Array.isArray(lightboxImages) || lightboxImages.length === 0) return;
+            } else if (Array.isArray(imagesData)) {
+                lightboxImages = imagesData;
+                // When opened directly from note images there is no gallery link
+                activeGalleryLinkForLightbox = null;
+                if (lightboxImages.length === 0) return;
+            } else {
+                return;
+            }
             currentLightboxIndex = startIndex;
             // Reset zoom when opening a new gallery
             currentZoom = 1;
@@ -3014,21 +3023,14 @@ document.addEventListener('DOMContentLoaded', function () {
         // Build caption with numbering
         const caption = image.caption || '';
         const numbering = `(${currentLightboxIndex + 1} / ${lightboxImages.length})`;
-        lightboxCaptionText.textContent = caption.trim();
-        // Show or hide the caption and delete button based on caption existence
-        if (caption.trim() === '') {
-            lightboxCaption.style.display = 'none';
-        } else {
-            lightboxCaption.style.display = 'flex';
-        }
-        // Append numbering after the caption within the caption element
+        lightboxCaption.style.display = 'flex';
         if (caption.trim()) {
             lightboxCaptionText.textContent = `${caption.trim()} ${numbering}`;
+            deleteCaptionBtn.style.display = 'inline-block';
         } else {
-            lightboxCaptionText.textContent = numbering;
+            lightboxCaptionText.textContent = `Añadir nota... ${numbering}`;
+            deleteCaptionBtn.style.display = 'none';
         }
-        // Show delete caption button only if there's a caption to delete
-        deleteCaptionBtn.style.display = caption.trim() ? 'inline-block' : 'none';
 
         prevLightboxBtn.style.display = currentLightboxIndex > 0 ? 'block' : 'none';
         nextLightboxBtn.style.display = currentLightboxIndex < lightboxImages.length - 1 ? 'block' : 'none';
@@ -3519,6 +3521,21 @@ document.addEventListener('DOMContentLoaded', function () {
              }
         });
 
+        notesEditor.addEventListener('dblclick', (e) => {
+            if (e.target.tagName === 'IMG') {
+                e.preventDefault();
+                const images = Array.from(notesEditor.querySelectorAll('img')).map(img => ({
+                    element: img,
+                    url: img.src,
+                    caption: img.dataset.caption || ''
+                }));
+                const idx = images.findIndex(obj => obj.element === e.target);
+                if (idx !== -1) {
+                    openImageLightbox(images, idx);
+                }
+            }
+        });
+
         // --- Quick Note Modal Listeners ---
         savePostitBtn.addEventListener('click', () => {
             // When editing a quick note, save its content and close modal
@@ -3611,6 +3628,28 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         }
+        if (lightboxCaption) {
+            lightboxCaption.addEventListener('click', (e) => {
+                if (e.target === deleteCaptionBtn) return;
+                const imgObj = lightboxImages[currentLightboxIndex];
+                if (!imgObj) return;
+                const newCaption = prompt('Nota al pie de la imagen:', imgObj.caption || '');
+                if (newCaption === null) return;
+                imgObj.caption = newCaption.trim();
+                updateLightboxView();
+                if (activeGalleryLinkForLightbox) {
+                    activeGalleryLinkForLightbox.dataset.images = JSON.stringify(lightboxImages);
+                    if (currentNotesArray && currentNotesArray[activeNoteIndex]) {
+                        saveCurrentNote();
+                    }
+                } else if (imgObj.element) {
+                    imgObj.element.dataset.caption = imgObj.caption;
+                    if (currentNotesArray && currentNotesArray[activeNoteIndex]) {
+                        saveCurrentNote();
+                    }
+                }
+            });
+        }
         if (deleteCaptionBtn) {
             deleteCaptionBtn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -3622,7 +3661,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     // Persist the updated images data back to the link and save note
                     if (activeGalleryLinkForLightbox) {
                         activeGalleryLinkForLightbox.dataset.images = JSON.stringify(lightboxImages);
-                        // Save state of current note when modifying gallery captions
+                        if (currentNotesArray && currentNotesArray[activeNoteIndex]) {
+                            saveCurrentNote();
+                        }
+                    } else if (imgObj.element) {
+                        imgObj.element.dataset.caption = '';
                         if (currentNotesArray && currentNotesArray[activeNoteIndex]) {
                             saveCurrentNote();
                         }
