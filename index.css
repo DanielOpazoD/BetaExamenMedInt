@@ -96,7 +96,12 @@
         .section-total-row .total-section-label { font-size: 0.75rem; }
 
         .grand-total-row td { font-size: 0.75rem; }
-        
+
+        #table-body td {
+            padding-top: 0.125rem;
+            padding-bottom: 0.125rem;
+        }
+
         thead th { position: sticky; top: 0; z-index: 20; background-color: var(--header-bg); color: var(--header-text); }
         
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease; }
@@ -107,11 +112,11 @@
         
         .notes-modal-content { max-width: 900px; height: 95vh; max-height: 95vh; padding: 0; }
         
-        .note-icon, .link-anchor, .edit-link-icon, .print-section-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; transition: background-color 0.2s, color 0.2s, opacity 0.2s, filter 0.2s; cursor: pointer; }
+        .note-icon, .link-anchor, .edit-link-icon, .print-section-btn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; transition: background-color 0.2s, color 0.2s, opacity 0.2s, filter 0.2s; cursor: pointer; }
         .note-icon:hover, .link-anchor:hover, .edit-link-icon:hover, .print-section-btn:hover { background-color: rgba(0,0,0,0.1); }
-        
-        .link-icon { width: 1.1em; height: 1.1em; }
-        .note-icon svg, .print-section-btn { width: 1.1em; height: 1.1em; }
+        .link-icon { width: 0.9em; height: 0.9em; }
+        .note-icon svg { width: 0.9em; height: 0.9em; }
+        .print-section-btn { font-size: 0.9em; }
         .note-icon.section-note-icon, .print-section-btn { color: var(--section-header-text); opacity: 0.8; }
         
         .note-icon.has-note {
