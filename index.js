@@ -12,6 +12,7 @@ import { makeTableResizable } from './table-resize.js';
 import { setupAdvancedSearchReplace } from './search-replace.js';
 import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
+import { getTemplates, applyTemplate } from './template-library.js';
 
 const pdfjsLib = typeof window !== 'undefined' ? window['pdfjsLib'] : null;
 if (pdfjsLib) {
@@ -1850,6 +1851,34 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(selectLineHeight);
 
+        // Template selector
+        const selectTemplate = document.createElement('select');
+        selectTemplate.className = 'toolbar-select';
+        selectTemplate.title = 'Plantillas';
+
+        const templatePlaceholder = document.createElement('option');
+        templatePlaceholder.value = '';
+        templatePlaceholder.textContent = 'Plantillas';
+        templatePlaceholder.disabled = true;
+        templatePlaceholder.selected = true;
+        selectTemplate.appendChild(templatePlaceholder);
+
+        getTemplates().forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            selectTemplate.appendChild(option);
+        });
+
+        selectTemplate.addEventListener('change', async () => {
+            if (selectTemplate.value) {
+                await applyTemplate(selectTemplate.value, notesEditor);
+                selectTemplate.selectedIndex = 0;
+                notesEditor.focus();
+            }
+        });
+
+        editorToolbar.appendChild(selectTemplate);
 
         editorToolbar.appendChild(createSeparator());
 
