@@ -654,6 +654,8 @@ table.resizable-table th {
         }
         #print-index ol {
             margin-left: 1.5rem;
+            list-style: none;
+            padding-left: 0;
         }
         #print-index a {
             text-decoration: none;
@@ -666,9 +668,10 @@ table.resizable-table th {
             color: #9ca3af;
         }
         .back-to-index {
-            display: inline-block;
+            display: block;
+            text-align: right;
             margin-bottom: 0.5rem;
-            font-size: 0.875rem;
+            font-size: 0.75rem;
         }
 
 
