@@ -710,10 +710,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
         subNoteToolbar.appendChild(createSNButton('Disminuir sangría', outdentSVG, 'outdent'));
         subNoteToolbar.appendChild(createSNButton('Aumentar sangría', indentSVG, 'indent'));
-        // Collapsible block (accordion)
-        const accordionSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-square w-5 h-5"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>`;
-        const accordionHTML = `<details><summary>Título</summary><div>Contenido...<br></div></details><p><br></p>`;
-        subNoteToolbar.appendChild(createSNButton('Insertar bloque colapsable', accordionSVG, 'insertHTML', accordionHTML));
+        // Collapsible list item
+        const collapsibleListSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-tree w-5 h-5"><path d="M21 7H9"/><path d="M21 12H9"/><path d="M21 17H9"/><path d="M3 17v-6a4 4 0 0 1 4-4h4"/></svg>`;
+        const collapsibleListHTML = `<details class="collapsible-list"><summary>Elemento</summary><div>Texto...<br></div></details><p><br></p>`;
+        subNoteToolbar.appendChild(createSNButton('Insertar lista colapsable', collapsibleListSVG, 'insertHTML', collapsibleListHTML));
         subNoteToolbar.appendChild(createSNSeparator());
         // Symbols and special characters
         const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
@@ -1989,10 +1989,10 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createButton('Disminuir sangría', outdentSVG, 'outdent'));
         editorToolbar.appendChild(createButton('Aumentar sangría', indentSVG, 'indent'));
         
-        const accordionSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-square w-5 h-5"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>`;
-        const accordionHTML = `<details><summary>Título</summary><div>Contenido...<br></div></details><p><br></p>`;
-        
-        editorToolbar.appendChild(createButton('Insertar bloque colapsable', accordionSVG, 'insertHTML', accordionHTML));
+        const collapsibleListSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-tree w-5 h-5"><path d="M21 7H9"/><path d="M21 12H9"/><path d="M21 17H9"/><path d="M3 17v-6a4 4 0 0 1 4-4h4"/></svg>`;
+        const collapsibleListHTML = `<details class="collapsible-list"><summary>Elemento</summary><div>Texto...<br></div></details><p><br></p>`;
+
+        editorToolbar.appendChild(createButton('Insertar lista colapsable', collapsibleListSVG, 'insertHTML', collapsibleListHTML));
         
         const subnoteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
         // El botón ahora crea una sub-nota en lugar de un Post-it

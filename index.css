@@ -177,23 +177,19 @@
             font-size: 0.8rem;
         }
         
-        #notes-editor details {
-            border: 1px solid var(--border-color);
-            border-radius: 0.5rem;
-            padding: 0.5rem;
-            margin: 1rem 0;
-            background-color: var(--bg-tertiary);
-            transition: background-color 0.2s;
+        #notes-editor details.collapsible-list,
+        #subnote-editor details.collapsible-list {
+            margin-left: 1.5rem;
         }
-        #notes-editor summary {
-            font-weight: 600;
+        #notes-editor details.collapsible-list summary,
+        #subnote-editor details.collapsible-list summary {
             cursor: pointer;
-            padding: 0.25rem;
-            outline: none;
-            user-select: none;
+            list-style: none;
         }
-        #notes-editor summary::marker {
-            color: var(--btn-primary-bg);
+        #notes-editor details.collapsible-list summary::marker,
+        #subnote-editor details.collapsible-list summary::marker {
+            content: '• ';
+            color: var(--text-color);
         }
         
         .progress-ring-circle { transition: stroke-dashoffset 0.5s ease-out; }
