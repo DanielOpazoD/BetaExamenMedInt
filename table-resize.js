@@ -5,10 +5,13 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   let startY = 0;
   let startSize = 0;
 
-  table.addEventListener('mousemove', onHover);
-  table.addEventListener('mousedown', startResize);
-  document.addEventListener('mousemove', onDrag);
-  document.addEventListener('mouseup', stopResize);
+  // Allow dragging with both mouse and touch inputs.
+  table.style.touchAction = 'none';
+
+  table.addEventListener('pointermove', onHover);
+  table.addEventListener('pointerdown', startResize);
+  document.addEventListener('pointermove', onDrag);
+  document.addEventListener('pointerup', stopResize);
   document.addEventListener('keydown', cancelOnEsc);
 
   function onHover(e) {
