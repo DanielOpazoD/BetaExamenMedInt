@@ -3058,7 +3058,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 header.textContent = sectionTitle;
                 indexContainer.appendChild(header);
                 currentOl = document.createElement('ol');
-                currentOl.start = counter;
                 indexContainer.appendChild(currentOl);
             } else {
                 const topicId = row.dataset.topicId;
@@ -3070,7 +3069,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const li = document.createElement('li');
                     const link = document.createElement('a');
                     link.href = `#print-${topicId}`;
-                    link.textContent = title;
+                    link.textContent = `${counter}. ${title}`;
                     link.className = hasNotes ? 'topic-developed' : 'topic-pending';
                     li.appendChild(link);
                     currentOl.appendChild(li);
@@ -3088,6 +3087,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const titleEl = document.createElement('h2');
                 titleEl.textContent = `${counter}. ${title}`;
+                if (!hasNotes) {
+                    titleEl.style.color = '#9ca3af';
+                }
                 topicWrapper.appendChild(titleEl);
 
                 if (hasNotes) {
