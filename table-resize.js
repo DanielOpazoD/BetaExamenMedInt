@@ -4,9 +4,21 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   let startX = 0;
   let startY = 0;
   let startSize = 0;
+  let startWidth = 0;
+  let startHeight = 0;
+
+  table.style.position = 'relative';
+  const handle = document.createElement('div');
+  handle.className = 'table-resize-handle';
+  table.appendChild(handle);
+  handle.addEventListener('mousemove', e => {
+    e.stopPropagation();
+    table.style.cursor = 'se-resize';
+  });
 
   table.addEventListener('mousemove', onHover);
   table.addEventListener('mousedown', startResize);
+  handle.addEventListener('mousedown', startTableResize);
   document.addEventListener('mousemove', onDrag);
   document.addEventListener('mouseup', stopResize);
   document.addEventListener('keydown', cancelOnEsc);
@@ -41,16 +53,34 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
       : getRowHeight(activeResize.index);
   }
 
+  function startTableResize(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    activeResize = { type: 'table' };
+    startX = e.clientX;
+    startY = e.clientY;
+    startWidth = table.offsetWidth;
+    startHeight = table.offsetHeight;
+    table.style.cursor = 'se-resize';
+  }
+
   function onDrag(e) {
     if (!activeResize) return;
     if (activeResize.type === 'col') {
       const dx = e.clientX - startX;
       const newWidth = Math.max(minSize, startSize + dx);
       setColWidth(activeResize.index, newWidth);
-    } else {
+    } else if (activeResize.type === 'row') {
       const dy = e.clientY - startY;
       const newHeight = Math.max(minSize, startSize + dy);
       setRowHeight(activeResize.index, newHeight);
+    } else {
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      const newWidth = Math.max(minSize, startWidth + dx);
+      const newHeight = Math.max(minSize, startHeight + dy);
+      table.style.width = newWidth + 'px';
+      table.style.height = newHeight + 'px';
     }
   }
 
@@ -64,8 +94,11 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
     if (e.key !== 'Escape' || !activeResize) return;
     if (activeResize.type === 'col') {
       setColWidth(activeResize.index, startSize);
-    } else {
+    } else if (activeResize.type === 'row') {
       setRowHeight(activeResize.index, startSize);
+    } else {
+      table.style.width = startWidth + 'px';
+      table.style.height = startHeight + 'px';
     }
     activeResize = null;
     table.style.cursor = '';

@@ -322,9 +322,22 @@
         }
 
 /* Basic styles for resizable tables */
+table.resizable-table {
+    position: relative;
+}
 table.resizable-table td,
 table.resizable-table th {
     position: relative;
+}
+
+table.resizable-table .table-resize-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    right: 0;
+    bottom: 0;
+    cursor: se-resize;
+    background: #999;
 }
 
 /* Floating image styles */
