@@ -322,9 +322,26 @@
         }
 
 /* Basic styles for resizable tables */
+table.resizable-table {
+    position: relative;
+}
 table.resizable-table td,
 table.resizable-table th {
     position: relative;
+}
+
+table.resizable-table .table-resize-handle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    right: 0;
+    bottom: 0;
+    cursor: se-resize;
+    background: transparent;
+    border-right: 2px solid var(--text-muted);
+    border-bottom: 2px solid var(--text-muted);
+    opacity: 0.7;
+    box-sizing: border-box;
 }
 
 /* Floating image styles */
