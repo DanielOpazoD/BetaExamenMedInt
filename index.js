@@ -2728,12 +2728,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         // initialize resizers on newly inserted tables (defer to allow DOM insertion)
         setTimeout(() => {
-            const tables = notesEditor.querySelectorAll('table.resizable-table');
+            const tables = notesEditor.querySelectorAll('table');
             tables.forEach(t => initTableResize(t));
         }, 50);
     }
     function initTableResize(table) {
+        if (table.dataset.resizableInitialized === 'true') return;
+        table.classList.add('resizable-table');
         makeTableResizable(table);
+        table.dataset.resizableInitialized = 'true';
     }
 
     function renderNotesList() {
@@ -2788,6 +2791,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
+        notesEditor.querySelectorAll('table').forEach(initTableResize);
 
         renderNotesList();
         notesEditor.focus();
@@ -3450,6 +3454,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const reader = new FileReader();
                     reader.onload = (e) => {
                         notesEditor.innerHTML = e.target.result;
+                        notesEditor.querySelectorAll('table').forEach(initTableResize);
                     };
                     reader.readAsText(file);
                 }
@@ -3989,7 +3994,7 @@ document.addEventListener('DOMContentLoaded', function () {
         populateIconPicker();
         loadState();
         setupEventListeners();
-        document.querySelectorAll('table.resizable-table').forEach(initTableResize);
+        document.querySelectorAll('table').forEach(initTableResize);
         applyTheme(document.documentElement.dataset.theme || 'default');
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();
