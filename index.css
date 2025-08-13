@@ -1,63 +1,69 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
-        :root {
+:root {
             --progress-ring-radius: 16;
             --progress-ring-circumference: calc(2 * 3.14159 * var(--progress-ring-radius));
-            
+
+            --accent-color: #1d4ed8;
+            --accent-color-hover: #2563eb;
+            --accent-text: #ffffff;
+
             --bg-primary: #f8fafc; --bg-secondary: #ffffff; --bg-tertiary: #f1f5f9;
             --text-primary: #1f2937; --text-secondary: #475569; --text-muted: #6b7280;
             --border-color: #e5e7eb;
-            --header-bg: #38bdf8; --header-text: #fff;
-            --section-header-bg: linear-gradient(to right, #e0f2fe, #bae6fd);
-            --section-header-text: #0c4a6e;
+            --header-bg: var(--accent-color); --header-text: var(--accent-text);
+            --section-header-bg: linear-gradient(to right, var(--accent-color-hover), var(--accent-color));
+            --section-header-text: var(--accent-text);
             --modal-bg: #ffffff; --modal-text: #1f2937;
-            --btn-primary-bg: #3b82f6; --btn-primary-text: #ffffff;
+            --btn-primary-bg: var(--accent-color); --btn-primary-text: var(--accent-text);
             --filled-bg: #dcfce7; --filled-text: #166534;
             --not-done-bg: #fee2e2; --not-done-text: #991b1b;
             --lectura-filled-bg: #fef9c3; --lectura-filled-text: #854d0e;
         }
-        html.dark { 
+html.dark {
             color-scheme: dark;
             --bg-primary: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155;
             --text-primary: #cbd5e1; --text-secondary: #94a3b8; --text-muted: #64748b;
             --border-color: #334155;
-            --header-bg: #0369a1; --header-text: #fff;
-            --section-header-bg: linear-gradient(to right, #0c4a6e, #075985);
-            --section-header-text: #e0f2fe;
+            --accent-color: #1e40af;
+            --accent-color-hover: #1d4ed8;
+            --accent-text: #e0f2fe;
             --modal-bg: #1e293b; --modal-text: #e2e8f0;
-            --btn-primary-bg: #2563eb; --btn-primary-text: #ffffff;
             --filled-bg: #14532d; --filled-text: #bbf7d0;
             --not-done-bg: #7f1d1d; --not-done-text: #fca5a5;
             --lectura-filled-bg: #713f12; --lectura-filled-text: #fde047;
         }
-        html[data-theme="ocean"] {
-            --header-bg: #164e63;
-            --section-header-bg: linear-gradient(to right, #0e7490, #164e63);
-            --section-header-text: #ecfeff;
-            --btn-primary-bg: #0891b2;
+html[data-theme="ocean"] {
+            --accent-color: #164e63;
+            --accent-color-hover: #0e7490;
+            --accent-text: #ecfeff;
         }
-        html[data-theme="ocean"].dark {
-            --header-bg: #155e75;
-            --section-header-bg: linear-gradient(to right, #164e63, #155e75);
+html[data-theme="ocean"].dark {
+            --accent-color: #155e75;
+            --accent-color-hover: #164e63;
+            --accent-text: #ecfeff;
         }
-        html[data-theme="forest"] {
-            --header-bg: #166534;
-            --section-header-bg: linear-gradient(to right, #15803d, #166534);
-            --section-header-text: #f0fdf4;
-            --btn-primary-bg: #16a34a;
+html[data-theme="forest"] {
+            --accent-color: #166534;
+            --accent-color-hover: #15803d;
+            --accent-text: #f0fdf4;
         }
-        html[data-theme="forest"].dark {
-            --header-bg: #14532d;
-            --section-header-bg: linear-gradient(to right, #166534, #14532d);
+html[data-theme="forest"].dark {
+            --accent-color: #14532d;
+            --accent-color-hover: #166534;
+            --accent-text: #f0fdf4;
         }
-        html[data-theme="minimalist"] {
-            --header-bg: #4b5563;
+html[data-theme="minimalist"] {
+            --accent-color: #4b5563;
+            --accent-color-hover: #374151;
+            --accent-text: #ffffff;
             --section-header-bg: linear-gradient(to right, #f3f4f6, #e5e7eb);
             --section-header-text: #1f2937;
-            --btn-primary-bg: #374151;
         }
-        html[data-theme="minimalist"].dark {
-            --header-bg: #374151;
+html[data-theme="minimalist"].dark {
+            --accent-color: #374151;
+            --accent-color-hover: #1f2937;
+            --accent-text: #f3f4f6;
             --section-header-bg: linear-gradient(to right, #374151, #1f2937);
             --section-header-text: #f3f4f6;
         }
@@ -65,10 +71,10 @@
 
         body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); }
 
-        .filter-btn.active {
-            box-shadow: 0 0 0 2px #0ea5e9, 0 0 0 4px var(--bg-secondary);
-            background-color: #0ea5e9;
-            color: #fff;
+.filter-btn.active {
+            box-shadow: 0 0 0 2px var(--accent-color), 0 0 0 4px var(--bg-secondary);
+            background-color: var(--accent-color);
+            color: var(--accent-text);
         }
         
         .fillable-cell, .lectura-cell { cursor: pointer; user-select: none; transition: background-color 0.2s; position: relative; text-align: center; }
