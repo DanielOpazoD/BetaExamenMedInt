@@ -726,6 +726,7 @@ table.resizable-table .table-resize-handle {
 
 /* Note callout styles */
 .note-callout {
+    box-sizing: border-box;
     border-radius: 8px;
     border: 2px solid var(--border-color);
     padding: 8px;
