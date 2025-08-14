@@ -319,6 +319,22 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveCloseSubnoteBtn = getElem('save-close-subnote-btn');
     const saveSubnoteBtn = getElem('save-subnote-btn');
 
+    // Note style modal elements
+    const noteStyleModal = getElem('note-style-modal');
+    const noteStyleTabPre = getElem('note-style-tab-pre');
+    const noteStyleTabCustom = getElem('note-style-tab-custom');
+    const noteStylePre = getElem('note-style-pre');
+    const noteStyleCustom = getElem('note-style-custom');
+    const noteBgColorInput = getElem('note-bg-color');
+    const noteBorderColorInput = getElem('note-border-color');
+    const noteRadiusInput = getElem('note-radius');
+    const noteBorderWidthInput = getElem('note-border-width');
+    const notePaddingInput = getElem('note-padding');
+    const noteMarginInput = getElem('note-margin');
+    const noteShadowInput = getElem('note-shadow');
+    const applyNoteStyleBtn = getElem('apply-note-style-btn');
+    const cancelNoteStyleBtn = getElem('cancel-note-style-btn');
+
     /*
      * Build the simplified toolbar for sub-note editing.  This toolbar intentionally omits
      * certain controls available in the main note editor, such as line height, image
@@ -856,6 +872,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeSubnoteLink = null;
     let editingQuickNote = false;
     let savedEditorSelection = null;
+    let currentCallout = null;
     let aiToolsGeneratedText = '';
 
     // Image selection handling within the sub-note editor
@@ -1993,7 +2010,18 @@ document.addEventListener('DOMContentLoaded', function () {
         const collapsibleListHTML = `<details class="collapsible-list"><summary>Elemento</summary><div>Texto...<br></div></details><p><br></p>`;
 
         editorToolbar.appendChild(createButton('Insertar lista colapsable', collapsibleListSVG, 'insertHTML', collapsibleListHTML));
-        
+
+        const calloutBtn = createButton('Nota', '💬', null, null, () => {
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) {
+                savedEditorSelection = selection.getRangeAt(0).cloneRange();
+            } else {
+                savedEditorSelection = null;
+            }
+            openNoteStyleModal();
+        });
+        editorToolbar.appendChild(calloutBtn);
+
         const subnoteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
         // El botón ahora crea una sub-nota en lugar de un Post-it
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
@@ -2059,6 +2087,81 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
         editorToolbar.appendChild(createSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
+    }
+
+    function rgbToHex(rgb) {
+        const result = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(rgb);
+        return result ? '#' + result.slice(1).map(n => ('0' + parseInt(n).toString(16)).slice(-2)).join('') : rgb;
+    }
+
+    function openNoteStyleModal(callout = null) {
+        currentCallout = callout;
+        noteStyleModal.classList.add('visible');
+        noteStyleTabPre.classList.add('border-b-2', 'border-blue-500');
+        noteStyleTabCustom.classList.remove('border-b-2', 'border-blue-500');
+        noteStylePre.classList.remove('hidden');
+        noteStyleCustom.classList.add('hidden');
+        if (callout) {
+            noteBgColorInput.value = rgbToHex(callout.style.backgroundColor || '#ffffff');
+            noteBorderColorInput.value = rgbToHex(callout.style.borderColor || '#000000');
+            noteRadiusInput.value = parseInt(callout.style.borderRadius) || 8;
+            noteBorderWidthInput.value = parseInt(callout.style.borderWidth) || 2;
+            notePaddingInput.value = parseInt(callout.style.padding) || 8;
+            noteMarginInput.value = parseInt(callout.style.marginTop) || 8;
+            noteShadowInput.checked = callout.classList.contains('note-shadow');
+        }
+    }
+
+    function closeNoteStyleModal() {
+        noteStyleModal.classList.remove('visible');
+        currentCallout = null;
+    }
+
+    function applyNoteStyle(opts) {
+        const PREDEF_CLASSES = ['note-blue','note-green','note-yellow','note-red','note-purple','note-gray'];
+        if (!currentCallout) {
+            const callout = document.createElement('div');
+            callout.className = 'note-callout';
+            callout.setAttribute('role','note');
+            callout.setAttribute('aria-label','Nota');
+            if (savedEditorSelection && !savedEditorSelection.collapsed) {
+                try {
+                    savedEditorSelection.surroundContents(callout);
+                } catch (e) {
+                    callout.textContent = savedEditorSelection.toString();
+                    savedEditorSelection.deleteContents();
+                    savedEditorSelection.insertNode(callout);
+                }
+            } else if (savedEditorSelection) {
+                callout.textContent = 'Escribe una nota...';
+                savedEditorSelection.insertNode(callout);
+            } else {
+                callout.textContent = 'Escribe una nota...';
+                notesEditor.appendChild(callout);
+            }
+            currentCallout = callout;
+        }
+        currentCallout.classList.remove(...PREDEF_CLASSES);
+        if (opts.presetClass) currentCallout.classList.add(opts.presetClass);
+        currentCallout.style.backgroundColor = opts.backgroundColor;
+        currentCallout.style.borderColor = opts.borderColor;
+        currentCallout.style.borderWidth = opts.borderWidth + 'px';
+        currentCallout.style.borderRadius = opts.borderRadius + 'px';
+        currentCallout.style.padding = opts.padding + 'px';
+        currentCallout.style.margin = opts.margin + 'px 0';
+        if (opts.shadow) {
+            currentCallout.classList.add('note-shadow');
+        } else {
+            currentCallout.classList.remove('note-shadow');
+        }
+        const range = document.createRange();
+        range.selectNodeContents(currentCallout);
+        range.collapse(false);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        notesEditor.focus();
+        closeNoteStyleModal();
     }
 
     function openAiToolsModal() {
@@ -3525,7 +3628,7 @@ document.addEventListener('DOMContentLoaded', function () {
                  showModal(subNoteModal);
                  subNoteEditor.focus();
                  return;
-             }
+            }
         });
 
         notesEditor.addEventListener('dblclick', (e) => {
@@ -3539,8 +3642,85 @@ document.addEventListener('DOMContentLoaded', function () {
                 const idx = images.findIndex(obj => obj.element === e.target);
                 if (idx !== -1) {
                     openImageLightbox(images, idx);
+                    return;
                 }
             }
+            const callout = e.target.closest('.note-callout');
+            if (callout) {
+                e.preventDefault();
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(callout);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                savedEditorSelection = range.cloneRange();
+                openNoteStyleModal(callout);
+            }
+        });
+
+        notesEditor.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
+                e.preventDefault();
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                }
+                openNoteStyleModal();
+            }
+        });
+
+        noteStyleTabPre.addEventListener('click', () => {
+            noteStyleTabPre.classList.add('border-b-2', 'border-blue-500');
+            noteStyleTabCustom.classList.remove('border-b-2', 'border-blue-500');
+            noteStylePre.classList.remove('hidden');
+            noteStyleCustom.classList.add('hidden');
+        });
+        noteStyleTabCustom.addEventListener('click', () => {
+            noteStyleTabCustom.classList.add('border-b-2', 'border-blue-500');
+            noteStyleTabPre.classList.remove('border-b-2', 'border-blue-500');
+            noteStylePre.classList.add('hidden');
+            noteStyleCustom.classList.remove('hidden');
+        });
+        cancelNoteStyleBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeNoteStyleModal();
+        });
+        noteStyleModal.addEventListener('click', (e) => {
+            if (e.target === noteStyleModal) closeNoteStyleModal();
+        });
+        applyNoteStyleBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const opts = {
+                backgroundColor: noteBgColorInput.value,
+                borderColor: noteBorderColorInput.value,
+                borderRadius: parseInt(noteRadiusInput.value) || 0,
+                borderWidth: parseInt(noteBorderWidthInput.value) || 0,
+                padding: parseInt(notePaddingInput.value) || 0,
+                margin: parseInt(noteMarginInput.value) || 0,
+                shadow: noteShadowInput.checked
+            };
+            applyNoteStyle(opts);
+        });
+        noteStyleModal.querySelectorAll('.predef-note-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const opts = {
+                    backgroundColor: btn.dataset.bg,
+                    borderColor: btn.dataset.border,
+                    borderRadius: 8,
+                    borderWidth: 2,
+                    padding: 8,
+                    margin: 8,
+                    shadow: false,
+                    presetClass: btn.classList.contains('note-blue') ? 'note-blue' :
+                                 btn.classList.contains('note-green') ? 'note-green' :
+                                 btn.classList.contains('note-yellow') ? 'note-yellow' :
+                                 btn.classList.contains('note-red') ? 'note-red' :
+                                 btn.classList.contains('note-purple') ? 'note-purple' :
+                                 btn.classList.contains('note-gray') ? 'note-gray' : null
+                };
+                applyNoteStyle(opts);
+            });
         });
 
         // --- Quick Note Modal Listeners ---
