@@ -730,6 +730,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const collapsibleListSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-tree w-5 h-5"><path d="M21 7H9"/><path d="M21 12H9"/><path d="M21 17H9"/><path d="M3 17v-6a4 4 0 0 1 4-4h4"/></svg>`;
         const collapsibleListHTML = `<details class="collapsible-list"><summary>Elemento</summary><div>Texto...<br></div></details><p><br></p>`;
         subNoteToolbar.appendChild(createSNButton('Insertar lista colapsable', collapsibleListSVG, 'insertHTML', collapsibleListHTML));
+
+        subNoteToolbar.appendChild(createSNButton('Insertar HTML', '&lt;/&gt;', null, null, () => {
+            const html = prompt('Pega el código HTML:');
+            if (html) {
+                document.execCommand('insertHTML', false, html);
+            }
+        }));
+
         subNoteToolbar.appendChild(createSNSeparator());
         // Symbols and special characters
         const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
@@ -2010,6 +2018,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const collapsibleListHTML = `<details class="collapsible-list"><summary>Elemento</summary><div>Texto...<br></div></details><p><br></p>`;
 
         editorToolbar.appendChild(createButton('Insertar lista colapsable', collapsibleListSVG, 'insertHTML', collapsibleListHTML));
+
+        const htmlCodeBtn = createButton('Insertar HTML', '&lt;/&gt;', null, null, () => {
+            const html = prompt('Pega el código HTML:');
+            if (html) {
+                document.execCommand('insertHTML', false, html);
+            }
+        });
+        editorToolbar.appendChild(htmlCodeBtn);
 
         const calloutBtn = createButton('Nota', '💬', null, null, () => {
             const selection = window.getSelection();
