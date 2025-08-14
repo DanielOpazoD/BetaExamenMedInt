@@ -537,6 +537,39 @@
         </div>
     </div>
 
+    <div id="note-style-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-sm">
+            <h3 class="text-lg font-bold mb-2">Estilo de Nota</h3>
+            <div class="flex border-b mb-2">
+                <button id="note-style-tab-pre" class="flex-1 p-1 border-b-2 border-blue-500">Predefinidos</button>
+                <button id="note-style-tab-custom" class="flex-1 p-1">Personalizado</button>
+            </div>
+            <div id="note-style-pre" class="space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                    <button class="predef-note-btn note-callout note-blue" data-bg="#dbeafe" data-border="#3b82f6">Azul</button>
+                    <button class="predef-note-btn note-callout note-green" data-bg="#d1fae5" data-border="#10b981">Verde</button>
+                    <button class="predef-note-btn note-callout note-yellow" data-bg="#fef9c3" data-border="#eab308">Amarillo</button>
+                    <button class="predef-note-btn note-callout note-red" data-bg="#fee2e2" data-border="#ef4444">Rojo</button>
+                    <button class="predef-note-btn note-callout note-purple" data-bg="#ede9fe" data-border="#8b5cf6">Morado</button>
+                    <button class="predef-note-btn note-callout note-gray" data-bg="#f3f4f6" data-border="#6b7280">Gris</button>
+                </div>
+            </div>
+            <div id="note-style-custom" class="hidden space-y-2">
+                <label class="flex items-center justify-between">Fondo <input type="color" id="note-bg-color" value="#ffffff" class="border"></label>
+                <label class="flex items-center justify-between">Borde <input type="color" id="note-border-color" value="#000000" class="border"></label>
+                <label class="flex items-center justify-between">Radio <input type="number" id="note-radius" value="8" class="w-16 border"></label>
+                <label class="flex items-center justify-between">Espesor <input type="number" id="note-border-width" value="2" class="w-16 border"></label>
+                <label class="flex items-center justify-between">Padding <input type="number" id="note-padding" value="8" class="w-16 border"></label>
+                <label class="flex items-center justify-between">Margen vertical <input type="number" id="note-margin" value="8" class="w-16 border"></label>
+                <label class="flex items-center justify-between"><span>Sombra</span><input type="checkbox" id="note-shadow"></label>
+            </div>
+            <div class="flex justify-end gap-2 mt-3">
+                <button id="cancel-note-style-btn" class="px-3 py-1 bg-gray-500 text-white rounded">Cancelar</button>
+                <button id="apply-note-style-btn" class="px-3 py-1 bg-blue-600 text-white rounded">Aplicar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="save-confirmation" class="fixed bottom-5 right-5 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 transition-opacity duration-300">
         Progreso guardado
     </div>

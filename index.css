@@ -723,3 +723,19 @@ table.resizable-table .table-resize-handle {
                 page-break-after: always;
             }
         }
+
+/* Note callout styles */
+.note-callout {
+    border-radius: 8px;
+    border: 2px solid var(--border-color);
+    padding: 8px;
+    margin: 8px 0;
+}
+.note-blue { background-color: #dbeafe; border-color: #3b82f6; }
+.note-green { background-color: #d1fae5; border-color: #10b981; }
+.note-yellow { background-color: #fef9c3; border-color: #eab308; }
+.note-red { background-color: #fee2e2; border-color: #ef4444; }
+.note-purple { background-color: #ede9fe; border-color: #8b5cf6; }
+.note-gray { background-color: #f3f4f6; border-color: #6b7280; }
+.note-shadow { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.predef-note-btn { margin:0; cursor:pointer; }
