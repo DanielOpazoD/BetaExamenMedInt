@@ -314,6 +314,21 @@
         </div>
     </div>
 
+    <div id="html-code-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-2xl">
+            <h3 class="text-lg font-bold mb-4">Insertar Código HTML</h3>
+            <select id="html-code-favorites" class="w-full p-2 border border-border-color rounded-lg bg-secondary mb-2">
+                <option value="">Selecciona un favorito</option>
+            </select>
+            <textarea id="html-code-input" class="w-full h-64 p-2 border border-border-color rounded-lg bg-secondary mb-4" placeholder="Pega aquí el código HTML"></textarea>
+            <div class="flex justify-end items-center gap-2">
+                <button id="save-html-favorite-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Guardar favorito</button>
+                <button id="insert-html-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Insertar</button>
+                <button id="close-html-modal-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="notes-modal" class="modal-overlay">
         <div class="modal-content notes-modal-content relative overflow-hidden">
             <div class="resizer resizer-r"></div>

@@ -319,6 +319,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveCloseSubnoteBtn = getElem('save-close-subnote-btn');
     const saveSubnoteBtn = getElem('save-subnote-btn');
 
+    // HTML code modal elements
+    const htmlCodeModal = getElem('html-code-modal');
+    const htmlCodeInput = getElem('html-code-input');
+    const htmlCodeFavorites = getElem('html-code-favorites');
+    const insertHtmlModalBtn = getElem('insert-html-btn');
+    const saveHtmlFavoriteBtn = getElem('save-html-favorite-btn');
+    const closeHtmlModalBtn = getElem('close-html-modal-btn');
+    const HTML_FAVORITES_KEY = 'htmlCodeFavorites';
+    let savedHtmlRange = null;
+
     // Note style modal elements
     const noteStyleModal = getElem('note-style-modal');
     const noteStyleTabPre = getElem('note-style-tab-pre');
@@ -334,6 +344,49 @@ document.addEventListener('DOMContentLoaded', function () {
     const noteShadowInput = getElem('note-shadow');
     const applyNoteStyleBtn = getElem('apply-note-style-btn');
     const cancelNoteStyleBtn = getElem('cancel-note-style-btn');
+
+    function loadHtmlFavorites() {
+        const favorites = JSON.parse(localStorage.getItem(HTML_FAVORITES_KEY) || '[]');
+        htmlCodeFavorites.innerHTML = '<option value="">Selecciona un favorito</option>';
+        favorites.forEach(fav => {
+            const option = document.createElement('option');
+            option.value = fav.code;
+            option.textContent = fav.name;
+            htmlCodeFavorites.appendChild(option);
+        });
+    }
+    loadHtmlFavorites();
+
+    htmlCodeFavorites.addEventListener('change', (e) => {
+        htmlCodeInput.value = e.target.value;
+    });
+
+    saveHtmlFavoriteBtn.addEventListener('click', () => {
+        const code = htmlCodeInput.value.trim();
+        if (!code) return;
+        const favorites = JSON.parse(localStorage.getItem(HTML_FAVORITES_KEY) || '[]');
+        const name = prompt('Nombre para este código HTML:') || `Favorito ${favorites.length + 1}`;
+        favorites.push({ name, code });
+        localStorage.setItem(HTML_FAVORITES_KEY, JSON.stringify(favorites));
+        loadHtmlFavorites();
+    });
+
+    insertHtmlModalBtn.addEventListener('click', () => {
+        const html = htmlCodeInput.value;
+        if (html) {
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            if (savedHtmlRange) selection.addRange(savedHtmlRange);
+            document.execCommand('insertHTML', false, html);
+            savedHtmlRange = null;
+        }
+        hideModal(htmlCodeModal);
+        htmlCodeInput.value = '';
+    });
+
+    closeHtmlModalBtn.addEventListener('click', () => {
+        hideModal(htmlCodeModal);
+    });
 
     /*
      * Build the simplified toolbar for sub-note editing.  This toolbar intentionally omits
@@ -732,10 +785,14 @@ document.addEventListener('DOMContentLoaded', function () {
         subNoteToolbar.appendChild(createSNButton('Insertar lista colapsable', collapsibleListSVG, 'insertHTML', collapsibleListHTML));
 
         subNoteToolbar.appendChild(createSNButton('Insertar HTML', '&lt;/&gt;', null, null, () => {
-            const html = prompt('Pega el código HTML:');
-            if (html) {
-                document.execCommand('insertHTML', false, html);
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && subNoteEditor.contains(selection.anchorNode)) {
+                savedHtmlRange = selection.getRangeAt(0).cloneRange();
             }
+            loadHtmlFavorites();
+            htmlCodeInput.value = '';
+            showModal(htmlCodeModal);
+            setTimeout(() => htmlCodeInput.focus(), 0);
         }));
 
         subNoteToolbar.appendChild(createSNSeparator());
@@ -2020,10 +2077,14 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createButton('Insertar lista colapsable', collapsibleListSVG, 'insertHTML', collapsibleListHTML));
 
         const htmlCodeBtn = createButton('Insertar HTML', '&lt;/&gt;', null, null, () => {
-            const html = prompt('Pega el código HTML:');
-            if (html) {
-                document.execCommand('insertHTML', false, html);
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0) {
+                savedHtmlRange = selection.getRangeAt(0).cloneRange();
             }
+            loadHtmlFavorites();
+            htmlCodeInput.value = '';
+            showModal(htmlCodeModal);
+            setTimeout(() => htmlCodeInput.focus(), 0);
         });
         editorToolbar.appendChild(htmlCodeBtn);
 
