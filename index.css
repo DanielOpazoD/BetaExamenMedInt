@@ -162,7 +162,7 @@
         #subnote-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
 
         /* Smaller buttons for the sub-note action bar */
-        #subnote-modal .flex.justify-end button {
+        #subnote-modal-actions button {
             padding: 0.2rem 0.5rem;
             font-size: 0.75rem;
         }
@@ -204,6 +204,8 @@
         .notes-modal-content.readonly-mode #add-note-panel-btn { display: none; }
         .notes-modal-content.readonly-mode .delete-note-btn { display: none; }
         .notes-modal-content.readonly-mode #notes-modal-title { pointer-events: none; }
+        .notes-modal-content.readonly-mode #subnote-modal-actions { display: none; }
+        .notes-modal-content.readonly-mode #subnote-title { pointer-events: none; }
 
 
         /* Icon Styles */

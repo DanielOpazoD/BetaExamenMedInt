@@ -325,9 +325,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const subNoteTitle = getElem('subnote-title');
     const subNoteEditor = getElem('subnote-editor');
     const subNoteToolbar = getElem('subnote-toolbar');
-    const deleteSubnoteBtn = getElem('delete-subnote-btn');
     const saveCloseSubnoteBtn = getElem('save-close-subnote-btn');
     const saveSubnoteBtn = getElem('save-subnote-btn');
+    const cancelSubnoteBtn = getElem('cancel-subnote-btn');
+    const toggleSubnoteReadOnlyBtn = getElem('toggle-subnote-readonly-btn');
 
     // Note style modal elements
     const noteStyleModal = getElem('note-style-modal');
@@ -838,27 +839,24 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Delete sub-note
-    if (deleteSubnoteBtn) {
-        deleteSubnoteBtn.addEventListener('click', async () => {
-            if (activeSubnoteLink && currentNotesArray[activeNoteIndex]) {
-                const confirmed = await showConfirmation('¿Eliminar esta sub-nota? El texto se mantendrá pero la sub-nota se borrará permanentemente.');
-                if (confirmed) {
-                    const subnoteId = activeSubnoteLink.dataset.subnoteId || activeSubnoteLink.dataset.postitId;
-                    // Remove from data store
-                    if (currentNotesArray[activeNoteIndex].postits) {
-                        delete currentNotesArray[activeNoteIndex].postits[subnoteId];
-                    }
-                    // Unwrap the link in the editor to keep plain text
-                    const parent = activeSubnoteLink.parentNode;
-                    while (activeSubnoteLink.firstChild) {
-                        parent.insertBefore(activeSubnoteLink.firstChild, activeSubnoteLink);
-                    }
-                    parent.removeChild(activeSubnoteLink);
-                    saveCurrentNote();
-                }
-                hideModal(subNoteModal);
-                activeSubnoteLink = null;
+    // Close sub-note without saving
+    if (cancelSubnoteBtn) {
+        cancelSubnoteBtn.addEventListener('click', () => {
+            hideModal(subNoteModal);
+            activeSubnoteLink = null;
+        });
+    }
+
+    // Toggle read-only mode for sub-notes
+    if (toggleSubnoteReadOnlyBtn) {
+        toggleSubnoteReadOnlyBtn.addEventListener('click', () => {
+            const modalContent = subNoteModal.querySelector('.notes-modal-content');
+            modalContent.classList.toggle('readonly-mode');
+            const isReadOnly = modalContent.classList.contains('readonly-mode');
+            subNoteEditor.contentEditable = !isReadOnly;
+            subNoteTitle.contentEditable = !isReadOnly;
+            if (!isReadOnly) {
+                subNoteEditor.focus();
             }
         });
     }
@@ -3716,11 +3714,14 @@ document.addEventListener('DOMContentLoaded', function () {
                      }
                  }
                  // Populate sub-note modal fields
-                 subNoteTitle.textContent = subnoteData.title || '';
-                 subNoteEditor.innerHTML = subnoteData.content || '<p><br></p>';
-                 showModal(subNoteModal);
-                 subNoteEditor.focus();
-                 return;
+                subNoteTitle.textContent = subnoteData.title || '';
+                subNoteEditor.innerHTML = subnoteData.content || '<p><br></p>';
+                const modalContent = subNoteModal.querySelector('.notes-modal-content');
+                modalContent.classList.add('readonly-mode');
+                subNoteEditor.contentEditable = false;
+                subNoteTitle.contentEditable = false;
+                showModal(subNoteModal);
+                return;
             }
         });
 
