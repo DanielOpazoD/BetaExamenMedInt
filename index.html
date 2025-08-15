@@ -415,7 +415,23 @@
             </div>
         </div>
     </div>
-    
+
+    <div id="html-code-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-2xl">
+            <h3 class="text-xl font-bold mb-4">Insertar HTML</h3>
+            <textarea id="html-code-input" class="w-full h-40 p-2 mb-4 border border-border-color rounded-lg bg-secondary font-mono"></textarea>
+            <div class="flex items-center mb-4 gap-2">
+                <input id="html-favorite-name" type="text" placeholder="Nombre del favorito" class="flex-grow p-2 border border-border-color rounded-lg bg-secondary">
+                <button id="save-html-favorite-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">Guardar</button>
+            </div>
+            <div id="html-favorites-list" class="flex flex-wrap gap-2 mb-4"></div>
+            <div class="flex justify-end gap-2">
+                <button id="cancel-html-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cancelar</button>
+                <button id="insert-html-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Insertar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="note-info-modal" class="modal-overlay">
         <div class="modal-content w-full max-w-sm">
             <h3 class="text-lg font-bold mb-4">Información de la Nota</h3>
