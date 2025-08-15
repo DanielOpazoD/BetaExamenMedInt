@@ -739,3 +739,16 @@ table.resizable-table .table-resize-handle {
 .note-gray { background-color: #f3f4f6; border-color: #6b7280; }
 .note-shadow { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .predef-note-btn { margin:0; cursor:pointer; }
+/* Inline image drag marker */
+#drop-caret {
+  display: inline-block;
+  width: 0;
+  border-left: 1px solid currentColor;
+  height: 1em;
+  vertical-align: middle;
+  pointer-events: none;
+}
+
+.img-dragging {
+  opacity: 0.6;
+}
