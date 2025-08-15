@@ -12,6 +12,7 @@ import { makeTableResizable } from './table-resize.js';
 import { setupAdvancedSearchReplace } from './search-replace.js';
 import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
+import { renderMarkdown } from './markdown-preview.js';
 
 const pdfjsLib = typeof window !== 'undefined' ? window['pdfjsLib'] : null;
 if (pdfjsLib) {
@@ -163,7 +164,37 @@ document.addEventListener('DOMContentLoaded', function () {
     const aiCanvas = getElem('ai-canvas');
     const aiCanvasReasoning = getElem('ai-canvas-reasoning');
     let uploadedFileText = '';
-    
+
+    const previewPanel = getElem('preview-panel');
+    const previewContent = getElem('preview-content');
+    const closePreviewPanelBtn = getElem('close-preview-panel');
+    let previewVisible = false;
+
+    function updatePreview() {
+        if (!previewContent) return;
+        const content = notesEditor ? notesEditor.innerText : '';
+        previewContent.innerHTML = renderMarkdown(content);
+    }
+
+    function togglePreviewPanel() {
+        if (!previewPanel) return;
+        previewPanel.classList.toggle('translate-x-full');
+        previewVisible = !previewPanel.classList.contains('translate-x-full');
+        if (previewVisible) {
+            updatePreview();
+        }
+    }
+
+    if (closePreviewPanelBtn) {
+        closePreviewPanelBtn.addEventListener('click', togglePreviewPanel);
+    }
+
+    if (notesEditor) {
+        notesEditor.addEventListener('input', () => {
+            if (previewVisible) updatePreview();
+        });
+    }
+
     // References modal elements
     const referencesModal = getElem('references-modal');
     const referencesEditor = getElem('references-editor');
@@ -2102,6 +2133,9 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(resizeMinusBtn);
 
         // Eliminamos el botón de inserción de tablas y el separador asociado
+
+        const previewBtn = createButton('Mostrar/ocultar vista previa', 'Preview', null, null, togglePreviewPanel);
+        editorToolbar.appendChild(previewBtn);
 
         // Print/Save
         const printBtn = createButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
