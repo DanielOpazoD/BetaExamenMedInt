@@ -163,6 +163,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const aiCanvas = getElem('ai-canvas');
     const aiCanvasReasoning = getElem('ai-canvas-reasoning');
     let uploadedFileText = '';
+    let deleteMode = false;
+    let deleteElementBtn = null;
     
     // References modal elements
     const referencesModal = getElem('references-modal');
@@ -1887,6 +1889,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(selectLineHeight);
 
+        // Delete mode toggle
+        deleteElementBtn = createButton('Eliminar elemento', '🗑️', null, null, () => {
+            deleteMode = !deleteMode;
+            deleteElementBtn.classList.toggle('active', deleteMode);
+        });
+        editorToolbar.appendChild(deleteElementBtn);
 
         editorToolbar.appendChild(createSeparator());
 
@@ -3674,46 +3682,85 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // --- Editor Listeners ---
         notesEditor.addEventListener('click', (e) => {
-             // Handle image selection
-             if (e.target.tagName === 'IMG') {
-                 document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
-                 e.target.classList.add('selected-for-resize');
-                 selectedImageForResize = e.target;
-             } else {
-                 document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
-                 selectedImageForResize = null;
-             }
+            if (deleteMode) {
+                if (e.target !== notesEditor) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const removable = e.target.closest('p, img, table, div, h1, h2, h3, h4, h5, h6, blockquote, pre, details, li');
+                    if (removable && notesEditor.contains(removable)) {
+                        removable.remove();
+                    }
+                    if (notesEditor.innerHTML.trim() === '') {
+                        notesEditor.innerHTML = '<p><br></p>';
+                    }
+                }
+                deleteMode = false;
+                if (deleteElementBtn) deleteElementBtn.classList.remove('active');
+                return;
+            }
 
-             // Handle gallery link clicks
-             const galleryLink = e.target.closest('.gallery-link');
-             if (galleryLink) {
-                 e.preventDefault();
-                 // Persist the link so that caption edits and image updates can be saved back
-                 activeGalleryLinkForLightbox = galleryLink;
-                 openImageLightbox(galleryLink.dataset.images);
-                 return;
-             }
-             
-             // Handle sub-note link clicks (supports legacy post-it links)
-             const subnoteLink = e.target.closest('.subnote-link, .postit-link');
-             if (subnoteLink) {
-                 e.preventDefault();
-                 activeSubnoteLink = subnoteLink;
-                 editingQuickNote = false;
-                 // Determine the identifier attribute (subnoteId or legacy postitId)
-                 const subnoteId = subnoteLink.dataset.subnoteId || subnoteLink.dataset.postitId;
-                 const noteData = currentNotesArray[activeNoteIndex];
-                 let subnoteData = { title: '', content: '' };
-                 if (noteData && noteData.postits) {
-                     const existing = noteData.postits[subnoteId];
-                     // Support legacy string format where value was a plain string
-                     if (typeof existing === 'string') {
-                         subnoteData = { title: '', content: existing };
-                     } else if (existing) {
-                         subnoteData = existing;
-                     }
-                 }
-                 // Populate sub-note modal fields
+            if (e.target === notesEditor) {
+                const selection = window.getSelection();
+                let range = null;
+                if (document.caretRangeFromPoint) {
+                    range = document.caretRangeFromPoint(e.clientX, e.clientY);
+                } else if (document.caretPositionFromPoint) {
+                    const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+                    range = document.createRange();
+                    range.setStart(pos.offsetNode, pos.offset);
+                }
+                if (range) {
+                    const p = document.createElement('p');
+                    p.innerHTML = '<br>';
+                    range.insertNode(p);
+                    range.setStart(p, 0);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+                return;
+            }
+
+            // Handle image selection
+            if (e.target.tagName === 'IMG') {
+                document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
+                e.target.classList.add('selected-for-resize');
+                selectedImageForResize = e.target;
+            } else {
+                document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
+                selectedImageForResize = null;
+            }
+
+            // Handle gallery link clicks
+            const galleryLink = e.target.closest('.gallery-link');
+            if (galleryLink) {
+                e.preventDefault();
+                // Persist the link so that caption edits and image updates can be saved back
+                activeGalleryLinkForLightbox = galleryLink;
+                openImageLightbox(galleryLink.dataset.images);
+                return;
+            }
+
+            // Handle sub-note link clicks (supports legacy post-it links)
+            const subnoteLink = e.target.closest('.subnote-link, .postit-link');
+            if (subnoteLink) {
+                e.preventDefault();
+                activeSubnoteLink = subnoteLink;
+                editingQuickNote = false;
+                // Determine the identifier attribute (subnoteId or legacy postitId)
+                const subnoteId = subnoteLink.dataset.subnoteId || subnoteLink.dataset.postitId;
+                const noteData = currentNotesArray[activeNoteIndex];
+                let subnoteData = { title: '', content: '' };
+                if (noteData && noteData.postits) {
+                    const existing = noteData.postits[subnoteId];
+                    // Support legacy string format where value was a plain string
+                    if (typeof existing === 'string') {
+                        subnoteData = { title: '', content: existing };
+                    } else if (existing) {
+                        subnoteData = existing;
+                    }
+                }
+                // Populate sub-note modal fields
                 subNoteTitle.textContent = subnoteData.title || '';
                 subNoteEditor.innerHTML = subnoteData.content || '<p><br></p>';
                 const modalContent = subNoteModal.querySelector('.notes-modal-content');
