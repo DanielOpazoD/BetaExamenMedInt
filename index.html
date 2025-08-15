@@ -537,18 +537,21 @@
 
     <!-- Sub-note Modal -->
     <div id="subnote-modal" class="modal-overlay no-print">
-        <div class="modal-content notes-modal-content flex flex-col" style="max-width: 900px; max-height: 90vh;">
+        <div class="modal-content notes-modal-content flex flex-col readonly-mode" style="max-width: 900px; max-height: 90vh;">
             <div class="flex items-center justify-between mb-2">
-                <h3 id="subnote-title" class="text-lg font-bold truncate" contenteditable="true"></h3>
+                <h3 id="subnote-title" class="text-lg font-bold truncate" contenteditable="false"></h3>
+                <button id="toggle-subnote-readonly-btn" class="toolbar-btn" title="Modo Lectura/Edición">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye w-5 h-5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
             </div>
             <!-- Barra de herramientas simplificada para las sub-notas -->
             <div id="subnote-toolbar" class="editor-toolbar"></div>
             <!-- Área de edición de la sub-nota -->
-            <div id="subnote-editor" contenteditable="true" spellcheck="false" class="flex-grow overflow-y-auto"></div>
-            <div class="flex justify-end gap-2 mt-1">
-                <button id="delete-subnote-btn" class="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">Eliminar</button>
-                <button id="save-subnote-btn" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">Guardar</button>
-                <button id="save-close-subnote-btn" class="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">Guardar y cerrar</button>
+            <div id="subnote-editor" contenteditable="false" spellcheck="false" class="flex-grow overflow-y-auto"></div>
+            <div id="subnote-modal-actions" class="flex justify-end gap-2 mt-1">
+                <button id="cancel-subnote-btn" class="px-3 py-1.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm">Cerrar</button>
+                <button id="save-subnote-btn" class="px-3 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm">Guardar</button>
+                <button id="save-close-subnote-btn" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">Guardar y cerrar</button>
             </div>
         </div>
     </div>
