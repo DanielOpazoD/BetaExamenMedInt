@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Resizable Demo</title>
+<style>
+.resizable{position:relative;display:inline-block;min-width:200px;max-width:100%;}
+.resizable .resize-handle{position:absolute;top:0;right:0;width:8px;height:100%;cursor:ew-resize;background:rgba(0,0,0,0.2);}
+</style>
+</head>
+<body>
+<button onclick="wrapSelectionAsResizable()">Envolver selección</button>
+<div id="note" class="resizable" style="width:300px;border:1px solid #ccc;padding:8px;">
+  Esta nota puede cambiar de ancho arrastrando el borde derecho.
+</div>
+<script>
+function makeResizable(el){
+  let startX,startWidth;
+  const handle=document.createElement('div');
+  handle.className='resize-handle';
+  el.appendChild(handle);
+  const getX=e=>e.touches?e.touches[0].clientX:e.clientX;
+  const onMove=e=>{
+    const dx=getX(e)-startX;
+    const min=200;
+    const max=el.parentElement.clientWidth;
+    let w=Math.min(Math.max(startWidth+dx,min),max);
+    el.style.width=w+'px';
+  };
+  const onUp=()=>{
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+    document.removeEventListener('touchmove',onMove);
+    document.removeEventListener('touchend',onUp);
+    el.style.width=el.offsetWidth+'px';
+  };
+  const onDown=e=>{
+    e.preventDefault();
+    startX=getX(e);
+    startWidth=el.offsetWidth;
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onUp);
+    document.addEventListener('touchmove',onMove);
+    document.addEventListener('touchend',onUp);
+  };
+  handle.addEventListener('mousedown',onDown);
+  handle.addEventListener('touchstart',onDown);
+}
+function wrapSelectionAsResizable(){
+  const sel=window.getSelection();
+  if(!sel.rangeCount) return;
+  const range=sel.getRangeAt(0);
+  const box=document.createElement('div');
+  box.className='resizable';
+  box.style.border='1px solid #ccc';
+  box.style.padding='8px';
+  range.surroundContents(box);
+  makeResizable(box);
+}
+makeResizable(document.getElementById('note'));
+</script>
+</body>
+</html>
