@@ -751,3 +751,49 @@ table.resizable-table .table-resize-handle {
 .note-gray { background-color: #f3f4f6; border-color: #6b7280; }
 .note-shadow { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .predef-note-btn { margin:0; cursor:pointer; }
+
+/* Inline note icon and tooltip */
+.inline-note-icon {
+    font-size: 0.8em;
+    cursor: pointer;
+    color: var(--btn-primary-bg);
+}
+.inline-note-popup {
+    position: absolute;
+    background: var(--modal-bg);
+    color: var(--modal-text);
+    border: 1px solid var(--border-color);
+    padding: 6px;
+    border-radius: 0.25rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 1000;
+    width: 200px;
+}
+.inline-note-popup .inline-note-input {
+    min-height: 60px;
+    outline: none;
+}
+.inline-note-popup .inline-note-actions {
+    text-align: right;
+    margin-top: 4px;
+}
+.inline-note-popup .inline-note-actions button {
+    margin-left: 4px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    border-radius: 0.25rem;
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-text);
+}
+.inline-note-tooltip {
+    position: absolute;
+    background: var(--modal-bg);
+    color: var(--modal-text);
+    border: 1px solid var(--border-color);
+    padding: 4px 8px;
+    border-radius: 0.25rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 1000;
+    max-width: 200px;
+    font-size: 0.875rem;
+}

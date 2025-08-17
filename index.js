@@ -330,6 +330,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const cancelSubnoteBtn = getElem('cancel-subnote-btn');
     const toggleSubnoteReadOnlyBtn = getElem('toggle-subnote-readonly-btn');
 
+    // Inline note popup elements (created dynamically)
+    let inlineNotePopup = null;
+    let inlineNoteInput = null;
+    let inlineNoteSaveBtn = null;
+    let inlineNoteCancelBtn = null;
+    let activeInlineNote = null;
+
     // Note style modal elements
     const noteStyleModal = getElem('note-style-modal');
     const noteStyleTabPre = getElem('note-style-tab-pre');
@@ -2075,7 +2082,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const subnoteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
         // El botón ahora crea una sub-nota en lugar de un Post-it
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
-        
+
+        // Insert inline note icon button
+        editorToolbar.appendChild(createButton('Nota breve', '💡', null, null, insertInlineNote));
+
         const aiBtn = createButton('Asistente de IA', '🤖', null, null, openAiToolsModal);
         editorToolbar.appendChild(aiBtn);
         const aiImproveBtn = createButton('Mejorar redacción', '✨', null, null, () => openAiToolsModalWithInstruction('Mejora la redacción del siguiente texto y corrige errores gramaticales'));
@@ -3097,6 +3107,91 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function insertInlineNote() {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+        const range = selection.getRangeAt(0);
+        const icon = document.createElement('sub');
+        icon.className = 'inline-note-icon';
+        icon.textContent = '💡';
+        icon.dataset.note = '';
+        range.insertNode(icon);
+        const spacer = document.createTextNode('\u00A0');
+        icon.parentNode.insertBefore(spacer, icon.nextSibling);
+        const newRange = document.createRange();
+        newRange.setStartAfter(spacer);
+        newRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+        notesEditor.focus();
+        saveCurrentNote();
+    }
+
+    function ensureInlineNoteElements() {
+        if (inlineNotePopup) return;
+        inlineNotePopup = document.createElement('div');
+        inlineNotePopup.className = 'inline-note-popup';
+        inlineNotePopup.style.display = 'none';
+        inlineNotePopup.innerHTML = '<div class="inline-note-input" contenteditable="true"></div><div class="inline-note-actions"><button type="button" class="inline-note-save">Guardar</button><button type="button" class="inline-note-cancel">Cancelar</button></div>';
+        document.body.appendChild(inlineNotePopup);
+        inlineNoteInput = inlineNotePopup.querySelector('.inline-note-input');
+        inlineNoteSaveBtn = inlineNotePopup.querySelector('.inline-note-save');
+        inlineNoteCancelBtn = inlineNotePopup.querySelector('.inline-note-cancel');
+        inlineNoteSaveBtn.addEventListener('click', () => {
+            if (activeInlineNote) {
+                activeInlineNote.dataset.note = inlineNoteInput.innerHTML;
+                activeInlineNote.setAttribute('title', inlineNoteInput.textContent);
+                hideInlineNotePopup();
+                saveCurrentNote();
+                saveState();
+            }
+        });
+        inlineNoteCancelBtn.addEventListener('click', hideInlineNotePopup);
+    }
+
+    function openInlineNotePopup(icon) {
+        ensureInlineNoteElements();
+        activeInlineNote = icon;
+        inlineNoteInput.innerHTML = icon.dataset.note || '';
+        const rect = icon.getBoundingClientRect();
+        inlineNotePopup.style.top = `${window.scrollY + rect.bottom + 4}px`;
+        inlineNotePopup.style.left = `${window.scrollX + rect.left}px`;
+        inlineNotePopup.style.display = 'block';
+        inlineNoteInput.focus();
+    }
+
+    function hideInlineNotePopup() {
+        if (inlineNotePopup) inlineNotePopup.style.display = 'none';
+        activeInlineNote = null;
+    }
+
+    function showInlineNoteTooltip(icon) {
+        if (!icon.dataset.note) return;
+        const tip = document.createElement('div');
+        tip.className = 'inline-note-tooltip';
+        tip.innerHTML = icon.dataset.note;
+        document.body.appendChild(tip);
+        const rect = icon.getBoundingClientRect();
+        tip.style.top = `${window.scrollY + rect.bottom + 4}px`;
+        tip.style.left = `${window.scrollX + rect.left}px`;
+        icon._inlineTip = tip;
+    }
+
+    function hideInlineNoteTooltip(icon) {
+        if (icon._inlineTip) {
+            icon._inlineTip.remove();
+            icon._inlineTip = null;
+        }
+    }
+
+    document.addEventListener('click', (e) => {
+        if (inlineNotePopup && inlineNotePopup.style.display === 'block') {
+            if (!inlineNotePopup.contains(e.target) && !e.target.closest('.inline-note-icon')) {
+                hideInlineNotePopup();
+            }
+        }
+    });
+
     function openGalleryLinkEditor() {
         const selection = window.getSelection();
         if (!selection.rangeCount) return;
@@ -3693,19 +3788,27 @@ document.addEventListener('DOMContentLoaded', function () {
         // --- Editor Listeners ---
         notesEditor.addEventListener('click', (e) => {
              // Handle image selection
-             if (e.target.tagName === 'IMG') {
-                 document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
-                 e.target.classList.add('selected-for-resize');
-                 selectedImageForResize = e.target;
-             } else {
-                 document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
-                 selectedImageForResize = null;
-             }
+            if (e.target.tagName === 'IMG') {
+                document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
+                e.target.classList.add('selected-for-resize');
+                selectedImageForResize = e.target;
+            } else {
+                document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
+                selectedImageForResize = null;
+            }
 
-             // Handle gallery link clicks
-             const galleryLink = e.target.closest('.gallery-link');
-             if (galleryLink) {
-                 e.preventDefault();
+            // Handle inline note icon click
+            const inlineIcon = e.target.closest('.inline-note-icon');
+            if (inlineIcon) {
+                e.preventDefault();
+                openInlineNotePopup(inlineIcon);
+                return;
+            }
+
+            // Handle gallery link clicks
+            const galleryLink = e.target.closest('.gallery-link');
+            if (galleryLink) {
+                e.preventDefault();
                  // Persist the link so that caption edits and image updates can be saved back
                  activeGalleryLinkForLightbox = galleryLink;
                  openImageLightbox(galleryLink.dataset.images);
@@ -3740,6 +3843,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 subNoteTitle.contentEditable = false;
                 showModal(subNoteModal);
                 return;
+            }
+        });
+
+        notesEditor.addEventListener('mouseover', (e) => {
+            const icon = e.target.closest('.inline-note-icon');
+            if (icon) {
+                showInlineNoteTooltip(icon);
+            }
+        });
+
+        notesEditor.addEventListener('mouseout', (e) => {
+            const icon = e.target.closest('.inline-note-icon');
+            if (icon) {
+                hideInlineNoteTooltip(icon);
             }
         });
 
