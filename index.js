@@ -2054,6 +2054,24 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(calloutBtn);
 
+        const resizeCalloutBtn = createButton('Redimensionar nota', '↔️', null, null, () => {
+            const selection = window.getSelection();
+            const node = selection && selection.focusNode;
+            const element = node ? (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement) : null;
+            const block = element ? element.closest('.note-callout, div, blockquote') : null;
+            if (!block || block === notesEditor) {
+                showAlert('Selecciona un bloque para redimensionar.');
+                return;
+            }
+            block.classList.toggle('note-resizable');
+            if (block.classList.contains('note-resizable')) {
+                block.style.width = block.offsetWidth + 'px';
+            } else {
+                block.style.width = '';
+            }
+        });
+        editorToolbar.appendChild(resizeCalloutBtn);
+
         const subnoteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
         // El botón ahora crea una sub-nota en lugar de un Post-it
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
