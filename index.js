@@ -125,6 +125,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const aiQuestionInput = getElem('ai-question-input');
     const cancelAiQaBtn = getElem('cancel-ai-qa-btn');
     const sendAiQaBtn = getElem('send-ai-qa-btn');
+    const aiSummaryModal = getElem('ai-summary-modal');
+    const aiSummaryLoader = getElem('ai-summary-loader');
+    const aiSummaryPreview = getElem('ai-summary-preview');
+    const cancelAiSummaryBtn = getElem('cancel-ai-summary-btn');
+    const insertAiSummaryBtn = getElem('insert-ai-summary-btn');
     const printAllBtn = getElem('print-all-btn');
     const exportBtn = getElem('export-btn');
     const importBtn = getElem('import-btn');
@@ -138,6 +143,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveConfirmation = getElem('save-confirmation');
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
+
+    let aiSummarySelection = null;
 
     
     // References modal elements
@@ -2275,29 +2282,36 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         const title = notesModalTitle.textContent.trim();
         const content = notesEditor.textContent.trim();
-        let savedSelection = null;
+        aiSummarySelection = null;
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
-            savedSelection = selection.getRangeAt(0).cloneRange();
+            aiSummarySelection = selection.getRangeAt(0).cloneRange();
         }
-        const prompt = `Analiza la nota que el usuario está editando.\nIdentifica la enfermedad principal desde el título.\nGenera un bloque en HTML con inline CSS que contenga:\n\nUn chip amarillo con el título: “Importancia clínica de la ENFERMEDAD”.\nUna lista de 4 a 8 viñetas telegráficas (1–2 líneas).\nCada viñeta con un cuadrado gris como icono (▫️), subtítulo en negrita y texto breve.\nLa última viñeta debe ser siempre “Tratamiento: ámbitos principales”, usando conocimiento médico general.\n\nEl contenido debe basarse primero en el documento actual; si faltan datos, complementar con conocimiento médico.\n\nDevuelve únicamente el bloque HTML.\n\nTítulo: ${title}\nContenido:\n${content}`;
+        aiSummaryPreview.innerHTML = '';
+        aiSummaryPreview.classList.add('hidden');
+        aiSummaryLoader.classList.remove('hidden');
+        showModal(aiSummaryModal);
+        const disease = title.split(':')[0].trim();
+        const prompt = `Analiza la nota que el usuario está editando.\nIdentifica la enfermedad principal desde el título.\nGenera de 4 a 8 viñetas en HTML sin contenedor <ul>, cada viñeta en formato: <li><b>Subtítulo:</b> texto breve</li>\nLa última viñeta debe ser siempre "Tratamiento: ámbitos principales".\nEl contenido debe basarse primero en el documento actual; si faltan datos, complementar con conocimiento médico.\nDevuelve únicamente las viñetas sin incluir <ul> ni título.\n\nTítulo: ${title}\nContenido:\n${content}`;
         try {
             const ai = new GoogleGenAI({ apiKey: API_KEY });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
             });
-            if (savedSelection) {
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(savedSelection);
-            }
-            document.execCommand('insertHTML', false, response.text);
+            let bulletItems = response.text.trim();
+            bulletItems = bulletItems.replace(/<\/?ul[^>]*>/g, '').trim();
+            bulletItems = bulletItems.replace(/<li>/g, '<li>▫️ ');
+            const summaryHtml = `<div style="background:linear-gradient(90deg,#fff9c4,#ffe082);padding:4px 8px;border-radius:4px;font-weight:bold;">Importancia clínica de ${disease}</div><ul style="list-style:none;padding-left:0;margin-top:4px;">${bulletItems}</ul>`;
+            aiSummaryPreview.innerHTML = summaryHtml;
+            aiSummaryLoader.classList.add('hidden');
+            aiSummaryPreview.classList.remove('hidden');
         } catch (error) {
+            aiSummaryLoader.classList.add('hidden');
+            hideModal(aiSummaryModal);
             console.error('AI Error:', error);
             await showAlert('Error al contactar a la IA: ' + error.message);
         }
-        notesEditor.focus();
     }
 
     function resizeSelectedImage(multiplier) {
@@ -4205,6 +4219,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 aiQaLoader.style.display = 'none';
                 sendAiQaBtn.disabled = false;
             }
+        });
+
+        cancelAiSummaryBtn.addEventListener('click', () => hideModal(aiSummaryModal));
+        insertAiSummaryBtn.addEventListener('click', () => {
+            if (aiSummarySelection) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(aiSummarySelection);
+            }
+            document.execCommand('insertHTML', false, aiSummaryPreview.innerHTML);
+            hideModal(aiSummaryModal);
+            notesEditor.focus();
         });
 
 

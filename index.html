@@ -399,6 +399,18 @@
         </div>
     </div>
 
+    <div id="ai-summary-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-2xl">
+            <h3 class="text-xl font-bold mb-4">Resumen de importancia clínica</h3>
+            <div id="ai-summary-loader" class="text-center my-2"><p>Pensando...</p></div>
+            <div id="ai-summary-preview" class="hidden w-full h-64 p-3 bg-bg-tertiary rounded-lg overflow-y-auto mb-4 border border-border-color" contenteditable="true"></div>
+            <div class="flex justify-end gap-2">
+                <button id="cancel-ai-summary-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cancelar</button>
+                <button id="insert-ai-summary-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Insertar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="html-code-modal" class="modal-overlay">
         <div class="modal-content w-full max-w-2xl">
             <h3 class="text-xl font-bold mb-4">Insertar HTML</h3>
