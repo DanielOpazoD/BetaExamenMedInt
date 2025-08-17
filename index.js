@@ -125,14 +125,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const aiQuestionInput = getElem('ai-question-input');
     const cancelAiQaBtn = getElem('cancel-ai-qa-btn');
     const sendAiQaBtn = getElem('send-ai-qa-btn');
-    const aiToolsModal = getElem('ai-tools-modal');
-    const aiToolsThinking = getElem('ai-tools-thinking');
-    const aiToolsResponse = getElem('ai-tools-response');
-    const aiToolsLoader = getElem('ai-tools-loader');
-    const aiToolsInput = getElem('ai-tools-input');
-    const cancelAiToolsBtn = getElem('cancel-ai-tools-btn');
-    const sendAiToolsBtn = getElem('send-ai-tools-btn');
-    const insertAiToolsBtn = getElem('insert-ai-tools-btn');
     const printAllBtn = getElem('print-all-btn');
     const exportBtn = getElem('export-btn');
     const importBtn = getElem('import-btn');
@@ -147,22 +139,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
 
-    const openAiPanelBtn = getElem('open-ai-panel');
-    const aiPanel = getElem('ai-panel');
-    const closeAiPanelBtn = getElem('close-ai-panel');
-    const aiMessages = getElem('ai-messages');
-    const aiInput = getElem('ai-input');
-    const sendAiPanelBtn = getElem('send-ai-btn');
-    const aiStatus = getElem('ai-status');
-    const aiToolSelect = getElem('ai-tool-select');
-    const toneSelect = getElem('tone-select');
-    const lengthRange = getElem('length-range');
-    const langSelect = getElem('lang-select');
-    const fileUploadInput = getElem('file-upload');
-    const generateCanvasBtn = getElem('generate-canvas-btn');
-    const aiCanvas = getElem('ai-canvas');
-    const aiCanvasReasoning = getElem('ai-canvas-reasoning');
-    let uploadedFileText = '';
     
     // References modal elements
     const referencesModal = getElem('references-modal');
@@ -894,7 +870,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let editingQuickNote = false;
     let savedEditorSelection = null;
     let currentCallout = null;
-    let aiToolsGeneratedText = '';
 
     // Image selection handling within the sub-note editor
     if (subNoteEditor) {
@@ -2161,14 +2136,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(inlineIconSelect);
 
-        const aiBtn = createButton('Asistente de IA', '🤖', null, null, openAiToolsModal);
-        editorToolbar.appendChild(aiBtn);
-        const aiImproveBtn = createButton('Mejorar redacción', '✨', null, null, () => openAiToolsModalWithInstruction('Mejora la redacción del siguiente texto y corrige errores gramaticales'));
-        editorToolbar.appendChild(aiImproveBtn);
-        const aiSummarizeBtn = createButton('Resumir texto', '📝', null, null, () => openAiToolsModalWithInstruction('Resume el siguiente texto'));
-        editorToolbar.appendChild(aiSummarizeBtn);
-        const aiExpandBtn = createButton('Expandir contenido', '➕', null, null, () => openAiToolsModalWithInstruction('Amplía el contenido del siguiente texto utilizando tu conocimiento'));
-        editorToolbar.appendChild(aiExpandBtn);
+        const aiSummaryBtn = createButton('Importancia clínica de la enfermedad', '🤖', null, null, insertClinicalImportanceSummary);
+        editorToolbar.appendChild(aiSummaryBtn);
         editorToolbar.appendChild(createSeparator());
 
         // Image controls
@@ -2299,25 +2268,36 @@ document.addEventListener('DOMContentLoaded', function () {
         closeNoteStyleModal();
     }
 
-    function openAiToolsModal() {
-        const selection = window.getSelection();
-        if (selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
-            savedEditorSelection = selection.getRangeAt(0).cloneRange();
-        } else {
-            savedEditorSelection = null;
+    async function insertClinicalImportanceSummary() {
+        if (!API_KEY) {
+            await showAlert("La API Key de Gemini no está configurada.");
+            return;
         }
-        aiToolsInput.value = '';
-        aiToolsResponse.textContent = 'Escribe tu instrucción a continuación...';
-        aiToolsThinking.textContent = '';
-        aiToolsGeneratedText = '';
-        insertAiToolsBtn.classList.add('hidden');
-        showModal(aiToolsModal);
-    }
-
-    function openAiToolsModalWithInstruction(instr) {
-        openAiToolsModal();
-        aiToolsInput.value = instr;
-        aiToolsInput.focus();
+        const title = notesModalTitle.textContent.trim();
+        const content = notesEditor.textContent.trim();
+        let savedSelection = null;
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
+            savedSelection = selection.getRangeAt(0).cloneRange();
+        }
+        const prompt = `Analiza la nota que el usuario está editando.\nIdentifica la enfermedad principal desde el título.\nGenera un bloque en HTML con inline CSS que contenga:\n\nUn chip amarillo con el título: “Importancia clínica de la ENFERMEDAD”.\nUna lista de 4 a 8 viñetas telegráficas (1–2 líneas).\nCada viñeta con un cuadrado gris como icono (▫️), subtítulo en negrita y texto breve.\nLa última viñeta debe ser siempre “Tratamiento: ámbitos principales”, usando conocimiento médico general.\n\nEl contenido debe basarse primero en el documento actual; si faltan datos, complementar con conocimiento médico.\n\nDevuelve únicamente el bloque HTML.\n\nTítulo: ${title}\nContenido:\n${content}`;
+        try {
+            const ai = new GoogleGenAI({ apiKey: API_KEY });
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            });
+            if (savedSelection) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(savedSelection);
+            }
+            document.execCommand('insertHTML', false, response.text);
+        } catch (error) {
+            console.error('AI Error:', error);
+            await showAlert('Error al contactar a la IA: ' + error.message);
+        }
+        notesEditor.focus();
     }
 
     function resizeSelectedImage(multiplier) {
@@ -2688,74 +2668,6 @@ document.addEventListener('DOMContentLoaded', function () {
         htmlFavoriteName.value = '';
     });
 
-    function gatherNotesContext() {
-        const allRows = document.querySelectorAll('tr[data-topic-id]');
-        let notesContext = '';
-        allRows.forEach(row => {
-            const notes = JSON.parse(row.dataset.notes || '[]');
-            if (notes.length > 0) {
-                const topicTitle = row.querySelector('.topic-text')?.textContent || `Tema ${row.dataset.topicId}`;
-                notes.forEach(note => {
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = note.content;
-                    notesContext += `Tema: ${topicTitle}\nNota: ${note.title}\nContenido:\n${tempDiv.textContent}\n\n---\n\n`;
-                });
-            }
-        });
-        return notesContext;
-    }
-
-    async function extractTextFromPDF(file) {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        let text = '';
-        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-            const page = await pdf.getPage(pageNum);
-            const content = await page.getTextContent();
-            const pageText = content.items.map(item => item.str).join(' ');
-            text += pageText + '\n';
-        }
-        return text;
-    }
-
-    async function readTextFile(file) {
-        return await file.text();
-    }
-
-    function drawCanvasFromDescription(desc) {
-        if (!aiCanvas) return;
-        let shapes;
-        try {
-            shapes = JSON.parse(desc);
-        } catch {
-            return;
-        }
-        const ctx = aiCanvas.getContext('2d');
-        ctx.clearRect(0, 0, aiCanvas.width, aiCanvas.height);
-        shapes.forEach(s => {
-            ctx.fillStyle = s.color || '#000';
-            if (s.type === 'circle') {
-                ctx.beginPath();
-                ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-                ctx.fill();
-            } else if (s.type === 'rect') {
-                ctx.fillRect(s.x, s.y, s.w, s.h);
-            }
-        });
-    }
-
-    function createMessageElement(role) {
-        const wrapper = document.createElement('div');
-        wrapper.className = role === 'user' ? 'text-right' : 'text-left';
-        const bubble = document.createElement('div');
-        bubble.className = role === 'user'
-            ? 'inline-block bg-indigo-600 text-white p-2 rounded-lg'
-            : 'inline-block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 p-2 rounded-lg';
-        wrapper.appendChild(bubble);
-        aiMessages.appendChild(wrapper);
-        aiMessages.scrollTop = aiMessages.scrollHeight;
-        return bubble;
-    }
 
     function formatAiResponse(text) {
         if (!text) return '';
@@ -2803,15 +2715,6 @@ document.addEventListener('DOMContentLoaded', function () {
             return `<details><summary>Pensamiento</summary>${formatAiResponse(reasoning)}</details>${answerHtml}`;
         }
         return answerHtml;
-    }
-
-    function appendMessage(role, text) {
-        const el = createMessageElement(role);
-        if (role === 'assistant') {
-            el.innerHTML = formatAiResponse(text);
-        } else {
-            el.textContent = text;
-        }
     }
 
     function filterTable() {
@@ -4285,8 +4188,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 const ai = new GoogleGenAI({ apiKey: API_KEY });
-                const extraContext = uploadedFileText ? `\n\nArchivo:\n${uploadedFileText}` : '';
-                const fullPrompt = `Basado en las siguientes notas de estudio${extraContext ? ' y archivo proporcionado' : ''}, responde la pregunta del usuario. Proporciona primero "Razonamiento:" y luego "Respuesta:". Contenido:\n\n${notesContext}${extraContext}\n\nPregunta: ${question}`;
+                const fullPrompt = `Basado en las siguientes notas de estudio, responde la pregunta del usuario. Proporciona primero "Razonamiento:" y luego "Respuesta:". Contenido:\n\n${notesContext}\n\nPregunta: ${question}`;
 
                 const response = await ai.models.generateContent({
                   model: 'gemini-2.5-flash',
@@ -4305,159 +4207,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        cancelAiToolsBtn.addEventListener('click', () => hideModal(aiToolsModal));
-        sendAiToolsBtn.addEventListener('click', async () => {
-            const instruction = aiToolsInput.value.trim();
-            if (!instruction) {
-                showAlert("Por favor, escribe una instrucción.");
-                return;
-            }
-            if (!API_KEY) {
-                showAlert("La API Key de Gemini no está configurada.");
-                return;
-            }
-            aiToolsLoader.classList.remove('hidden');
-            aiToolsResponse.textContent = '';
-            aiToolsThinking.textContent = '';
-            sendAiToolsBtn.disabled = true;
-            try {
-                const selectionText = savedEditorSelection ? savedEditorSelection.toString() : '';
-                const context = [selectionText, uploadedFileText].filter(Boolean).join('\n\n');
-                const prompt = `Proporciona primero "Razonamiento:" con máximo tres frases y luego "Respuesta:". Instrucción: ${instruction}${context ? `\n\nTexto:\n${context}` : ''}`;
-                const ai = new GoogleGenAI({ apiKey: API_KEY });
-                const response = await ai.models.generateContent({
-                    model: 'gemini-1.5-flash',
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                });
-                const { reasoning, answer } = splitReasoning(response.text);
-                aiToolsGeneratedText = answer;
-                aiToolsThinking.innerHTML = formatAiResponse(reasoning);
-                aiToolsResponse.innerHTML = formatAiResponse(answer);
-                insertAiToolsBtn.classList.remove('hidden');
-            } catch (error) {
-                console.error('AI Error:', error);
-                aiToolsResponse.textContent = 'Error al contactar a la IA: ' + error.message;
-            } finally {
-                aiToolsLoader.classList.add('hidden');
-                sendAiToolsBtn.disabled = false;
-            }
-        });
-        insertAiToolsBtn.addEventListener('click', () => {
-            if (!aiToolsGeneratedText) return;
-            if (savedEditorSelection) {
-                const selection = window.getSelection();
-                selection.removeAllRanges();
-                selection.addRange(savedEditorSelection);
-            }
-            document.execCommand('insertHTML', false, formatAiResponse(aiToolsGeneratedText));
-            hideModal(aiToolsModal);
-            notesEditor.focus();
-        });
-
-        openAiPanelBtn.addEventListener('click', () => {
-            aiPanel.classList.remove('translate-x-full');
-            aiInput.focus();
-        });
-        closeAiPanelBtn.addEventListener('click', () => {
-            aiPanel.classList.add('translate-x-full');
-        });
-        fileUploadInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                try {
-                    if (file.type === 'application/pdf' && pdfjsLib) {
-                        uploadedFileText = await extractTextFromPDF(file);
-                    } else {
-                        uploadedFileText = await readTextFile(file);
-                    }
-                } catch (err) {
-                    console.error('Error al leer el archivo:', err);
-                }
-            }
-        });
-        sendAiPanelBtn.addEventListener('click', async () => {
-            const userText = aiInput.value.trim();
-            if (!userText && aiToolSelect.value === 'qa') {
-                showAlert("Por favor, escribe un mensaje.");
-                return;
-            }
-            if (!API_KEY) {
-                showAlert("La API Key de Gemini no está configurada.");
-                return;
-            }
-            const tone = toneSelect.value;
-            const length = lengthRange.value;
-            const lang = langSelect.value;
-            const notesContext = gatherNotesContext();
-            const fileContext = uploadedFileText ? `\n\nContenido del archivo:\n${uploadedFileText}` : '';
-            const combinedContext = notesContext + fileContext;
-            let prompt = '';
-            switch (aiToolSelect.value) {
-                case 'summary':
-                    prompt = `En ${lang} y con un tono ${tone}, resume el siguiente contenido en no más de ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
-                    break;
-                case 'flashcards':
-                    prompt = `En ${lang} y con un tono ${tone}, crea tarjetas de estudio (pregunta: respuesta) basadas en el siguiente contenido. Limita cada tarjeta a ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
-                    break;
-                case 'translate':
-                    prompt = `Traduce al ${lang} con un tono ${tone} el siguiente contenido. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
-                    break;
-                case 'questions':
-                    prompt = `En ${lang} y con un tono ${tone}, genera preguntas tipo examen con respuestas breves basadas en este contenido. Limita cada respuesta a ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
-                    break;
-                default:
-                    prompt = `Responde en ${lang} con un tono ${tone} y no más de ${length} palabras a la siguiente consulta del usuario utilizando el contexto. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n\nContexto:\n${combinedContext}\n\nPregunta: ${userText}`;
-            }
-            appendMessage('user', userText || aiToolSelect.options[aiToolSelect.selectedIndex].textContent);
-            aiInput.value = '';
-            aiStatus.classList.remove('hidden');
-            sendAiPanelBtn.disabled = true;
-            try {
-                const ai = new GoogleGenAI({ apiKey: API_KEY });
-                const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                });
-                const { reasoning, answer } = splitReasoning(response.text);
-                const assistantBubble = createMessageElement('assistant');
-                assistantBubble.innerHTML = buildReasoningHTML(reasoning, answer);
-                aiMessages.scrollTop = aiMessages.scrollHeight;
-            } catch (error) {
-                console.error("AI Error:", error);
-                const errBubble = createMessageElement('assistant');
-                errBubble.textContent = "Error al contactar a la IA: " + error.message;
-            } finally {
-                aiStatus.classList.add('hidden');
-                sendAiPanelBtn.disabled = false;
-            }
-        });
-
-        generateCanvasBtn.addEventListener('click', async () => {
-            if (!API_KEY) {
-                showAlert("La API Key de Gemini no está configurada.");
-                return;
-            }
-            aiCanvasReasoning.innerHTML = '';
-            aiStatus.classList.remove('hidden');
-            generateCanvasBtn.disabled = true;
-            try {
-                const ai = new GoogleGenAI({ apiKey: API_KEY });
-                const prompt = 'Genera una lista JSON de hasta cinco figuras simples (rect o circle) para dibujar en un canvas de 300x300. Proporciona primero "Razonamiento:" y luego "Respuesta:".';
-                const response = await ai.models.generateContent({
-                    model: 'gemini-1.5-flash',
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                });
-                const { reasoning, answer } = splitReasoning(response.text);
-                aiCanvasReasoning.innerHTML = formatAiResponse(reasoning);
-                drawCanvasFromDescription(answer);
-            } catch (err) {
-                console.error('AI Canvas Error:', err);
-                showAlert('Error al generar canvas.');
-            } finally {
-                aiStatus.classList.add('hidden');
-                generateCanvasBtn.disabled = false;
-            }
-        });
 
         // Close dropdowns when clicking outside
         window.addEventListener('click', (e) => {
