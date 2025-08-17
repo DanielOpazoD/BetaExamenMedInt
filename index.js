@@ -2512,6 +2512,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function showModal(modal) {
+        // Move modal to end of <body> to ensure it appears on top of other modals
+        document.body.appendChild(modal);
         modal.classList.add('visible');
     }
 
