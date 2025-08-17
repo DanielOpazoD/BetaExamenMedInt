@@ -2075,7 +2075,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const subnoteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
         // El botón ahora crea una sub-nota en lugar de un Post-it
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
-        
+
+        const inlineNoteBtn = createButton('Insertar nota en línea', '💡', null, null, insertInlineNoteIcon);
+        editorToolbar.appendChild(inlineNoteBtn);
+
         const aiBtn = createButton('Asistente de IA', '🤖', null, null, openAiToolsModal);
         editorToolbar.appendChild(aiBtn);
         const aiImproveBtn = createButton('Mejorar redacción', '✨', null, null, () => openAiToolsModalWithInstruction('Mejora la redacción del siguiente texto y corrige errores gramaticales'));
@@ -3097,6 +3100,57 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function insertInlineNoteIcon() {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+        const range = selection.getRangeAt(0);
+        const uniqueId = `inline-note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const icon = document.createElement('span');
+        icon.className = 'inline-note';
+        icon.dataset.subnoteId = uniqueId;
+        icon.textContent = '💡';
+        icon.contentEditable = 'false';
+        range.insertNode(icon);
+        const spacer = document.createTextNode('\u00A0');
+        icon.parentNode.insertBefore(spacer, icon.nextSibling);
+        const newRange = document.createRange();
+        newRange.setStartAfter(spacer);
+        newRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+        notesEditor.focus();
+        if (currentNotesArray[activeNoteIndex]) {
+            if (!currentNotesArray[activeNoteIndex].postits) {
+                currentNotesArray[activeNoteIndex].postits = {};
+            }
+            currentNotesArray[activeNoteIndex].postits[uniqueId] = { title: '', content: '' };
+            saveCurrentNote();
+        }
+    }
+
+    function showInlineNoteTooltip(icon) {
+        const subnoteId = icon.dataset.subnoteId || icon.dataset.postitId;
+        const noteData = currentNotesArray[activeNoteIndex];
+        if (!noteData || !noteData.postits) return;
+        const subnote = noteData.postits[subnoteId];
+        if (!subnote || !subnote.content) return;
+        const tooltip = document.createElement('div');
+        tooltip.className = 'inline-note-tooltip';
+        tooltip.innerHTML = subnote.content;
+        document.body.appendChild(tooltip);
+        const rect = icon.getBoundingClientRect();
+        tooltip.style.top = `${rect.bottom + window.scrollY + 4}px`;
+        tooltip.style.left = `${rect.left + window.scrollX}px`;
+        icon._tooltip = tooltip;
+    }
+
+    function hideInlineNoteTooltip(icon) {
+        if (icon._tooltip) {
+            icon._tooltip.remove();
+            delete icon._tooltip;
+        }
+    }
+
     function openGalleryLinkEditor() {
         const selection = window.getSelection();
         if (!selection.rangeCount) return;
@@ -3711,7 +3765,36 @@ document.addEventListener('DOMContentLoaded', function () {
                  openImageLightbox(galleryLink.dataset.images);
                  return;
              }
-             
+
+             // Handle inline note icon clicks
+             const inlineIcon = e.target.closest('.inline-note');
+             if (inlineIcon) {
+                 e.preventDefault();
+                 hideInlineNoteTooltip(inlineIcon);
+                 activeSubnoteLink = inlineIcon;
+                 editingQuickNote = false;
+                 const subnoteId = inlineIcon.dataset.subnoteId || inlineIcon.dataset.postitId;
+                 const noteData = currentNotesArray[activeNoteIndex];
+                 let subnoteData = { title: '', content: '' };
+                 if (noteData && noteData.postits) {
+                     const existing = noteData.postits[subnoteId];
+                     if (typeof existing === 'string') {
+                         subnoteData = { title: '', content: existing };
+                     } else if (existing) {
+                         subnoteData = existing;
+                     }
+                 }
+                 subNoteTitle.textContent = subnoteData.title || '';
+                 subNoteEditor.innerHTML = subnoteData.content || '<p><br></p>';
+                 const modalContent = subNoteModal.querySelector('.notes-modal-content');
+                 modalContent.classList.remove('readonly-mode');
+                 subNoteEditor.contentEditable = true;
+                 subNoteTitle.contentEditable = true;
+                 subNoteEditor.focus();
+                 showModal(subNoteModal);
+                 return;
+             }
+
              // Handle sub-note link clicks (supports legacy post-it links)
              const subnoteLink = e.target.closest('.subnote-link, .postit-link');
              if (subnoteLink) {
@@ -3740,6 +3823,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 subNoteTitle.contentEditable = false;
                 showModal(subNoteModal);
                 return;
+            }
+        });
+
+        notesEditor.addEventListener('mouseover', (e) => {
+            const icon = e.target.closest('.inline-note');
+            if (icon) {
+                showInlineNoteTooltip(icon);
+            }
+        });
+
+        notesEditor.addEventListener('mouseout', (e) => {
+            const icon = e.target.closest('.inline-note');
+            if (icon) {
+                hideInlineNoteTooltip(icon);
             }
         });
 
