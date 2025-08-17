@@ -2054,6 +2054,9 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(calloutBtn);
 
+        const textBoxBtn = createButton('Insertar cuadro redimensionable', '🔳', null, null, insertResizableTextBox);
+        editorToolbar.appendChild(textBoxBtn);
+
         const subnoteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
         // El botón ahora crea una sub-nota en lugar de un Post-it
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
@@ -2228,6 +2231,65 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             showAlert("Por favor, selecciona una imagen primero para cambiar su tamaño.");
         }
+    }
+
+    function makeTextBoxResizable(box) {
+        const existing = box.querySelector('.resize-handle');
+        if (existing) existing.remove();
+
+        const handle = document.createElement('div');
+        handle.className = 'resize-handle';
+        handle.contentEditable = 'false';
+        box.appendChild(handle);
+
+        let startX = 0;
+        let startWidth = 0;
+        const minWidth = 100;
+
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            startX = e.clientX;
+            startWidth = box.offsetWidth;
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        function onMouseMove(e) {
+            const dx = e.clientX - startX;
+            const newWidth = Math.max(minWidth, startWidth + dx);
+            box.style.width = newWidth + 'px';
+        }
+
+        function onMouseUp() {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        }
+    }
+
+    function initTextBoxResize(box) {
+        box.classList.add('resizable-text-box');
+        makeTextBoxResizable(box);
+    }
+
+    function insertResizableTextBox() {
+        const box = document.createElement('div');
+        box.contentEditable = 'true';
+        box.innerHTML = '<p><br></p>';
+        initTextBoxResize(box);
+
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(box);
+            range.setStartAfter(box);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        } else {
+            notesEditor.appendChild(box);
+        }
+        box.focus();
     }
 
     function updateAllTotals() {
@@ -2982,10 +3044,11 @@ document.addEventListener('DOMContentLoaded', function () {
         
         activeNoteIndex = index;
         const note = currentNotesArray[index];
-        
+
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
         notesEditor.querySelectorAll('table').forEach(initTableResize);
+        notesEditor.querySelectorAll('.resizable-text-box').forEach(initTextBoxResize);
 
         renderNotesList();
         notesEditor.focus();
@@ -3649,6 +3712,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     reader.onload = (e) => {
                         notesEditor.innerHTML = e.target.result;
                         notesEditor.querySelectorAll('table').forEach(initTableResize);
+                        notesEditor.querySelectorAll('.resizable-text-box').forEach(initTextBoxResize);
                     };
                     reader.readAsText(file);
                 }
