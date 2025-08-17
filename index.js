@@ -2054,6 +2054,9 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(calloutBtn);
 
+        const lampBtn = createButton('Nota rápida', '💡', null, null, insertLampNote);
+        editorToolbar.appendChild(lampBtn);
+
         const subnoteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
         // El botón ahora crea una sub-nota en lugar de un Post-it
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
@@ -3036,10 +3039,54 @@ document.addEventListener('DOMContentLoaded', function () {
         tempDiv.innerHTML = note.content || '';
         const text = tempDiv.textContent || tempDiv.innerText || '';
         const words = text.trim().split(/\s+/).filter(Boolean);
-        
+
         infoWordCount.textContent = words.length;
         infoNoteSize.textContent = formatBytes(new Blob([note.content]).size);
         infoLastEdited.textContent = note.lastEdited ? new Date(note.lastEdited).toLocaleString() : 'N/A';
+    }
+
+    function insertLampNote() {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+
+        const range = selection.getRangeAt(0);
+        const wrapBlock = !selection.isCollapsed;
+
+        const container = document.createElement(wrapBlock ? 'div' : 'span');
+        container.className = 'lamp-note';
+        if (wrapBlock) container.classList.add('lamp-note-block');
+
+        const icon = document.createElement('sup');
+        icon.className = 'lamp-note-icon';
+        icon.textContent = '💡';
+
+        const note = document.createElement('span');
+        note.className = 'lamp-note-content';
+        note.contentEditable = 'true';
+        note.textContent = '';
+
+        container.appendChild(icon);
+        container.appendChild(note);
+
+        if (wrapBlock) {
+            const content = range.extractContents();
+            container.appendChild(content);
+            range.insertNode(container);
+        } else {
+            range.insertNode(container);
+        }
+
+        const spacer = document.createTextNode('\u00A0');
+        container.parentNode.insertBefore(spacer, container.nextSibling);
+
+        const newRange = document.createRange();
+        newRange.setStartAfter(spacer);
+        newRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+
+        saveCurrentNote();
+        notesEditor.focus();
     }
 
     function createSubnoteLink() {
