@@ -2044,6 +2044,68 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(htmlCodeBtn);
 
+        const enableLeftResize = (el) => {
+            const threshold = 5;
+            let resizing = false;
+            let startX = 0;
+            let startWidth = 0;
+            let startMargin = 0;
+
+            const onHover = (e) => {
+                if (resizing) return;
+                const rect = el.getBoundingClientRect();
+                if (e.clientX - rect.left <= threshold) {
+                    el.style.cursor = 'ew-resize';
+                } else {
+                    el.style.cursor = '';
+                }
+            };
+
+            const onMouseDown = (e) => {
+                const rect = el.getBoundingClientRect();
+                if (e.clientX - rect.left <= threshold) {
+                    resizing = true;
+                    startX = e.clientX;
+                    startWidth = el.offsetWidth;
+                    startMargin = parseFloat(getComputedStyle(el).marginLeft) || 0;
+                    document.addEventListener('mousemove', onDrag);
+                    document.addEventListener('mouseup', onStop);
+                    e.preventDefault();
+                }
+            };
+
+            const onDrag = (e) => {
+                if (!resizing) return;
+                const dx = e.clientX - startX;
+                const newWidth = Math.max(30, startWidth - dx);
+                el.style.width = newWidth + 'px';
+                el.style.marginLeft = startMargin + dx + 'px';
+            };
+
+            const onStop = () => {
+                if (!resizing) return;
+                resizing = false;
+                el.style.cursor = '';
+                document.removeEventListener('mousemove', onDrag);
+                document.removeEventListener('mouseup', onStop);
+            };
+
+            el.addEventListener('mousemove', onHover);
+            el.addEventListener('mousedown', onMouseDown);
+            el._leftResizeHandlers = { onHover, onMouseDown, onDrag, onStop };
+        };
+
+        const disableLeftResize = (el) => {
+            const h = el._leftResizeHandlers;
+            if (!h) return;
+            el.removeEventListener('mousemove', h.onHover);
+            el.removeEventListener('mousedown', h.onMouseDown);
+            document.removeEventListener('mousemove', h.onDrag);
+            document.removeEventListener('mouseup', h.onStop);
+            el.style.cursor = '';
+            delete el._leftResizeHandlers;
+        };
+
         const calloutBtn = createButton('Nota', '💬', null, null, () => {
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0) {
@@ -2067,8 +2129,11 @@ document.addEventListener('DOMContentLoaded', function () {
             block.classList.toggle('note-resizable');
             if (block.classList.contains('note-resizable')) {
                 block.style.width = block.offsetWidth + 'px';
+                enableLeftResize(block);
             } else {
                 block.style.width = '';
+                block.style.marginLeft = '';
+                disableLeftResize(block);
             }
         });
         editorToolbar.appendChild(resizeCalloutBtn);
