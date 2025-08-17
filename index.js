@@ -881,6 +881,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let saveTimeout;
     let activeReferencesCell = null;
     let activeIconPickerButton = null;
+    let iconPickerCallback = null;
     let currentNotesArray = [];
     let activeNoteIndex = 0;
     let isResizing = false;
@@ -1455,7 +1456,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     const EMOJI_CATEGORIES = {
-        'Sugeridos': ['🔗', '📄', '📹', '🖼️', '💡', '📌', '✅', '⭐', '📖', '📚'],
+        'Sugeridos': ['ℹ️', '❓', '💡', '🔖', '⁎', '🧩', '🗒️', '🔗', '📄', '📹', '🖼️', '📌', '✅', '⭐', '📖', '📚'],
         'Símbolos': ['✅', '☑️', '❌', '➡️', '⬅️', '➕', '➖', '❓', '❕', '❤️', '💔', '🔥', '💯', '⚠️', '⬆️', '⬇️'],
         'Objetos': ['🔗', '📄', '📝', '📋', '📎', '🔑', '📈', '📉', '💡', '📌', '📖', '📚', '💻', '🖱️', '📱', '📹', '🎥', '🎬', '📺', '🖼️', '🎨', '📷'],
         'Medicina': ['🩺', '💉', '💊', '🩸', '🧪', '🔬', '🩻', '🦠', '🧬', '🧠', '❤️‍🩹', '🦴', '🫀', '🫁'],
@@ -2827,6 +2828,16 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function openIconPicker(callback) {
+        iconPickerCallback = callback;
+        selectedIconCategory = 'Sugeridos';
+        document.querySelectorAll('#icon-picker-categories .category-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.category === selectedIconCategory);
+        });
+        loadEmojisForCategory(selectedIconCategory);
+        showModal(iconPickerModal);
+    }
+
     function createReferenceSlot(ref = { icon: '🔗', url: '' }) {
         const slot = document.createElement('div');
         slot.className = 'reference-slot flex items-center gap-2';
@@ -3100,40 +3111,44 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    const availableInlineIcons = ['ℹ️','❓','💡','🔖','⁎','🧩','🗒️'];
-    function chooseInlineNoteIcon() {
-        const choice = prompt(`Selecciona un icono: ${availableInlineIcons.join(' ')}`, 'ℹ️') || 'ℹ️';
-        return availableInlineIcons.includes(choice) ? choice : 'ℹ️';
-    }
-
     function insertInlineNoteIcon() {
         const selection = window.getSelection();
-        if (!selection.rangeCount) return;
-        const range = selection.getRangeAt(0);
-        const uniqueId = `inline-note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const icon = document.createElement('span');
-        icon.className = 'inline-note';
-        icon.dataset.subnoteId = uniqueId;
-        icon.textContent = chooseInlineNoteIcon();
-        range.insertNode(icon);
-        const spacer = document.createTextNode('\u00A0');
-        icon.parentNode.insertBefore(spacer, icon.nextSibling);
-        const newRange = document.createRange();
-        newRange.setStartAfter(spacer);
-        newRange.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(newRange);
-        notesEditor.focus();
-        if (currentNotesArray[activeNoteIndex]) {
-            if (!currentNotesArray[activeNoteIndex].postits) {
-                currentNotesArray[activeNoteIndex].postits = {};
+        if (!selection || !selection.rangeCount) return;
+        savedEditorSelection = selection.getRangeAt(0).cloneRange();
+        openIconPicker((chosen) => {
+            const iconChar = chosen || 'ℹ️';
+            if (!savedEditorSelection) return;
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(savedEditorSelection);
+            const range = sel.getRangeAt(0);
+            const uniqueId = `inline-note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const icon = document.createElement('span');
+            icon.className = 'inline-note';
+            icon.dataset.subnoteId = uniqueId;
+            icon.textContent = iconChar;
+            range.insertNode(icon);
+            const spacer = document.createTextNode('\u00A0');
+            icon.parentNode.insertBefore(spacer, icon.nextSibling);
+            const newRange = document.createRange();
+            newRange.setStartAfter(spacer);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            notesEditor.focus();
+            if (currentNotesArray[activeNoteIndex]) {
+                if (!currentNotesArray[activeNoteIndex].postits) {
+                    currentNotesArray[activeNoteIndex].postits = {};
+                }
+                currentNotesArray[activeNoteIndex].postits[uniqueId] = { title: '', content: '' };
+                saveCurrentNote();
             }
-            currentNotesArray[activeNoteIndex].postits[uniqueId] = { title: '', content: '' };
-            saveCurrentNote();
-        }
+            savedEditorSelection = null;
+        });
     }
 
     function showInlineNoteTooltip(icon) {
+        if (icon._tooltip) return;
         const subnoteId = icon.dataset.subnoteId || icon.dataset.postitId;
         const noteData = currentNotesArray[activeNoteIndex];
         if (!noteData || !noteData.postits) return;
@@ -3147,6 +3162,21 @@ document.addEventListener('DOMContentLoaded', function () {
         tooltip.style.top = `${rect.bottom + window.scrollY + 4}px`;
         tooltip.style.left = `${rect.left + window.scrollX}px`;
         icon._tooltip = tooltip;
+        tooltip.addEventListener('mouseleave', (e) => {
+            const to = e.relatedTarget;
+            if (to === icon) return;
+            hideInlineNoteTooltip(icon);
+        });
+        tooltip.addEventListener('dblclick', (e) => {
+            if (e.target.tagName === 'IMG') {
+                e.preventDefault();
+                const imgs = Array.from(tooltip.querySelectorAll('img')).map(img => ({ url: img.src, caption: img.dataset.caption || '' }));
+                const idx = imgs.findIndex(img => img.url === e.target.src);
+                if (idx !== -1) {
+                    openImageLightbox(imgs, idx);
+                }
+            }
+        });
     }
 
     function hideInlineNoteTooltip(icon) {
@@ -3844,6 +3874,10 @@ document.addEventListener('DOMContentLoaded', function () {
         notesEditor.addEventListener('mouseout', (e) => {
             const icon = e.target.closest('.inline-note');
             if (icon) {
+                const to = e.relatedTarget;
+                if (to === icon._tooltip || (icon._tooltip && icon._tooltip.contains(to))) {
+                    return;
+                }
                 hideInlineNoteTooltip(icon);
             }
         });
@@ -4124,7 +4158,13 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         emojiGrid.addEventListener('click', (e) => {
             const btn = e.target.closest('.emoji-btn');
-            if (btn && activeIconPickerButton) {
+            if (!btn) return;
+            if (iconPickerCallback) {
+                const cb = iconPickerCallback;
+                iconPickerCallback = null;
+                hideModal(iconPickerModal);
+                cb(btn.dataset.emoji);
+            } else if (activeIconPickerButton) {
                 activeIconPickerButton.textContent = btn.dataset.emoji;
                 hideModal(iconPickerModal);
                 activeIconPickerButton = null;
@@ -4146,7 +4186,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 loadEmojisForCategory(category);
             });
         }
-        cancelIconPickerBtn.addEventListener('click', () => hideModal(iconPickerModal));
+        cancelIconPickerBtn.addEventListener('click', () => {
+            hideModal(iconPickerModal);
+            if (iconPickerCallback) {
+                iconPickerCallback(null);
+                iconPickerCallback = null;
+            }
+            activeIconPickerButton = null;
+        });
 
         // --- Confirmation Modal Listeners ---
         cancelConfirmationBtn.addEventListener('click', () => {
