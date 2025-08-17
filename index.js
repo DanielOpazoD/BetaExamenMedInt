@@ -112,6 +112,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const notesModal = getElem('notes-modal');
     const notesModalTitle = getElem('notes-modal-title');
     const notesEditor = getElem('notes-editor');
+    const subnoteTooltip = getElem('subnote-tooltip');
     const editorToolbar = notesModal.querySelector('.editor-toolbar');
     const saveNoteBtn = getElem('save-note-btn');
     const saveAndCloseNoteBtn = getElem('save-and-close-note-btn');
@@ -3062,38 +3063,49 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function createSubnoteLink() {
         const selection = window.getSelection();
-        if (!selection.rangeCount || selection.isCollapsed) {
-            showAlert("Por favor, selecciona el texto que quieres convertir en una sub-nota.");
+        if (!selection.rangeCount) {
             return;
         }
         const range = selection.getRangeAt(0);
         const uniqueId = `subnote-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        // Create an anchor to wrap the selected content
         const anchor = document.createElement('a');
         anchor.className = 'subnote-link';
         anchor.dataset.subnoteId = uniqueId;
         anchor.href = '#';
-        // Extract selected content and append
-        const selectedContent = range.extractContents();
-        anchor.appendChild(selectedContent);
+        anchor.textContent = '💡';
         range.insertNode(anchor);
-        // Insert a non-breaking space after the anchor to exit the hyperlink context
         const spacer = document.createTextNode('\u00A0');
         anchor.parentNode.insertBefore(spacer, anchor.nextSibling);
-        // Move cursor after inserted spacer
         const newRange = document.createRange();
         newRange.setStartAfter(spacer);
         newRange.collapse(true);
         selection.removeAllRanges();
         selection.addRange(newRange);
         notesEditor.focus();
-        // Save a placeholder subnote entry
         if (currentNotesArray[activeNoteIndex]) {
             if (!currentNotesArray[activeNoteIndex].postits) {
                 currentNotesArray[activeNoteIndex].postits = {};
             }
             currentNotesArray[activeNoteIndex].postits[uniqueId] = { title: '', content: '' };
             saveCurrentNote();
+        }
+    }
+
+    function showSubnoteTooltip(link) {
+        if (!subnoteTooltip || !currentNotesArray[activeNoteIndex]) return;
+        const subnoteId = link.dataset.subnoteId || link.dataset.postitId;
+        const noteData = currentNotesArray[activeNoteIndex].postits?.[subnoteId];
+        if (!noteData || !noteData.content) return;
+        subnoteTooltip.innerHTML = noteData.content;
+        const rect = link.getBoundingClientRect();
+        subnoteTooltip.style.left = `${rect.left + window.scrollX}px`;
+        subnoteTooltip.style.top = `${rect.bottom + window.scrollY + 4}px`;
+        subnoteTooltip.style.display = 'block';
+    }
+
+    function hideSubnoteTooltip() {
+        if (subnoteTooltip) {
+            subnoteTooltip.style.display = 'none';
         }
     }
 
@@ -3713,12 +3725,13 @@ document.addEventListener('DOMContentLoaded', function () {
              }
              
              // Handle sub-note link clicks (supports legacy post-it links)
-             const subnoteLink = e.target.closest('.subnote-link, .postit-link');
-             if (subnoteLink) {
-                 e.preventDefault();
-                 activeSubnoteLink = subnoteLink;
-                 editingQuickNote = false;
-                 // Determine the identifier attribute (subnoteId or legacy postitId)
+            const subnoteLink = e.target.closest('.subnote-link, .postit-link');
+            if (subnoteLink) {
+                e.preventDefault();
+                hideSubnoteTooltip();
+                activeSubnoteLink = subnoteLink;
+                editingQuickNote = false;
+                // Determine the identifier attribute (subnoteId or legacy postitId)
                  const subnoteId = subnoteLink.dataset.subnoteId || subnoteLink.dataset.postitId;
                  const noteData = currentNotesArray[activeNoteIndex];
                  let subnoteData = { title: '', content: '' };
@@ -3740,6 +3753,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 subNoteTitle.contentEditable = false;
                 showModal(subNoteModal);
                 return;
+            }
+        });
+
+        notesEditor.addEventListener('mouseover', (e) => {
+            const link = e.target.closest('.subnote-link');
+            if (link) {
+                showSubnoteTooltip(link);
+            }
+        });
+
+        notesEditor.addEventListener('mouseout', (e) => {
+            if (e.target.closest('.subnote-link')) {
+                hideSubnoteTooltip();
             }
         });
 

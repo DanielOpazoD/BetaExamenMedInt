@@ -219,9 +219,23 @@
 
 /* Enlaces de sub-notas: estilo distintivo con subrayado punteado */
 .subnote-link {
-    text-decoration: underline dotted;
+    text-decoration: none;
     cursor: pointer;
     color: inherit;
+    vertical-align: sub;
+    font-size: 0.8em;
+}
+
+#subnote-tooltip {
+    position: absolute;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 4px 6px;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    display: none;
+    z-index: 1000;
+    max-width: 200px;
 }
         /* Toolbar styles */
         .toolbar-separator {
