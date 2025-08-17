@@ -881,6 +881,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let saveTimeout;
     let activeReferencesCell = null;
     let activeIconPickerButton = null;
+    let iconPickerCallback = null;
     let currentNotesArray = [];
     let activeNoteIndex = 0;
     let isResizing = false;
@@ -1455,7 +1456,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     const EMOJI_CATEGORIES = {
-        'Sugeridos': ['🔗', '📄', '📹', '🖼️', '💡', '📌', '✅', '⭐', '📖', '📚'],
+        'Sugeridos': ['ℹ️', '❓', '💡', '🔖', '⁎', '🧩', '🗒️', '🔗', '📄', '📹', '🖼️', '📌', '✅', '⭐', '📖', '📚'],
         'Símbolos': ['✅', '☑️', '❌', '➡️', '⬅️', '➕', '➖', '❓', '❕', '❤️', '💔', '🔥', '💯', '⚠️', '⬆️', '⬇️'],
         'Objetos': ['🔗', '📄', '📝', '📋', '📎', '🔑', '📈', '📉', '💡', '📌', '📖', '📚', '💻', '🖱️', '📱', '📹', '🎥', '🎬', '📺', '🖼️', '🎨', '📷'],
         'Medicina': ['🩺', '💉', '💊', '🩸', '🧪', '🔬', '🩻', '🦠', '🧬', '🧠', '❤️‍🩹', '🦴', '🫀', '🫁'],
@@ -2075,7 +2076,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const subnoteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
         // El botón ahora crea una sub-nota en lugar de un Post-it
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
-        
+
+        const inlineNoteBtn = createButton('Insertar nota en línea', 'ℹ️', null, null, insertInlineNoteIcon);
+        editorToolbar.appendChild(inlineNoteBtn);
+
         const aiBtn = createButton('Asistente de IA', '🤖', null, null, openAiToolsModal);
         editorToolbar.appendChild(aiBtn);
         const aiImproveBtn = createButton('Mejorar redacción', '✨', null, null, () => openAiToolsModalWithInstruction('Mejora la redacción del siguiente texto y corrige errores gramaticales'));
@@ -2824,6 +2828,16 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function openIconPicker(callback) {
+        iconPickerCallback = callback;
+        selectedIconCategory = 'Sugeridos';
+        document.querySelectorAll('#icon-picker-categories .category-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.category === selectedIconCategory);
+        });
+        loadEmojisForCategory(selectedIconCategory);
+        showModal(iconPickerModal);
+    }
+
     function createReferenceSlot(ref = { icon: '🔗', url: '' }) {
         const slot = document.createElement('div');
         slot.className = 'reference-slot flex items-center gap-2';
@@ -3097,6 +3111,81 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function insertInlineNoteIcon() {
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) return;
+        savedEditorSelection = selection.getRangeAt(0).cloneRange();
+        openIconPicker((chosen) => {
+            const iconChar = chosen || 'ℹ️';
+            if (!savedEditorSelection) return;
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(savedEditorSelection);
+            const range = sel.getRangeAt(0);
+            const uniqueId = `inline-note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const icon = document.createElement('span');
+            icon.className = 'inline-note';
+            icon.dataset.subnoteId = uniqueId;
+            icon.textContent = iconChar;
+            range.insertNode(icon);
+            const spacer = document.createTextNode('\u00A0');
+            icon.parentNode.insertBefore(spacer, icon.nextSibling);
+            const newRange = document.createRange();
+            newRange.setStartAfter(spacer);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            notesEditor.focus();
+            if (currentNotesArray[activeNoteIndex]) {
+                if (!currentNotesArray[activeNoteIndex].postits) {
+                    currentNotesArray[activeNoteIndex].postits = {};
+                }
+                currentNotesArray[activeNoteIndex].postits[uniqueId] = { title: '', content: '' };
+                saveCurrentNote();
+            }
+            savedEditorSelection = null;
+        });
+    }
+
+    function showInlineNoteTooltip(icon) {
+        if (icon._tooltip) return;
+        const subnoteId = icon.dataset.subnoteId || icon.dataset.postitId;
+        const noteData = currentNotesArray[activeNoteIndex];
+        if (!noteData || !noteData.postits) return;
+        const subnote = noteData.postits[subnoteId];
+        if (!subnote || !subnote.content) return;
+        const tooltip = document.createElement('div');
+        tooltip.className = 'inline-note-tooltip';
+        tooltip.innerHTML = subnote.content;
+        document.body.appendChild(tooltip);
+        const rect = icon.getBoundingClientRect();
+        tooltip.style.top = `${rect.bottom + window.scrollY + 4}px`;
+        tooltip.style.left = `${rect.left + window.scrollX}px`;
+        icon._tooltip = tooltip;
+        tooltip.addEventListener('mouseleave', (e) => {
+            const to = e.relatedTarget;
+            if (to === icon) return;
+            hideInlineNoteTooltip(icon);
+        });
+        tooltip.addEventListener('dblclick', (e) => {
+            if (e.target.tagName === 'IMG') {
+                e.preventDefault();
+                const imgs = Array.from(tooltip.querySelectorAll('img')).map(img => ({ url: img.src, caption: img.dataset.caption || '' }));
+                const idx = imgs.findIndex(img => img.url === e.target.src);
+                if (idx !== -1) {
+                    openImageLightbox(imgs, idx);
+                }
+            }
+        });
+    }
+
+    function hideInlineNoteTooltip(icon) {
+        if (icon._tooltip) {
+            icon._tooltip.remove();
+            delete icon._tooltip;
+        }
+    }
+
     function openGalleryLinkEditor() {
         const selection = window.getSelection();
         if (!selection.rangeCount) return;
@@ -3218,6 +3307,9 @@ document.addEventListener('DOMContentLoaded', function () {
             lightboxImage.style.transformOrigin = 'center center';
             updateLightboxView();
             showModal(imageLightboxModal);
+            if (imageLightboxModal.requestFullscreen) {
+                imageLightboxModal.requestFullscreen().catch(() => {});
+            }
         } catch(e) {
             console.error("Could not parse image gallery data:", e);
             showAlert("No se pudo abrir la galería de imágenes. Los datos pueden estar corruptos.");
@@ -3711,7 +3803,36 @@ document.addEventListener('DOMContentLoaded', function () {
                  openImageLightbox(galleryLink.dataset.images);
                  return;
              }
-             
+
+             // Handle inline note icon clicks
+             const inlineIcon = e.target.closest('.inline-note');
+             if (inlineIcon) {
+                 e.preventDefault();
+                 hideInlineNoteTooltip(inlineIcon);
+                 activeSubnoteLink = inlineIcon;
+                 editingQuickNote = false;
+                 const subnoteId = inlineIcon.dataset.subnoteId || inlineIcon.dataset.postitId;
+                 const noteData = currentNotesArray[activeNoteIndex];
+                 let subnoteData = { title: '', content: '' };
+                 if (noteData && noteData.postits) {
+                     const existing = noteData.postits[subnoteId];
+                     if (typeof existing === 'string') {
+                         subnoteData = { title: '', content: existing };
+                     } else if (existing) {
+                         subnoteData = existing;
+                     }
+                 }
+                 subNoteTitle.textContent = subnoteData.title || '';
+                 subNoteEditor.innerHTML = subnoteData.content || '<p><br></p>';
+                 const modalContent = subNoteModal.querySelector('.notes-modal-content');
+                 modalContent.classList.remove('readonly-mode');
+                 subNoteEditor.contentEditable = true;
+                 subNoteTitle.contentEditable = true;
+                 subNoteEditor.focus();
+                 showModal(subNoteModal);
+                 return;
+             }
+
              // Handle sub-note link clicks (supports legacy post-it links)
              const subnoteLink = e.target.closest('.subnote-link, .postit-link');
              if (subnoteLink) {
@@ -3740,6 +3861,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 subNoteTitle.contentEditable = false;
                 showModal(subNoteModal);
                 return;
+            }
+        });
+
+        notesEditor.addEventListener('mouseover', (e) => {
+            const icon = e.target.closest('.inline-note');
+            if (icon) {
+                showInlineNoteTooltip(icon);
+            }
+        });
+
+        notesEditor.addEventListener('mouseout', (e) => {
+            const icon = e.target.closest('.inline-note');
+            if (icon) {
+                const to = e.relatedTarget;
+                if (to === icon._tooltip || (icon._tooltip && icon._tooltip.contains(to))) {
+                    return;
+                }
+                hideInlineNoteTooltip(icon);
             }
         });
 
@@ -3874,7 +4013,12 @@ document.addEventListener('DOMContentLoaded', function () {
         saveGalleryLinkBtn.addEventListener('click', handleGalleryLinkSave);
 
         // Lightbox Listeners
-        closeLightboxBtn.addEventListener('click', () => hideModal(imageLightboxModal));
+        closeLightboxBtn.addEventListener('click', () => {
+            hideModal(imageLightboxModal);
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            }
+        });
         prevLightboxBtn.addEventListener('click', () => {
             if (currentLightboxIndex > 0) {
                 currentLightboxIndex--;
@@ -3890,6 +4034,9 @@ document.addEventListener('DOMContentLoaded', function () {
         imageLightboxModal.addEventListener('click', (e) => {
             if (e.target === imageLightboxModal || e.target.id === 'image-lightbox-content') {
                  hideModal(imageLightboxModal);
+                 if (document.fullscreenElement) {
+                     document.exitFullscreen();
+                 }
             }
         });
 
@@ -4011,7 +4158,13 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         emojiGrid.addEventListener('click', (e) => {
             const btn = e.target.closest('.emoji-btn');
-            if (btn && activeIconPickerButton) {
+            if (!btn) return;
+            if (iconPickerCallback) {
+                const cb = iconPickerCallback;
+                iconPickerCallback = null;
+                hideModal(iconPickerModal);
+                cb(btn.dataset.emoji);
+            } else if (activeIconPickerButton) {
                 activeIconPickerButton.textContent = btn.dataset.emoji;
                 hideModal(iconPickerModal);
                 activeIconPickerButton = null;
@@ -4033,7 +4186,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 loadEmojisForCategory(category);
             });
         }
-        cancelIconPickerBtn.addEventListener('click', () => hideModal(iconPickerModal));
+        cancelIconPickerBtn.addEventListener('click', () => {
+            hideModal(iconPickerModal);
+            if (iconPickerCallback) {
+                iconPickerCallback(null);
+                iconPickerCallback = null;
+            }
+            activeIconPickerButton = null;
+        });
 
         // --- Confirmation Modal Listeners ---
         cancelConfirmationBtn.addEventListener('click', () => {
