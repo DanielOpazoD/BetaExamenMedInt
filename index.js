@@ -380,13 +380,22 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.innerHTML = content;
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (command) {
-                    document.execCommand(command, false, value);
+                if (command === 'indent' || command === 'outdent') {
+                    const blocks = getSelectedBlocksSN();
+                    const handled = applyIndentation(blocks, command === 'indent');
+                    if (!handled) {
+                        document.execCommand(command, false, value);
+                    }
                     collapseSelectionSN();
-                }
-                if (action) {
-                    action();
-                    collapseSelectionSN();
+                } else {
+                    if (command) {
+                        document.execCommand(command, false, value);
+                        collapseSelectionSN();
+                    }
+                    if (action) {
+                        action();
+                        collapseSelectionSN();
+                    }
                 }
                 subNoteEditor.focus();
             });
@@ -1608,6 +1617,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return [startBlock]; // Fallback
     }
+
+    function applyIndentation(blocks, indent) {
+        const sel = window.getSelection();
+        const anchor = sel && sel.anchorNode ? (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement) : null;
+        const callout = anchor ? anchor.closest('.note-callout') : null;
+        if (!callout) return false;
+
+        const targets = blocks.filter(block => block && callout.contains(block) && block !== callout);
+        if (targets.length === 0) return true;
+
+        const step = 24;
+        targets.forEach(block => {
+            const current = parseInt(block.style.marginInlineStart) || 0;
+            if (indent) {
+                block.style.marginInlineStart = `${current + step}px`;
+            } else {
+                const newVal = Math.max(0, current - step);
+                if (newVal === 0) {
+                    block.style.removeProperty('margin-inline-start');
+                } else {
+                    block.style.marginInlineStart = `${newVal}px`;
+                }
+            }
+        });
+        return true;
+    }
     
     function setupEditorToolbar() {
         editorToolbar.innerHTML = ''; // Clear existing toolbar
@@ -1632,15 +1667,24 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.innerHTML = content;
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (command) {
-                    document.execCommand(command, false, value);
-                    // Collapse the selection after applying the command
+                if (command === 'indent' || command === 'outdent') {
+                    const blocks = getSelectedBlockElements();
+                    const handled = applyIndentation(blocks, command === 'indent');
+                    if (!handled) {
+                        document.execCommand(command, false, value);
+                    }
                     collapseSelection(notesEditor);
-                }
-                if (action) {
-                    action();
-                    // Collapse again after custom actions
-                    collapseSelection(notesEditor);
+                } else {
+                    if (command) {
+                        document.execCommand(command, false, value);
+                        // Collapse the selection after applying the command
+                        collapseSelection(notesEditor);
+                    }
+                    if (action) {
+                        action();
+                        // Collapse again after custom actions
+                        collapseSelection(notesEditor);
+                    }
                 }
                 notesEditor.focus();
             });
