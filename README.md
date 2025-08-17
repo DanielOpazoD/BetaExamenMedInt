@@ -12,3 +12,7 @@ This contains everything you need to run your app locally.
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+### Features
+
+- Nueva herramienta en el editor para redimensionar lateralmente notas con fondo de color mediante el botón ↔️ de la barra de herramientas.

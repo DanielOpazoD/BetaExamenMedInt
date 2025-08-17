@@ -737,6 +737,12 @@ table.resizable-table .table-resize-handle {
     padding: 8px;
     margin: 8px 0;
 }
+.note-resizable {
+    resize: horizontal;
+    overflow: auto;
+    display: inline-block;
+    max-width: 100%;
+}
 .note-blue { background-color: #dbeafe; border-color: #3b82f6; }
 .note-green { background-color: #d1fae5; border-color: #10b981; }
 .note-yellow { background-color: #fef9c3; border-color: #eab308; }
