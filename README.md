@@ -16,3 +16,4 @@ This contains everything you need to run your app locally.
 ### Features
 
 - Nueva herramienta en el editor para redimensionar lateralmente notas o bloques HTML insertados mediante el botón ↔️ de la barra de herramientas.
+- Herramienta de IA "Importancia clínica" que analiza la nota actual y genera un bloque HTML con los puntos clínicos más relevantes.
