@@ -890,6 +890,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentLightboxIndex = 0;
     let currentNoteRow = null;
     let activeSubnoteLink = null;
+    let currentInlineNoteIcon = 'ℹ️';
     let editingQuickNote = false;
     let savedEditorSelection = null;
     let currentCallout = null;
@@ -2076,8 +2077,24 @@ document.addEventListener('DOMContentLoaded', function () {
         // El botón ahora crea una sub-nota en lugar de un Post-it
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
 
-        const inlineNoteBtn = createButton('Insertar nota en línea', '💡', null, null, insertInlineNoteIcon);
+        const inlineNoteBtn = createButton('Insertar nota en línea', currentInlineNoteIcon, null, null, insertInlineNoteIcon);
         editorToolbar.appendChild(inlineNoteBtn);
+
+        // Selector de iconos predefinidos para las notas en línea
+        const inlineIconSelect = document.createElement('select');
+        inlineIconSelect.className = 'toolbar-select';
+        ['ℹ️','❓','💡','🔖','⁎','🧩','🗒️'].forEach(icon => {
+            const opt = document.createElement('option');
+            opt.value = icon;
+            opt.textContent = icon;
+            inlineIconSelect.appendChild(opt);
+        });
+        inlineIconSelect.value = currentInlineNoteIcon;
+        inlineIconSelect.addEventListener('change', () => {
+            currentInlineNoteIcon = inlineIconSelect.value;
+            inlineNoteBtn.textContent = currentInlineNoteIcon;
+        });
+        editorToolbar.appendChild(inlineIconSelect);
 
         const aiBtn = createButton('Asistente de IA', '🤖', null, null, openAiToolsModal);
         editorToolbar.appendChild(aiBtn);
@@ -3108,7 +3125,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const icon = document.createElement('span');
         icon.className = 'inline-note';
         icon.dataset.subnoteId = uniqueId;
-        icon.textContent = '💡';
+        icon.textContent = currentInlineNoteIcon;
         icon.contentEditable = 'false';
         range.insertNode(icon);
         const spacer = document.createTextNode('\u00A0');
@@ -3137,6 +3154,19 @@ document.addEventListener('DOMContentLoaded', function () {
         const tooltip = document.createElement('div');
         tooltip.className = 'inline-note-tooltip';
         tooltip.innerHTML = subnote.content;
+        tooltip.addEventListener('mouseleave', () => hideInlineNoteTooltip(icon));
+        tooltip.addEventListener('dblclick', (e) => {
+            if (e.target.tagName === 'IMG') {
+                e.preventDefault();
+                const images = Array.from(tooltip.querySelectorAll('img')).map(img => ({
+                    element: img,
+                    url: img.src,
+                    caption: img.dataset.caption || ''
+                }));
+                const idx = images.findIndex(img => img.element === e.target);
+                openImageLightbox(images, idx);
+            }
+        });
         document.body.appendChild(tooltip);
         const rect = icon.getBoundingClientRect();
         tooltip.style.top = `${rect.bottom + window.scrollY + 4}px`;
@@ -3836,6 +3866,10 @@ document.addEventListener('DOMContentLoaded', function () {
         notesEditor.addEventListener('mouseout', (e) => {
             const icon = e.target.closest('.inline-note');
             if (icon) {
+                const related = e.relatedTarget;
+                if (related && (related === icon._tooltip || icon._tooltip?.contains(related))) {
+                    return;
+                }
                 hideInlineNoteTooltip(icon);
             }
         });
