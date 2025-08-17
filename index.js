@@ -306,7 +306,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const nextLightboxBtn = getElem('next-lightbox-btn');
     const lightboxImage = getElem('lightbox-image');
     const lightboxCaption = getElem('lightbox-caption');
-    const lightboxCaptionText = getElem('lightbox-caption-text');
+    const lightboxCaptionInput = getElem('lightbox-caption-input');
     const deleteCaptionBtn = getElem('delete-caption-btn');
     const zoomInLightboxBtn = getElem('zoom-in-lightbox-btn');
     const zoomOutLightboxBtn = getElem('zoom-out-lightbox-btn');
@@ -3307,9 +3307,6 @@ document.addEventListener('DOMContentLoaded', function () {
             lightboxImage.style.transformOrigin = 'center center';
             updateLightboxView();
             showModal(imageLightboxModal);
-            if (imageLightboxModal.requestFullscreen) {
-                imageLightboxModal.requestFullscreen().catch(() => {});
-            }
         } catch(e) {
             console.error("Could not parse image gallery data:", e);
             showAlert("No se pudo abrir la galería de imágenes. Los datos pueden estar corruptos.");
@@ -3332,13 +3329,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const caption = image.caption || '';
         const numbering = `(${currentLightboxIndex + 1} / ${lightboxImages.length})`;
         lightboxCaption.style.display = 'flex';
-        if (caption.trim()) {
-            lightboxCaptionText.textContent = `${caption.trim()} ${numbering}`;
-            deleteCaptionBtn.style.display = 'inline-block';
-        } else {
-            lightboxCaptionText.textContent = `Añadir nota... ${numbering}`;
-            deleteCaptionBtn.style.display = 'none';
-        }
+        lightboxCaptionInput.placeholder = `Añadir nota... ${numbering}`;
+        lightboxCaptionInput.value = caption.trim();
+        deleteCaptionBtn.style.display = caption.trim() ? 'inline-block' : 'none';
 
         prevLightboxBtn.style.display = currentLightboxIndex > 0 ? 'block' : 'none';
         nextLightboxBtn.style.display = currentLightboxIndex < lightboxImages.length - 1 ? 'block' : 'none';
@@ -4015,9 +4008,6 @@ document.addEventListener('DOMContentLoaded', function () {
         // Lightbox Listeners
         closeLightboxBtn.addEventListener('click', () => {
             hideModal(imageLightboxModal);
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            }
         });
         prevLightboxBtn.addEventListener('click', () => {
             if (currentLightboxIndex > 0) {
@@ -4034,9 +4024,6 @@ document.addEventListener('DOMContentLoaded', function () {
         imageLightboxModal.addEventListener('click', (e) => {
             if (e.target === imageLightboxModal || e.target.id === 'image-lightbox-content') {
                  hideModal(imageLightboxModal);
-                 if (document.fullscreenElement) {
-                     document.exitFullscreen();
-                 }
             }
         });
 
@@ -4074,14 +4061,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         }
-        if (lightboxCaption) {
-            lightboxCaption.addEventListener('click', (e) => {
-                if (e.target === deleteCaptionBtn) return;
+        if (lightboxCaptionInput) {
+            lightboxCaptionInput.addEventListener('change', () => {
                 const imgObj = lightboxImages[currentLightboxIndex];
                 if (!imgObj) return;
-                const newCaption = prompt('Nota al pie de la imagen:', imgObj.caption || '');
-                if (newCaption === null) return;
-                imgObj.caption = newCaption.trim();
+                imgObj.caption = lightboxCaptionInput.value.trim();
                 updateLightboxView();
                 if (activeGalleryLinkForLightbox) {
                     activeGalleryLinkForLightbox.dataset.images = JSON.stringify(lightboxImages);
@@ -4104,6 +4088,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (imgObj) {
                     imgObj.caption = '';
                     updateLightboxView();
+                    lightboxCaptionInput.value = '';
                     // Persist the updated images data back to the link and save note
                     if (activeGalleryLinkForLightbox) {
                         activeGalleryLinkForLightbox.dataset.images = JSON.stringify(lightboxImages);

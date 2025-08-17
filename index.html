@@ -478,7 +478,7 @@
 
     <!-- Modal for Image Lightbox Viewer -->
     <div id="image-lightbox-modal" class="modal-overlay">
-        <div id="image-lightbox-content" class="relative w-full h-full p-4 flex items-center justify-center">
+            <div id="image-lightbox-content" class="relative w-full h-full p-4 flex flex-col items-center justify-center">
             <button id="close-lightbox-btn" class="absolute top-4 right-4 text-white text-4xl font-bold z-20" style="text-shadow: 0 0 8px rgba(0,0,0,0.8);">&times;</button>
             <button id="prev-lightbox-btn" class="absolute left-4 top-1/2 -translate-y-1/2 text-white text-4xl font-bold z-20 p-4" style="text-shadow: 0 0 8px rgba(0,0,0,0.8);">&#10094;</button>
             <button id="next-lightbox-btn" class="absolute right-4 top-1/2 -translate-y-1/2 text-white text-4xl font-bold z-20 p-4" style="text-shadow: 0 0 8px rgba(0,0,0,0.8);">&#10095;</button>
@@ -499,10 +499,10 @@
             </div>
             <div class="relative max-w-[90vw] max-h-[85vh] overflow-auto">
                 <img id="lightbox-image" src="" alt="Vista de imagen" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-transform duration-200 ease-in-out">
-                <div id="lightbox-caption" class="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center text-white text-center text-sm p-2 rounded-lg" style="background-color: rgba(0,0,0,0.6);">
-                    <span id="lightbox-caption-text" class="flex-grow"></span>
-                    <button id="delete-caption-btn" class="ml-2 text-red-300 hover:text-red-500 text-lg font-bold">&times;</button>
-                </div>
+            </div>
+            <div id="lightbox-caption" class="mt-4 w-full max-w-[90vw] flex items-center text-white text-sm">
+                <input id="lightbox-caption-input" type="text" class="flex-grow p-2 rounded bg-black/60 placeholder-gray-300" placeholder="Añadir nota..." />
+                <button id="delete-caption-btn" class="ml-2 text-red-300 hover:text-red-500 text-lg font-bold">&times;</button>
             </div>
         </div>
     </div>
