@@ -15,4 +15,4 @@ This contains everything you need to run your app locally.
 
 ### Features
 
-- Nueva herramienta en el editor para redimensionar lateralmente notas con fondo de color mediante el botón ↔️ de la barra de herramientas.
+- Nueva herramienta en el editor para redimensionar lateralmente notas o bloques HTML insertados mediante el botón ↔️ de la barra de herramientas.

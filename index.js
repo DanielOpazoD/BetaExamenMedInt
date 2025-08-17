@@ -2058,16 +2058,16 @@ document.addEventListener('DOMContentLoaded', function () {
             const selection = window.getSelection();
             const node = selection && selection.focusNode;
             const element = node ? (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement) : null;
-            const callout = element ? element.closest('.note-callout') : null;
-            if (!callout) {
-                showAlert('Selecciona una nota para redimensionar.');
+            const block = element ? element.closest('.note-callout, div, blockquote') : null;
+            if (!block || block === notesEditor) {
+                showAlert('Selecciona un bloque para redimensionar.');
                 return;
             }
-            callout.classList.toggle('note-resizable');
-            if (callout.classList.contains('note-resizable')) {
-                callout.style.width = callout.offsetWidth + 'px';
+            block.classList.toggle('note-resizable');
+            if (block.classList.contains('note-resizable')) {
+                block.style.width = block.offsetWidth + 'px';
             } else {
-                callout.style.width = '';
+                block.style.width = '';
             }
         });
         editorToolbar.appendChild(resizeCalloutBtn);
