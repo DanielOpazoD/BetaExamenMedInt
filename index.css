@@ -745,3 +745,37 @@ table.resizable-table .table-resize-handle {
 .note-gray { background-color: #f3f4f6; border-color: #6b7280; }
 .note-shadow { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .predef-note-btn { margin:0; cursor:pointer; }
+
+/* Lamp hover note */
+.lamp-note {
+    position: relative;
+    display: inline-block;
+}
+
+.lamp-note-block {
+    display: block;
+}
+
+.lamp-note-icon {
+    cursor: pointer;
+    font: inherit;
+    line-height: 1;
+}
+
+.lamp-note-content {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 1.2em;
+    padding: 0.25em 0.5em;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font: inherit;
+    z-index: 2000;
+}
+
+.lamp-note:hover .lamp-note-content {
+    display: block;
+}
