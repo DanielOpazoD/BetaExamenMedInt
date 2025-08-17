@@ -9,6 +9,7 @@ import { GoogleGenAI } from "@google/genai";
 // inline IndexedDB implementation and keeps the rest of the code unchanged.
 import db from './db.js';
 import { makeTableResizable } from './table-resize.js';
+import { makeCalloutResizable } from './callout-resize.js';
 import { setupAdvancedSearchReplace } from './search-replace.js';
 import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
@@ -2186,6 +2187,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             currentCallout.classList.remove('note-shadow');
         }
+        initCalloutResize(currentCallout);
         const range = document.createRange();
         range.selectNodeContents(currentCallout);
         range.collapse(false);
@@ -2933,6 +2935,12 @@ document.addEventListener('DOMContentLoaded', function () {
         table.dataset.resizableInitialized = 'true';
     }
 
+    function initCalloutResize(callout) {
+        if (callout.dataset.resizableInitialized === 'true') return;
+        makeCalloutResizable(callout);
+        callout.dataset.resizableInitialized = 'true';
+    }
+
     function renderNotesList() {
         notesList.innerHTML = '';
         if (currentNotesArray.length === 0) {
@@ -2986,6 +2994,7 @@ document.addEventListener('DOMContentLoaded', function () {
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
         notesEditor.querySelectorAll('table').forEach(initTableResize);
+        notesEditor.querySelectorAll('.note-callout').forEach(initCalloutResize);
 
         renderNotesList();
         notesEditor.focus();
@@ -3649,6 +3658,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     reader.onload = (e) => {
                         notesEditor.innerHTML = e.target.result;
                         notesEditor.querySelectorAll('table').forEach(initTableResize);
+                        notesEditor.querySelectorAll('.note-callout').forEach(initCalloutResize);
                     };
                     reader.readAsText(file);
                 }
@@ -4269,6 +4279,7 @@ document.addEventListener('DOMContentLoaded', function () {
         loadState();
         setupEventListeners();
         document.querySelectorAll('table').forEach(initTableResize);
+        document.querySelectorAll('.note-callout').forEach(initCalloutResize);
         applyTheme(document.documentElement.dataset.theme || 'default');
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();

@@ -732,10 +732,23 @@ table.resizable-table .table-resize-handle {
 
 /* Note callout styles */
 .note-callout {
+    position: relative;
     border-radius: 8px;
     border: 2px solid var(--border-color);
     padding: 8px;
     margin: 8px 0;
+}
+.note-callout .callout-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 6px;
+    height: 100%;
+    cursor: ew-resize;
+    background: transparent;
+    border-right: 2px solid var(--text-muted);
+    opacity: 0.7;
+    box-sizing: border-box;
 }
 .note-blue { background-color: #dbeafe; border-color: #3b82f6; }
 .note-green { background-color: #d1fae5; border-color: #10b981; }
