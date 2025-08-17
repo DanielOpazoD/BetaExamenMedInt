@@ -891,6 +891,9 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentNoteRow = null;
     let activeSubnoteLink = null;
     let editingQuickNote = false;
+    const inlineNoteIcons = ['ℹ️','❓','💡','🔖','⁎','🧩','🗒️'];
+    let currentInlineNoteIcon = 'ℹ️';
+    let inlineNoteSize = 0.8;
     let savedEditorSelection = null;
     let currentCallout = null;
     let aiToolsGeneratedText = '';
@@ -2076,8 +2079,63 @@ document.addEventListener('DOMContentLoaded', function () {
         // El botón ahora crea una sub-nota en lugar de un Post-it
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
 
-        const inlineNoteBtn = createButton('Insertar nota en línea', '💡', null, null, insertInlineNoteIcon);
-        editorToolbar.appendChild(inlineNoteBtn);
+        const inlineNoteDropdown = document.createElement('div');
+        inlineNoteDropdown.className = 'symbol-dropdown';
+
+        const inlineNoteBtn = createButton('Insertar nota en línea', currentInlineNoteIcon, null, null, insertInlineNoteIcon);
+        inlineNoteDropdown.appendChild(inlineNoteBtn);
+
+        const inlineNoteCaret = document.createElement('button');
+        inlineNoteCaret.className = 'toolbar-btn';
+        inlineNoteCaret.innerHTML = '▾';
+        inlineNoteDropdown.appendChild(inlineNoteCaret);
+
+        const inlineNoteContent = document.createElement('div');
+        inlineNoteContent.className = 'symbol-dropdown-content';
+
+        inlineNoteIcons.forEach((sym) => {
+            const sBtn = document.createElement('button');
+            sBtn.className = 'symbol-btn';
+            sBtn.textContent = sym;
+            sBtn.addEventListener('click', () => {
+                currentInlineNoteIcon = sym;
+                inlineNoteBtn.innerHTML = sym;
+                inlineNoteContent.classList.remove('visible');
+                insertInlineNoteIcon();
+            });
+            inlineNoteContent.appendChild(sBtn);
+        });
+
+        const sizeLabel = document.createElement('label');
+        sizeLabel.textContent = 'Tamaño';
+        sizeLabel.style.display = 'block';
+        sizeLabel.style.marginTop = '4px';
+
+        const sizeInput = document.createElement('input');
+        sizeInput.type = 'range';
+        sizeInput.min = '0.5';
+        sizeInput.max = '1.5';
+        sizeInput.step = '0.1';
+        sizeInput.value = inlineNoteSize;
+        sizeInput.addEventListener('input', () => {
+            inlineNoteSize = parseFloat(sizeInput.value);
+        });
+
+        inlineNoteContent.appendChild(sizeLabel);
+        inlineNoteContent.appendChild(sizeInput);
+
+        inlineNoteDropdown.appendChild(inlineNoteContent);
+
+        inlineNoteCaret.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                if (d !== inlineNoteContent) d.classList.remove('visible');
+            });
+            inlineNoteContent.classList.toggle('visible');
+        });
+
+        editorToolbar.appendChild(inlineNoteDropdown);
 
         const aiBtn = createButton('Asistente de IA', '🤖', null, null, openAiToolsModal);
         editorToolbar.appendChild(aiBtn);
@@ -3105,10 +3163,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!selection.rangeCount) return;
         const range = selection.getRangeAt(0);
         const uniqueId = `inline-note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const icon = document.createElement('span');
+        const icon = document.createElement('sup');
         icon.className = 'inline-note';
         icon.dataset.subnoteId = uniqueId;
-        icon.textContent = '💡';
+        icon.textContent = currentInlineNoteIcon;
+        icon.style.fontSize = inlineNoteSize + 'em';
         icon.contentEditable = 'false';
         range.insertNode(icon);
         const spacer = document.createTextNode('\u00A0');
@@ -3134,6 +3193,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!noteData || !noteData.postits) return;
         const subnote = noteData.postits[subnoteId];
         if (!subnote || !subnote.content) return;
+        if (icon._tooltip) return;
         const tooltip = document.createElement('div');
         tooltip.className = 'inline-note-tooltip';
         tooltip.innerHTML = subnote.content;
@@ -3142,6 +3202,14 @@ document.addEventListener('DOMContentLoaded', function () {
         tooltip.style.top = `${rect.bottom + window.scrollY + 4}px`;
         tooltip.style.left = `${rect.left + window.scrollX}px`;
         icon._tooltip = tooltip;
+
+        tooltip.addEventListener('mouseleave', () => hideInlineNoteTooltip(icon));
+        tooltip.addEventListener('dblclick', (e) => {
+            const img = e.target.closest('img');
+            if (img) {
+                openImageLightbox([{ url: img.src, caption: img.alt || '' }]);
+            }
+        });
     }
 
     function hideInlineNoteTooltip(icon) {
@@ -3836,6 +3904,10 @@ document.addEventListener('DOMContentLoaded', function () {
         notesEditor.addEventListener('mouseout', (e) => {
             const icon = e.target.closest('.inline-note');
             if (icon) {
+                const to = e.relatedTarget;
+                if (icon._tooltip && to && icon._tooltip.contains(to)) {
+                    return;
+                }
                 hideInlineNoteTooltip(icon);
             }
         });
@@ -3990,6 +4062,18 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
+        if (lightboxImage) {
+            lightboxImage.addEventListener('dblclick', () => {
+                if (imageLightboxModal.requestFullscreen) {
+                    if (!document.fullscreenElement) {
+                        imageLightboxModal.requestFullscreen();
+                    } else {
+                        document.exitFullscreen();
+                    }
+                }
+            });
+        }
+
         // Additional Lightbox controls
         if (zoomInLightboxBtn) {
             zoomInLightboxBtn.addEventListener('click', (e) => {
@@ -4027,11 +4111,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if (lightboxCaption) {
             lightboxCaption.addEventListener('click', (e) => {
                 if (e.target === deleteCaptionBtn) return;
+                lightboxCaptionText.contentEditable = 'true';
+                lightboxCaptionText.focus();
+            });
+            lightboxCaptionText.addEventListener('blur', () => {
+                lightboxCaptionText.contentEditable = 'false';
                 const imgObj = lightboxImages[currentLightboxIndex];
                 if (!imgObj) return;
-                const newCaption = prompt('Nota al pie de la imagen:', imgObj.caption || '');
-                if (newCaption === null) return;
-                imgObj.caption = newCaption.trim();
+                imgObj.caption = lightboxCaptionText.textContent.trim();
                 updateLightboxView();
                 if (activeGalleryLinkForLightbox) {
                     activeGalleryLinkForLightbox.dataset.images = JSON.stringify(lightboxImages);
