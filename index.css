@@ -244,6 +244,7 @@
             min-height: 26px;
         }
         .toolbar-btn:hover { background-color: var(--bg-tertiary); }
+        .toolbar-btn.active { background-color: var(--bg-tertiary); }
         .toolbar-select {
             font-size: 12px;
             background-color: var(--bg-secondary);
