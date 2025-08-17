@@ -228,9 +228,9 @@
     cursor: pointer;
     color: inherit;
 }
-/* Icono de nota en línea como superíndice; tamaño ajustable */
+/* Icono de nota en línea como subíndice; tamaño ajustable */
 .inline-note {
-    vertical-align: super;
+    vertical-align: sub;
     font-size: var(--inline-note-size, 0.75em);
     cursor: pointer;
     color: inherit;
