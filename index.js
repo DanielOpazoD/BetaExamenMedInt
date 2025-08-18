@@ -3248,7 +3248,42 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    const tooltipHideDelay = 300;
+    const tooltipHideMargin = 8;
+    let lastMousePos = { x: 0, y: 0 };
+    document.addEventListener('mousemove', (e) => {
+        lastMousePos.x = e.clientX;
+        lastMousePos.y = e.clientY;
+    });
+
+    function scheduleHideInlineNoteTooltip(icon) {
+        if (icon._hideTimeout) {
+            clearTimeout(icon._hideTimeout);
+        }
+        icon._hideTimeout = setTimeout(() => {
+            const tooltip = icon._tooltip;
+            if (!tooltip) return;
+            const rect = tooltip.getBoundingClientRect();
+            const x = lastMousePos.x;
+            const y = lastMousePos.y;
+            const withinX = x >= rect.left - tooltipHideMargin && x <= rect.right + tooltipHideMargin;
+            const withinY = y >= rect.top - tooltipHideMargin && y <= rect.bottom + tooltipHideMargin;
+            if (withinX && withinY) {
+                scheduleHideInlineNoteTooltip(icon);
+            } else {
+                hideInlineNoteTooltip(icon);
+            }
+        }, tooltipHideDelay);
+    }
+
     function showInlineNoteTooltip(icon) {
+        if (icon._tooltip) {
+            if (icon._hideTimeout) {
+                clearTimeout(icon._hideTimeout);
+                delete icon._hideTimeout;
+            }
+            return;
+        }
         const subnoteId = icon.dataset.subnoteId || icon.dataset.postitId;
         const noteData = currentNotesArray[activeNoteIndex];
         if (!noteData || !noteData.postits) return;
@@ -3257,7 +3292,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const tooltip = document.createElement('div');
         tooltip.className = 'inline-note-tooltip';
         tooltip.innerHTML = subnote.content;
-        tooltip.addEventListener('mouseleave', () => hideInlineNoteTooltip(icon));
+        tooltip.addEventListener('mouseenter', () => {
+            if (icon._hideTimeout) {
+                clearTimeout(icon._hideTimeout);
+                delete icon._hideTimeout;
+            }
+        });
+        tooltip.addEventListener('mouseleave', () => scheduleHideInlineNoteTooltip(icon));
         tooltip.addEventListener('dblclick', (e) => {
             if (e.target.tagName === 'IMG') {
                 e.preventDefault();
@@ -3278,6 +3319,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function hideInlineNoteTooltip(icon) {
+        if (icon._hideTimeout) {
+            clearTimeout(icon._hideTimeout);
+            delete icon._hideTimeout;
+        }
         if (icon._tooltip) {
             icon._tooltip.remove();
             delete icon._tooltip;
@@ -3973,7 +4018,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (related && (related === icon._tooltip || icon._tooltip?.contains(related))) {
                     return;
                 }
-                hideInlineNoteTooltip(icon);
+                scheduleHideInlineNoteTooltip(icon);
             }
         });
 
