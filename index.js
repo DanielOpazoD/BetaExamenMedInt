@@ -2194,6 +2194,17 @@ document.addEventListener('DOMContentLoaded', function () {
             notesEditor.focus();
         });
         editorToolbar.appendChild(floatImageBtn);
+
+        const sideBySideBtn = createButton('Insertar dos imágenes lado a lado', '🖼️🖼️', null, null, () => {
+            const url1 = prompt('URL de la primera imagen:');
+            if (!url1) return;
+            const url2 = prompt('URL de la segunda imagen:');
+            if (!url2) return;
+            const html = `<div class="image-row"><img src="${url1}"><img src="${url2}"></div>`;
+            document.execCommand('insertHTML', false, html);
+            saveState();
+        });
+        editorToolbar.appendChild(sideBySideBtn);
         
         const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
         editorToolbar.appendChild(createButton('Crear Galería de Imágenes', gallerySVG, null, null, openGalleryLinkEditor));

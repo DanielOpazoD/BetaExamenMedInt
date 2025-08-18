@@ -150,6 +150,14 @@
         #notes-editor:focus { outline: none; }
         #notes-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; cursor: pointer; }
         #notes-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
+        #notes-editor .image-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+        #notes-editor .image-row img {
+            flex: 1;
+            width: 100%;
+        }
 
         /* Style the sub-note editor similar to the main notes editor */
         #subnote-editor {
@@ -164,6 +172,14 @@
         #subnote-editor:focus { outline: none; }
         #subnote-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; cursor: pointer; }
         #subnote-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
+        #subnote-editor .image-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+        #subnote-editor .image-row img {
+            flex: 1;
+            width: 100%;
+        }
 
         /* Smaller buttons for the sub-note action bar */
         #subnote-modal-actions button {
