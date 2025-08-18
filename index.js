@@ -1211,6 +1211,41 @@ document.addEventListener('DOMContentLoaded', function () {
         selectedImageForResize = img;
     }
 
+    /**
+     * Wraps at least two selected images in a flex container so they appear side by side.
+     */
+    function wrapSelectedImagesSideBySide() {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        const contents = range.cloneContents();
+        const imgCount = contents.querySelectorAll('img').length;
+        if (imgCount < 2) {
+            alertMessage.textContent = 'Selecciona al menos dos imágenes para alinearlas en fila.';
+            alertTitle.textContent = 'Imágenes insuficientes';
+            showModal(alertModal);
+            return;
+        }
+        const fragment = range.extractContents();
+        const div = document.createElement('div');
+        div.className = 'image-row';
+        div.appendChild(fragment);
+        // Replace paragraphs containing only an image with the image itself
+        div.querySelectorAll('p').forEach(p => {
+            if (p.childElementCount === 1 && p.firstElementChild.tagName === 'IMG') {
+                div.replaceChild(p.firstElementChild, p);
+            }
+        });
+        range.insertNode(div);
+        // Move caret after the inserted container
+        sel.removeAllRanges();
+        const newRange = document.createRange();
+        newRange.setStartAfter(div);
+        newRange.collapse(true);
+        sel.addRange(newRange);
+        notesEditor.focus();
+    }
+
     // When loading a note into the editor, ensure any existing floating
     // images become draggable again.  This runs after setting the editor's
     // innerHTML in loadNoteIntoEditor().
@@ -2194,7 +2229,10 @@ document.addEventListener('DOMContentLoaded', function () {
             notesEditor.focus();
         });
         editorToolbar.appendChild(floatImageBtn);
-        
+
+        const sideBySideBtn = createButton('Alinear imágenes en fila', '🖼️🖼️', null, null, wrapSelectedImagesSideBySide);
+        editorToolbar.appendChild(sideBySideBtn);
+
         const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
         editorToolbar.appendChild(createButton('Crear Galería de Imágenes', gallerySVG, null, null, openGalleryLinkEditor));
 

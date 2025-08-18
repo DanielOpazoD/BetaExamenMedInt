@@ -151,6 +151,18 @@
         #notes-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; cursor: pointer; }
         #notes-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
 
+        /* Display multiple images in a row */
+        #notes-editor .image-row {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        #notes-editor .image-row img {
+            flex: 1 1 0;
+            max-width: 100%;
+            height: auto;
+        }
+
         /* Style the sub-note editor similar to the main notes editor */
         #subnote-editor {
             border: 1px solid var(--border-color);
