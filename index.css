@@ -758,6 +758,23 @@ table.resizable-table .table-resize-handle {
             .topic-print-wrapper:first-child {
                 page-break-before: auto;
             }
+            /* Ensure side-by-side images print in the same row */
+            #notes-editor .image-row,
+            #print-area .image-row {
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: nowrap;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            #notes-editor .image-row img,
+            #print-area .image-row img {
+                flex: 1 1 0;
+                max-width: 100%;
+                height: auto;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
             #print-index {
                 page-break-after: always;
             }
