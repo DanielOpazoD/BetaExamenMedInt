@@ -804,3 +804,14 @@ table.resizable-table .table-resize-handle {
 .note-gray { background-color: #f3f4f6; border-color: #6b7280; }
 .note-shadow { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .predef-note-btn { margin:0; cursor:pointer; }
+
+#drop-caret {
+    display: inline-block;
+    width: 1px;
+    height: 1em;
+    background: var(--btn-primary-bg);
+    vertical-align: bottom;
+}
+.img-dragging {
+    opacity: 0.6;
+}

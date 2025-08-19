@@ -12,6 +12,7 @@ import { makeTableResizable } from './table-resize.js';
 import { setupAdvancedSearchReplace } from './search-replace.js';
 import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
+import { enableInlineImageDrag } from './inline-image-drag.js';
 
 const pdfjsLib = typeof window !== 'undefined' ? window['pdfjsLib'] : null;
 if (pdfjsLib) {
@@ -112,6 +113,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const notesModal = getElem('notes-modal');
     const notesModalTitle = getElem('notes-modal-title');
     const notesEditor = getElem('notes-editor');
+    enableInlineImageDrag(notesEditor);
     const editorToolbar = notesModal.querySelector('.editor-toolbar');
     const saveNoteBtn = getElem('save-note-btn');
     const saveAndCloseNoteBtn = getElem('save-and-close-note-btn');
@@ -324,6 +326,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const subNoteModal = getElem('subnote-modal');
     const subNoteTitle = getElem('subnote-title');
     const subNoteEditor = getElem('subnote-editor');
+    enableInlineImageDrag(subNoteEditor);
     const subNoteToolbar = getElem('subnote-toolbar');
     const saveCloseSubnoteBtn = getElem('save-close-subnote-btn');
     const saveSubnoteBtn = getElem('save-subnote-btn');
