@@ -12,6 +12,7 @@ import { makeTableResizable } from './table-resize.js';
 import { setupAdvancedSearchReplace } from './search-replace.js';
 import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
+import { setupInlineImageDrag } from './image-drag-inline.js';
 
 const pdfjsLib = typeof window !== 'undefined' ? window['pdfjsLib'] : null;
 if (pdfjsLib) {
@@ -4570,6 +4571,8 @@ document.addEventListener('DOMContentLoaded', function () {
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();
         setupCloudIntegration();
+        setupInlineImageDrag(notesEditor);
+        if (subNoteEditor) setupInlineImageDrag(subNoteEditor);
     }
 
     init();
