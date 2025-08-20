@@ -804,3 +804,49 @@ table.resizable-table .table-resize-handle {
 .note-gray { background-color: #f3f4f6; border-color: #6b7280; }
 .note-shadow { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .predef-note-btn { margin:0; cursor:pointer; }
+/* Print-friendly grid for cards */
+@page {
+    size: A4 portrait;
+    margin: 12mm;
+}
+@page letter {
+    size: 8.5in 11in;
+    margin: 12mm;
+}
+@media print {
+    /* Switch to letter size when data-paper="letter" is present on html */
+    html[data-paper="letter"] {
+        page: letter;
+    }
+
+    *, *::before, *::after {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    body {
+        margin: 0;
+    }
+
+    .print-scale {
+        /* Controlled internal scaling instead of print dialog zoom */
+        transform-origin: top left;
+        scale: var(--print-scale, 1);
+        width: calc(100% / var(--print-scale, 1));
+    }
+
+    .print-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--print-card-gap, 8mm);
+    }
+    .print-grid > * {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    textarea {
+        overflow: visible !important;
+        resize: none !important;
+    }
+}
