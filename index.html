@@ -432,6 +432,17 @@
         </div>
     </div>
 
+    <div id="selected-html-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-2xl">
+            <h3 class="text-xl font-bold mb-4">HTML del contenido seleccionado</h3>
+            <textarea id="selected-html-output" class="w-full h-40 p-2 mb-4 border border-border-color rounded-lg bg-secondary font-mono" readonly></textarea>
+            <div class="flex justify-end gap-2">
+                <button id="copy-selected-html-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Copiar</button>
+                <button id="close-selected-html-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="note-info-modal" class="modal-overlay">
         <div class="modal-content w-full max-w-sm">
             <h3 class="text-lg font-bold mb-4">Información de la Nota</h3>

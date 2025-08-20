@@ -206,6 +206,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const htmlFavoritesList = getElem('html-favorites-list');
     let currentHtmlEditor = null;
 
+    const selectedHtmlModal = getElem('selected-html-modal');
+    const selectedHtmlOutput = getElem('selected-html-output');
+    const copySelectedHtmlBtn = getElem('copy-selected-html-btn');
+    const closeSelectedHtmlBtn = getElem('close-selected-html-btn');
+
     // Table grid element
     const tableGridEl = getElem('table-grid');
 
@@ -751,6 +756,21 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             currentHtmlEditor = subNoteEditor;
             openHtmlCodeModal();
+        }));
+
+        subNoteToolbar.appendChild(createSNButton('Ver HTML del seleccionado', '&lt;HTML&gt;', null, null, () => {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) {
+                showAlert('No hay selección para mostrar.');
+                return;
+            }
+            const range = selection.getRangeAt(0);
+            const container = document.createElement('div');
+            container.appendChild(range.cloneContents());
+            selectedHtmlOutput.value = container.innerHTML;
+            currentHtmlEditor = subNoteEditor;
+            showModal(selectedHtmlModal);
+            setTimeout(() => selectedHtmlOutput.select(), 0);
         }));
 
         subNoteToolbar.appendChild(createSNSeparator());
@@ -2112,6 +2132,22 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(htmlCodeBtn);
 
+        const viewHtmlBtn = createButton('Ver HTML del seleccionado', '&lt;HTML&gt;', null, null, () => {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) {
+                showAlert('No hay selección para mostrar.');
+                return;
+            }
+            const range = selection.getRangeAt(0);
+            const container = document.createElement('div');
+            container.appendChild(range.cloneContents());
+            selectedHtmlOutput.value = container.innerHTML;
+            currentHtmlEditor = notesEditor;
+            showModal(selectedHtmlModal);
+            setTimeout(() => selectedHtmlOutput.select(), 0);
+        });
+        editorToolbar.appendChild(viewHtmlBtn);
+
         const enableLeftResize = (el) => {
             const threshold = 5;
             let resizing = false;
@@ -2746,6 +2782,17 @@ document.addEventListener('DOMContentLoaded', function () {
         hideModal(htmlCodeModal);
         if (currentHtmlEditor) currentHtmlEditor.focus();
         savedEditorSelection = null;
+    });
+
+    copySelectedHtmlBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(selectedHtmlOutput.value || '');
+        hideModal(selectedHtmlModal);
+        if (currentHtmlEditor) currentHtmlEditor.focus();
+    });
+
+    closeSelectedHtmlBtn.addEventListener('click', () => {
+        hideModal(selectedHtmlModal);
+        if (currentHtmlEditor) currentHtmlEditor.focus();
     });
 
     saveHtmlFavoriteBtn.addEventListener('click', async () => {
