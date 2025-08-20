@@ -895,6 +895,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let savedEditorSelection = null;
     let currentCallout = null;
     let aiToolsGeneratedText = '';
+    let lineEraseMode = false;
 
     // Image selection handling within the sub-note editor
     if (subNoteEditor) {
@@ -909,6 +910,14 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+
+    notesEditor.addEventListener('click', (e) => {
+        if (!lineEraseMode) return;
+        const block = e.target.closest('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details');
+        if (block && notesEditor.contains(block)) {
+            block.innerHTML = '<br>';
+        }
+    });
 
     // ------------------------------------------------------------------------
     // Icon Manager and Character Manager Functions
@@ -2061,7 +2070,31 @@ document.addEventListener('DOMContentLoaded', function () {
         const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
         editorToolbar.appendChild(createButton('Disminuir sangría', outdentSVG, 'outdent'));
         editorToolbar.appendChild(createButton('Aumentar sangría', indentSVG, 'indent'));
-        
+
+        const insertBlankLineAbove = () => {
+            let blocks = getSelectedBlockElements();
+            if (blocks.length === 0) {
+                document.execCommand('formatBlock', false, 'p');
+                blocks = getSelectedBlockElements();
+            }
+            const first = blocks[0];
+            if (first && notesEditor.contains(first)) {
+                const tag = first.tagName === 'LI' ? 'li' : 'p';
+                const blank = document.createElement(tag);
+                blank.innerHTML = '<br>';
+                first.parentNode.insertBefore(blank, first);
+            }
+        };
+
+        editorToolbar.appendChild(createButton('Insertar línea en blanco arriba', '⬆️⏎', null, null, insertBlankLineAbove));
+
+        const eraseLineBtn = createButton('Borrar contenido con clic', '🧹', null, null, () => {
+            lineEraseMode = !lineEraseMode;
+            notesEditor.style.cursor = lineEraseMode ? 'crosshair' : '';
+            eraseLineBtn.classList.toggle('active', lineEraseMode);
+        });
+        editorToolbar.appendChild(eraseLineBtn);
+
         const collapsibleListSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-tree w-5 h-5"><path d="M21 7H9"/><path d="M21 12H9"/><path d="M21 17H9"/><path d="M3 17v-6a4 4 0 0 1 4-4h4"/></svg>`;
         const collapsibleListHTML = `<details class="collapsible-list"><summary>Elemento</summary><div>Texto...<br></div></details><p><br></p>`;
 
