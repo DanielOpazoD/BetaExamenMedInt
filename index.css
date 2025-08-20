@@ -406,6 +406,14 @@ table.resizable-table .table-resize-handle {
     border-radius: 0.25rem;
 }
 
+/* Caption below images */
+.image-caption {
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
 /* Table size selection grid */
 #table-grid {
     display: grid;
