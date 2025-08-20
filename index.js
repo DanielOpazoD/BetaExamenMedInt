@@ -204,6 +204,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveHtmlFavoriteBtn = getElem('save-html-favorite-btn');
     const htmlFavoriteName = getElem('html-favorite-name');
     const htmlFavoritesList = getElem('html-favorites-list');
+    const importHtmlFavoritesBtn = getElem('import-html-favorites-btn');
+    const exportHtmlFavoritesBtn = getElem('export-html-favorites-btn');
+    const importHtmlFavoritesInput = getElem('html-favorites-file');
+    let editingHtmlFavoriteIndex = null;
     let currentHtmlEditor = null;
 
     const selectedHtmlModal = getElem('selected-html-modal');
@@ -2744,23 +2748,51 @@ document.addEventListener('DOMContentLoaded', function () {
     async function populateHtmlFavorites() {
         const favorites = await loadHtmlFavorites();
         htmlFavoritesList.innerHTML = '';
-        favorites.forEach(fav => {
+        favorites.forEach((fav, index) => {
+            const container = document.createElement('div');
+            container.className = 'flex items-center gap-1';
+
             const btn = document.createElement('button');
             btn.className = 'px-2 py-1 bg-secondary text-text-primary rounded border border-border-color hover:bg-bg-tertiary text-sm';
             btn.textContent = fav.name;
             btn.addEventListener('click', () => {
                 htmlCodeInput.value = fav.code;
             });
-            htmlFavoritesList.appendChild(btn);
+
+            const editBtn = document.createElement('button');
+            editBtn.className = 'text-xs text-blue-500 hover:underline';
+            editBtn.textContent = 'Editar';
+            editBtn.addEventListener('click', () => {
+                htmlFavoriteName.value = fav.name;
+                htmlCodeInput.value = fav.code;
+                editingHtmlFavoriteIndex = index;
+                saveHtmlFavoriteBtn.textContent = 'Actualizar';
+            });
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'text-xs text-red-500 hover:underline';
+            deleteBtn.textContent = 'Eliminar';
+            deleteBtn.addEventListener('click', async () => {
+                favorites.splice(index, 1);
+                await db.set('keyvalue', { key: 'htmlFavorites', value: favorites });
+                await populateHtmlFavorites();
+            });
+
+            container.appendChild(btn);
+            container.appendChild(editBtn);
+            container.appendChild(deleteBtn);
+            htmlFavoritesList.appendChild(container);
         });
     }
 
     function openHtmlCodeModal() {
         htmlCodeInput.value = '';
-       htmlFavoriteName.value = '';
-       populateHtmlFavorites();
-       showModal(htmlCodeModal);
-       setTimeout(() => htmlCodeInput.focus(), 0);
+        htmlFavoriteName.value = '';
+        editingHtmlFavoriteIndex = null;
+        saveHtmlFavoriteBtn.textContent = 'Guardar';
+        populateHtmlFavorites();
+        showModal(htmlCodeModal);
+        setTimeout(() => htmlCodeInput.focus(), 0);
     }
 
     insertHtmlBtn.addEventListener('click', () => {
@@ -2776,12 +2808,16 @@ document.addEventListener('DOMContentLoaded', function () {
         hideModal(htmlCodeModal);
         if (currentHtmlEditor) currentHtmlEditor.focus();
         savedEditorSelection = null;
+        editingHtmlFavoriteIndex = null;
+        saveHtmlFavoriteBtn.textContent = 'Guardar';
     });
 
     cancelHtmlBtn.addEventListener('click', () => {
         hideModal(htmlCodeModal);
         if (currentHtmlEditor) currentHtmlEditor.focus();
         savedEditorSelection = null;
+        editingHtmlFavoriteIndex = null;
+        saveHtmlFavoriteBtn.textContent = 'Guardar';
     });
 
     copySelectedHtmlBtn.addEventListener('click', () => {
@@ -2800,10 +2836,47 @@ document.addEventListener('DOMContentLoaded', function () {
         const code = htmlCodeInput.value;
         if (!name || !code) return;
         const favorites = await loadHtmlFavorites();
-        favorites.push({ name, code });
+        if (editingHtmlFavoriteIndex !== null) {
+            favorites[editingHtmlFavoriteIndex] = { name, code };
+            editingHtmlFavoriteIndex = null;
+            saveHtmlFavoriteBtn.textContent = 'Guardar';
+        } else {
+            favorites.push({ name, code });
+        }
         await db.set('keyvalue', { key: 'htmlFavorites', value: favorites });
         await populateHtmlFavorites();
         htmlFavoriteName.value = '';
+    });
+
+    importHtmlFavoritesBtn.addEventListener('click', () => {
+        importHtmlFavoritesInput.click();
+    });
+
+    importHtmlFavoritesInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+            const text = await file.text();
+            const imported = JSON.parse(text);
+            if (Array.isArray(imported)) {
+                await db.set('keyvalue', { key: 'htmlFavorites', value: imported });
+                await populateHtmlFavorites();
+            }
+        } catch (err) {
+            console.error('Error importing HTML favorites:', err);
+        }
+        importHtmlFavoritesInput.value = '';
+    });
+
+    exportHtmlFavoritesBtn.addEventListener('click', async () => {
+        const favorites = await loadHtmlFavorites();
+        const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(favorites));
+        const a = document.createElement('a');
+        a.href = dataStr;
+        a.download = 'html-favorites.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     });
 
     function gatherNotesContext() {
