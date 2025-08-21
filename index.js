@@ -4737,6 +4737,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 case 'questions':
                     prompt = `En ${lang} y con un tono ${tone}, genera preguntas tipo examen con respuestas breves basadas en este contenido. Limita cada respuesta a ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
                     break;
+                case 'clinical':
+                    const currentDocHtml = notesEditor.innerHTML;
+                    prompt = `Analiza el siguiente documento médico en español. Identifica la enfermedad principal desde el primer <h1> o <h2>. Con esa enfermedad, redacta un bloque HTML con estilos inline que contenga un chip amarillo titulado \"Importancia clínica de la ENFERMEDAD\", seguido de 4 a 8 viñetas telegráficas con un icono cuadrado gris, subtítulo en negritas y texto breve. La última viñeta debe iniciar con \"Tratamiento:\" y mencionar los ámbitos principales. Prioriza la información del documento y complementa con conocimiento médico general si falta. Proporciona primero \"Razonamiento:\" y luego \"Respuesta:\". Devuelve solo el bloque HTML.\n\nDocumento:\n${currentDocHtml}`;
+                    break;
                 default:
                     prompt = `Responde en ${lang} con un tono ${tone} y no más de ${length} palabras a la siguiente consulta del usuario utilizando el contexto. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n\nContexto:\n${combinedContext}\n\nPregunta: ${userText}`;
             }
