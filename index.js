@@ -2549,7 +2549,8 @@ document.addEventListener('DOMContentLoaded', function () {
             state.sections[sectionId] = {
                 isCollapsed: row.classList.contains('collapsed'),
                 title: row.querySelector('.section-title').textContent,
-                note: row.dataset.sectionNote || ''
+                note: row.dataset.sectionNote || '',
+                coverImage: row.dataset.coverImage || ''
             };
         });
         
@@ -2618,6 +2619,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         headerRow.dataset.sectionNote = sectionData.note;
                         const noteIcon = headerRow.querySelector('.section-note-icon');
                         if (noteIcon) noteIcon.classList.add('has-note');
+                    }
+                    if (sectionData.coverImage) {
+                        headerRow.dataset.coverImage = sectionData.coverImage;
+                        const coverIcon = headerRow.querySelector('.section-cover-icon');
+                        if (coverIcon) coverIcon.classList.add('has-cover');
                     }
                     if (sectionData.isCollapsed) {
                         headerRow.classList.add('collapsed');
@@ -3578,6 +3584,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const rows = document.querySelectorAll('tr.section-header-row, tr[data-topic-id]');
         let currentOl = null;
         let counter = 1;
+        let lastElementWasCover = false;
 
         for (const row of rows) {
             if (row.classList.contains('section-header-row')) {
@@ -3587,6 +3594,25 @@ document.addEventListener('DOMContentLoaded', function () {
                 indexContainer.appendChild(header);
                 currentOl = document.createElement('ol');
                 indexContainer.appendChild(currentOl);
+
+                const cover = document.createElement('div');
+                cover.className = 'section-cover-page';
+                const titleEl = document.createElement('h1');
+                titleEl.textContent = sectionTitle;
+                cover.appendChild(titleEl);
+                const imgSrc = row.dataset.coverImage;
+                if (imgSrc) {
+                    const imgEl = document.createElement('img');
+                    imgEl.src = imgSrc;
+                    cover.appendChild(imgEl);
+                }
+                const authorEl = document.createElement('p');
+                authorEl.className = 'author-info';
+                authorEl.textContent = 'Dr Daniel Opazo, Medicina Interna, Universidad de Valparaíso, Chile 2025';
+                cover.appendChild(authorEl);
+                printArea.appendChild(cover);
+                lastElementWasCover = true;
+                continue;
             } else {
                 const topicId = row.dataset.topicId;
                 const title = row.cells[1]?.textContent.trim() || '';
@@ -3606,6 +3632,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 const topicWrapper = document.createElement('div');
                 topicWrapper.id = `print-${topicId}`;
                 topicWrapper.className = 'topic-print-wrapper';
+                if (lastElementWasCover) {
+                    topicWrapper.style.pageBreakBefore = 'auto';
+                    lastElementWasCover = false;
+                }
 
                 const backLink = document.createElement('a');
                 backLink.href = '#print-index';
@@ -3652,8 +3682,27 @@ document.addEventListener('DOMContentLoaded', function () {
         const sectionId = sectionHeaderRow.dataset.sectionHeader;
         const topicRows = document.querySelectorAll(`tr[data-section="${sectionId}"]`);
         const printArea = getElem('print-area');
-        printArea.innerHTML = ''; // Clear previous print content
+        printArea.innerHTML = '';
 
+        const cover = document.createElement('div');
+        cover.className = 'section-cover-page';
+        const titleText = sectionHeaderRow.querySelector('.section-title')?.textContent || '';
+        const titleEl = document.createElement('h1');
+        titleEl.textContent = titleText;
+        cover.appendChild(titleEl);
+        const imgSrc = sectionHeaderRow.dataset.coverImage;
+        if (imgSrc) {
+            const imgEl = document.createElement('img');
+            imgEl.src = imgSrc;
+            cover.appendChild(imgEl);
+        }
+        const authorEl = document.createElement('p');
+        authorEl.className = 'author-info';
+        authorEl.textContent = 'Dr Daniel Opazo, Medicina Interna, Universidad de Valparaíso, Chile 2025';
+        cover.appendChild(authorEl);
+        printArea.appendChild(cover);
+
+        let first = true;
         for (const row of topicRows) {
             const topicId = row.dataset.topicId;
             const topicData = await db.get('topics', topicId);
@@ -3661,6 +3710,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (topicData && topicData.notes && topicData.notes.length > 0) {
                 const topicWrapper = document.createElement('div');
                 topicWrapper.className = 'topic-print-wrapper';
+                if (first) {
+                    topicWrapper.style.pageBreakBefore = 'auto';
+                    first = false;
+                }
 
                 topicData.notes.forEach(note => {
                     const noteContent = document.createElement('div');
@@ -3675,8 +3728,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 printArea.appendChild(topicWrapper);
             }
         }
-        
-        if (printArea.innerHTML.trim() === '') {
+
+        if (!printArea.querySelector('.topic-print-wrapper')) {
+            printArea.innerHTML = '';
             await showAlert("No hay notas que imprimir en esta sección.");
             return;
         }
@@ -3727,6 +3781,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
+            // Cover image upload icon click
+            if (target.closest('.section-cover-icon')) {
+                e.stopPropagation();
+                const input = target.closest('.section-cover-icon').querySelector('.section-cover-input');
+                if (input) input.click();
+                return;
+            }
+
             // Note icon click
             if (target.closest('.note-icon')) {
                 e.stopPropagation();
@@ -3764,6 +3826,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 showModal(notesModal);
                 return;
+            }
+        });
+
+        tableBody.addEventListener('change', async (e) => {
+            const input = e.target.closest('.section-cover-input');
+            if (input && input.files && input.files[0]) {
+                const file = input.files[0];
+                const reader = new FileReader();
+                reader.onload = async () => {
+                    const headerRow = input.closest('tr.section-header-row');
+                    if (headerRow) {
+                        headerRow.dataset.coverImage = reader.result;
+                        const icon = headerRow.querySelector('.section-cover-icon');
+                        if (icon) icon.classList.add('has-cover');
+                        await saveState();
+                    }
+                    input.value = '';
+                };
+                reader.readAsDataURL(file);
             }
         });
 
