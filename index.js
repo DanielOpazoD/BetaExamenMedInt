@@ -3590,10 +3590,17 @@ document.addEventListener('DOMContentLoaded', function () {
         for (const row of rows) {
             if (row.classList.contains('section-header-row')) {
                 const sectionTitle = row.querySelector('.section-title')?.textContent || '';
+                const sectionId = row.dataset.sectionHeader;
+                const sectionTopicCount = document.querySelectorAll(`tr[data-section="${sectionId}"]`).length;
                 const header = document.createElement('h2');
                 header.textContent = sectionTitle;
+                const countSpanHeader = document.createElement('span');
+                countSpanHeader.textContent = ` (${sectionTopicCount})`;
+                countSpanHeader.className = 'section-topic-count';
+                header.appendChild(countSpanHeader);
                 indexContainer.appendChild(header);
                 currentOl = document.createElement('ol');
+                currentOl.start = counter;
                 indexContainer.appendChild(currentOl);
 
                 const cover = document.createElement('div');
@@ -3603,6 +3610,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 const titleEl = document.createElement('h1');
                 titleEl.textContent = sectionTitle;
+                const countSpan = document.createElement('span');
+                countSpan.textContent = ` (${sectionTopicCount})`;
+                countSpan.className = 'section-topic-count';
+                titleEl.appendChild(countSpan);
                 cover.appendChild(titleEl);
                 const imgSrc = row.dataset.coverImage;
                 if (imgSrc) {
@@ -3617,6 +3628,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const list = document.createElement('ol');
                 list.className = 'section-cover-topics';
+                list.start = counter;
                 cover.appendChild(list);
                 currentCoverList = list;
 
@@ -3633,7 +3645,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const li = document.createElement('li');
                     const link = document.createElement('a');
                     link.href = `#print-${topicId}`;
-                    link.textContent = `${counter}. ${title}`;
+                    link.textContent = title;
                     link.className = hasNotes ? 'topic-developed' : 'topic-pending';
                     li.appendChild(link);
                     currentOl.appendChild(li);
@@ -3643,7 +3655,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const liCover = document.createElement('li');
                     const linkCover = document.createElement('a');
                     linkCover.href = `#print-${topicId}`;
-                    linkCover.textContent = `- ${title} (${counter})`;
+                    linkCover.textContent = title;
                     linkCover.className = hasNotes ? 'topic-developed' : 'topic-pending';
                     liCover.appendChild(linkCover);
                     currentCoverList.appendChild(liCover);
@@ -3713,8 +3725,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const cover = document.createElement('div');
         cover.className = 'section-cover-page';
         const titleText = sectionHeaderRow.querySelector('.section-title')?.textContent || '';
+        const topicCount = topicRows.length;
         const titleEl = document.createElement('h1');
         titleEl.textContent = titleText;
+        const countSpan = document.createElement('span');
+        countSpan.textContent = ` (${topicCount})`;
+        countSpan.className = 'section-topic-count';
+        titleEl.appendChild(countSpan);
         cover.appendChild(titleEl);
         const imgSrc = sectionHeaderRow.dataset.coverImage;
         if (imgSrc) {
@@ -3729,6 +3746,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const list = document.createElement('ol');
         list.className = 'section-cover-topics';
+        const firstTopicId = topicRows[0]?.dataset.topicId;
+        if (firstTopicId) {
+            list.start = globalNumbers[firstTopicId];
+        }
         cover.appendChild(list);
 
         printArea.appendChild(cover);
@@ -3744,7 +3765,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const li = document.createElement('li');
             const link = document.createElement('a');
             link.href = `#print-${topicId}`;
-            link.textContent = `- ${title} (${globalNumbers[topicId]})`;
+            link.textContent = title;
             link.className = hasNotes ? 'topic-developed' : 'topic-pending';
             li.appendChild(link);
             list.appendChild(li);

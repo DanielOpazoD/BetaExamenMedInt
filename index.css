@@ -746,6 +746,10 @@ table.resizable-table .table-resize-handle {
             font-size: 2.5rem;
             font-weight: 700;
         }
+        .section-topic-count {
+            font-size: 0.6em;
+            font-weight: 400;
+        }
         .section-cover-page img {
             max-width: 100%;
             height: auto;
