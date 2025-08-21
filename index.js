@@ -4737,6 +4737,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 case 'questions':
                     prompt = `En ${lang} y con un tono ${tone}, genera preguntas tipo examen con respuestas breves basadas en este contenido. Limita cada respuesta a ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
                     break;
+                case 'importance':
+                    prompt = `Analiza el siguiente documento médico en formato HTML. Identifica la enfermedad principal a partir del primer encabezado <h1> o <h2>. Genera un bloque HTML con estilo inline que comience con un chip amarillo que diga "Importancia clínica de la ENFERMEDAD" seguido de una lista de 4 a 8 viñetas, cada una con un cuadrado gris como icono, un subtítulo en negrita y texto telegráfico de 1-2 líneas. La última viñeta debe resumir los principales ámbitos de tratamiento. Usa principalmente la información del documento y complementa solo si es necesario. Devuelve únicamente el bloque HTML. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
+                    break;
                 default:
                     prompt = `Responde en ${lang} con un tono ${tone} y no más de ${length} palabras a la siguiente consulta del usuario utilizando el contexto. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n\nContexto:\n${combinedContext}\n\nPregunta: ${userText}`;
             }
