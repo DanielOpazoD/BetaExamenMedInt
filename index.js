@@ -355,7 +355,6 @@ document.addEventListener('DOMContentLoaded', function () {
     function normalizePastedLists(html) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
-
         const allLis = Array.from(doc.querySelectorAll('li'));
         allLis.forEach(li => {
             const parent = li.parentElement;
@@ -377,12 +376,29 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
+        // Remove redundant nested lists that are direct children of another list
         doc.querySelectorAll('ul ul, ol ul, ul ol, ol ol').forEach(list => {
             const parent = list.parentElement;
             if (parent && (parent.tagName === 'UL' || parent.tagName === 'OL')) {
                 while (list.firstChild) parent.insertBefore(list.firstChild, list);
-                parent.removeChild(list);
+                list.remove();
             }
+        });
+
+        // Merge adjacent lists of the same type
+        const bodyChildren = Array.from(doc.body.children);
+        for (let i = 1; i < bodyChildren.length; i++) {
+            const prev = bodyChildren[i - 1];
+            const curr = bodyChildren[i];
+            if (prev.tagName && prev.tagName === curr.tagName && (curr.tagName === 'UL' || curr.tagName === 'OL')) {
+                while (curr.firstChild) prev.appendChild(curr.firstChild);
+                curr.remove();
+            }
+        }
+
+        // Remove empty list items
+        doc.querySelectorAll('li').forEach(li => {
+            if (!li.textContent.trim()) li.remove();
         });
 
         return doc.body.innerHTML;
