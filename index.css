@@ -126,6 +126,15 @@
              background-color: var(--btn-primary-bg);
              filter: brightness(1.15);
         }
+
+        .section-cover-icon.has-cover {
+            background-color: var(--btn-primary-bg);
+            color: var(--btn-primary-text);
+        }
+        .section-cover-icon.has-cover:hover {
+            background-color: var(--btn-primary-bg);
+            filter: brightness(1.15);
+        }
         
         .confidence-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #d1d5db; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; }
         html.dark .confidence-dot { border-color: #4b5563; }
@@ -729,6 +738,46 @@ table.resizable-table .table-resize-handle {
             font-size: 0.75rem;
         }
 
+        .back-to-section {
+            margin-left: 0.5rem;
+            font-size: 0.75rem;
+            text-decoration: none;
+        }
+
+        .section-cover-page {
+            text-align: center;
+            margin-top: 4rem;
+        }
+        .section-cover-page h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+        .section-topic-count {
+            font-size: 0.6em;
+            font-weight: 400;
+        }
+        .section-cover-page img {
+            max-width: 100%;
+            height: auto;
+            margin-top: 1.5rem;
+        }
+        .section-cover-page .author-info {
+            margin-top: 2rem;
+            font-weight: 600;
+        }
+
+        .section-cover-topics {
+            margin-top: 2rem;
+            text-align: left;
+            column-count: 2;
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .section-cover-topics li {
+            break-inside: avoid;
+        }
+
 
         @media print {
             html, body {
@@ -759,6 +808,15 @@ table.resizable-table .table-resize-handle {
                 page-break-before: always;
             }
             .topic-print-wrapper:first-child {
+                page-break-before: auto;
+            }
+            #print-index {
+                page-break-after: always;
+            }
+            .section-cover-page {
+                page-break-after: always;
+            }
+            .section-cover-page + .topic-print-wrapper {
                 page-break-before: auto;
             }
             /* Ensure side-by-side images print in the same row */
