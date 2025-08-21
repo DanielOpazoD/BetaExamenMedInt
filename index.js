@@ -3598,6 +3598,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const cover = document.createElement('div');
                 cover.className = 'section-cover-page';
+                if (printArea.children.length > 0) {
+                    cover.style.pageBreakBefore = 'always';
+                }
                 const titleEl = document.createElement('h1');
                 titleEl.textContent = sectionTitle;
                 cover.appendChild(titleEl);
@@ -3640,7 +3643,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const liCover = document.createElement('li');
                     const linkCover = document.createElement('a');
                     linkCover.href = `#print-${topicId}`;
-                    linkCover.textContent = `${title} (${counter})`;
+                    linkCover.textContent = `- ${title} (${counter})`;
                     linkCover.className = hasNotes ? 'topic-developed' : 'topic-pending';
                     liCover.appendChild(linkCover);
                     currentCoverList.appendChild(liCover);
@@ -3741,7 +3744,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const li = document.createElement('li');
             const link = document.createElement('a');
             link.href = `#print-${topicId}`;
-            link.textContent = `${title} (${globalNumbers[topicId]})`;
+            link.textContent = `- ${title} (${globalNumbers[topicId]})`;
             link.className = hasNotes ? 'topic-developed' : 'topic-pending';
             li.appendChild(link);
             list.appendChild(li);
