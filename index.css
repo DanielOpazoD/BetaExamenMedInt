@@ -862,3 +862,19 @@ table.resizable-table .table-resize-handle {
 .note-gray { background-color: #f3f4f6; border-color: #6b7280; }
 .note-shadow { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .predef-note-btn { margin:0; cursor:pointer; }
+/* Resizable elements */
+.resizable {
+    position: relative;
+    max-width: 100%;
+    min-width: 200px;
+}
+.resizable-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 8px;
+    height: 100%;
+    cursor: ew-resize;
+    background: rgba(0,0,0,0.2);
+    touch-action: none;
+}

@@ -9,9 +9,12 @@ import { GoogleGenAI } from "@google/genai";
 // inline IndexedDB implementation and keeps the rest of the code unchanged.
 import db from './db.js';
 import { makeTableResizable } from './table-resize.js';
+import { makeResizable, wrapSelectionAsResizable } from './div-resize.js';
 import { setupAdvancedSearchReplace } from './search-replace.js';
 import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
+window.makeResizable = makeResizable;
+window.wrapSelectionAsResizable = wrapSelectionAsResizable;
 
 const pdfjsLib = typeof window !== 'undefined' ? window['pdfjsLib'] : null;
 if (pdfjsLib) {
