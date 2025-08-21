@@ -3583,6 +3583,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const rows = document.querySelectorAll('tr.section-header-row, tr[data-topic-id]');
         let currentOl = null;
+        let currentCoverList = null;
         let counter = 1;
         let lastElementWasCover = false;
 
@@ -3610,6 +3611,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 authorEl.className = 'author-info';
                 authorEl.textContent = 'Dr Daniel Opazo, Medicina Interna, Universidad de Valparaíso, Chile 2025';
                 cover.appendChild(authorEl);
+
+                const list = document.createElement('ol');
+                list.className = 'section-cover-topics';
+                cover.appendChild(list);
+                currentCoverList = list;
+
                 printArea.appendChild(cover);
                 lastElementWasCover = true;
                 continue;
@@ -3627,6 +3634,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     link.className = hasNotes ? 'topic-developed' : 'topic-pending';
                     li.appendChild(link);
                     currentOl.appendChild(li);
+                }
+
+                if (currentCoverList) {
+                    const liCover = document.createElement('li');
+                    const linkCover = document.createElement('a');
+                    linkCover.href = `#print-${topicId}`;
+                    linkCover.textContent = `${title} (${counter})`;
+                    linkCover.className = hasNotes ? 'topic-developed' : 'topic-pending';
+                    liCover.appendChild(linkCover);
+                    currentCoverList.appendChild(liCover);
                 }
 
                 const topicWrapper = document.createElement('div');
@@ -3681,6 +3698,12 @@ document.addEventListener('DOMContentLoaded', function () {
     async function handlePrintSection(sectionHeaderRow) {
         const sectionId = sectionHeaderRow.dataset.sectionHeader;
         const topicRows = document.querySelectorAll(`tr[data-section="${sectionId}"]`);
+        const allTopicRows = document.querySelectorAll('tr[data-topic-id]');
+        const globalNumbers = {};
+        let gCounter = 1;
+        allTopicRows.forEach(r => {
+            globalNumbers[r.dataset.topicId] = gCounter++;
+        });
         const printArea = getElem('print-area');
         printArea.innerHTML = '';
 
@@ -3700,21 +3723,45 @@ document.addEventListener('DOMContentLoaded', function () {
         authorEl.className = 'author-info';
         authorEl.textContent = 'Dr Daniel Opazo, Medicina Interna, Universidad de Valparaíso, Chile 2025';
         cover.appendChild(authorEl);
+
+        const list = document.createElement('ol');
+        list.className = 'section-cover-topics';
+        cover.appendChild(list);
+
         printArea.appendChild(cover);
 
         let first = true;
+        let localCounter = 1;
         for (const row of topicRows) {
             const topicId = row.dataset.topicId;
+            const title = row.cells[1]?.textContent.trim() || '';
             const topicData = await db.get('topics', topicId);
+            const hasNotes = topicData && topicData.notes && topicData.notes.length > 0;
 
-            if (topicData && topicData.notes && topicData.notes.length > 0) {
-                const topicWrapper = document.createElement('div');
-                topicWrapper.className = 'topic-print-wrapper';
-                if (first) {
-                    topicWrapper.style.pageBreakBefore = 'auto';
-                    first = false;
-                }
+            const li = document.createElement('li');
+            const link = document.createElement('a');
+            link.href = `#print-${topicId}`;
+            link.textContent = `${title} (${globalNumbers[topicId]})`;
+            link.className = hasNotes ? 'topic-developed' : 'topic-pending';
+            li.appendChild(link);
+            list.appendChild(li);
 
+            const topicWrapper = document.createElement('div');
+            topicWrapper.id = `print-${topicId}`;
+            topicWrapper.className = 'topic-print-wrapper';
+            if (first) {
+                topicWrapper.style.pageBreakBefore = 'auto';
+                first = false;
+            }
+
+            const titleEl = document.createElement('h2');
+            titleEl.textContent = `${localCounter}. ${title}`;
+            if (!hasNotes) {
+                titleEl.style.color = '#9ca3af';
+            }
+            topicWrapper.appendChild(titleEl);
+
+            if (hasNotes) {
                 topicData.notes.forEach(note => {
                     const noteContent = document.createElement('div');
                     noteContent.innerHTML = note.content;
@@ -3725,8 +3772,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     topicWrapper.appendChild(noteContent);
                 });
-                printArea.appendChild(topicWrapper);
+            } else {
+                const placeholder = document.createElement('p');
+                placeholder.textContent = 'Tema no desarrollado.';
+                topicWrapper.appendChild(placeholder);
             }
+            printArea.appendChild(topicWrapper);
+            localCounter++;
         }
 
         if (!printArea.querySelector('.topic-print-wrapper')) {

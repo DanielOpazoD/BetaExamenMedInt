@@ -752,6 +752,17 @@ table.resizable-table .table-resize-handle {
             font-weight: 600;
         }
 
+        .section-cover-topics {
+            margin-top: 2rem;
+            text-align: left;
+            column-count: 2;
+            list-style-position: inside;
+        }
+
+        .section-cover-topics li {
+            break-inside: avoid;
+        }
+
 
         @media print {
             html, body {
