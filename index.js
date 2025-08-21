@@ -217,6 +217,27 @@ document.addEventListener('DOMContentLoaded', function () {
     // Flag to prevent multiple table insertions if user double-clicks or if events overlap
     let isInsertingTable = false;
 
+    function wrapOrphanListItems(root) {
+        const lis = Array.from(root.querySelectorAll('li'));
+        lis.forEach(li => {
+            const parent = li.parentElement;
+            if (!parent || (parent.tagName !== 'UL' && parent.tagName !== 'OL')) {
+                const ul = document.createElement('ul');
+                if (parent) {
+                    parent.insertBefore(ul, li);
+                } else {
+                    root.appendChild(ul);
+                }
+                ul.appendChild(li);
+                let next = ul.nextSibling;
+                while (next && next.nodeType === 1 && next.tagName === 'LI') {
+                    ul.appendChild(next);
+                    next = ul.nextSibling;
+                }
+            }
+        });
+    }
+
 
     /**
      * Initialize the table size selection grid.  This creates the 10x10 cells
@@ -829,6 +850,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!currentNotesArray[activeNoteIndex].postits) {
                     currentNotesArray[activeNoteIndex].postits = {};
                 }
+                wrapOrphanListItems(subNoteEditor);
                 currentNotesArray[activeNoteIndex].postits[subnoteId] = {
                     title: subNoteTitle.textContent.trim(),
                     content: subNoteEditor.innerHTML
@@ -849,6 +871,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!currentNotesArray[activeNoteIndex].postits) {
                     currentNotesArray[activeNoteIndex].postits = {};
                 }
+                wrapOrphanListItems(subNoteEditor);
                 currentNotesArray[activeNoteIndex].postits[subnoteId] = {
                     title: subNoteTitle.textContent.trim(),
                     content: subNoteEditor.innerHTML
@@ -919,6 +942,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Image selection handling within the sub-note editor
     if (subNoteEditor) {
+        subNoteEditor.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const data = e.clipboardData.getData('text/html') || e.clipboardData.getData('text/plain');
+            const temp = document.createElement('div');
+            temp.innerHTML = data;
+            wrapOrphanListItems(temp);
+            document.execCommand('insertHTML', false, temp.innerHTML);
+        });
         subNoteEditor.addEventListener('click', (e) => {
             if (e.target.tagName === 'IMG') {
                 subNoteEditor.querySelectorAll('img').forEach(img => img.classList.remove('selected-for-resize'));
@@ -2777,7 +2808,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 selection.removeAllRanges();
                 selection.addRange(savedEditorSelection);
             }
-            document.execCommand('insertHTML', false, html);
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            wrapOrphanListItems(temp);
+            document.execCommand('insertHTML', false, temp.innerHTML);
         }
         hideModal(htmlCodeModal);
         if (currentHtmlEditor) currentHtmlEditor.focus();
@@ -3087,7 +3121,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function saveCurrentNote() {
         if (!currentNoteRow || !currentNotesArray || currentNotesArray.length === 0) return;
-        
+        wrapOrphanListItems(notesEditor);
         const currentContent = notesEditor.innerHTML;
         const currentTitle = notesModalTitle.textContent.trim();
         
@@ -3212,6 +3246,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
+        wrapOrphanListItems(notesEditor);
         notesEditor.querySelectorAll('table').forEach(initTableResize);
 
         renderNotesList();
@@ -4147,6 +4182,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const reader = new FileReader();
                     reader.onload = (e) => {
                         notesEditor.innerHTML = e.target.result;
+                        wrapOrphanListItems(notesEditor);
                         notesEditor.querySelectorAll('table').forEach(initTableResize);
                     };
                     reader.readAsText(file);
@@ -4211,14 +4247,15 @@ document.addEventListener('DOMContentLoaded', function () {
                          subnoteData = existing;
                      }
                  }
-                 subNoteTitle.textContent = subnoteData.title || '';
-                 subNoteEditor.innerHTML = subnoteData.content || '<p><br></p>';
-                 const modalContent = subNoteModal.querySelector('.notes-modal-content');
-                 modalContent.classList.remove('readonly-mode');
-                 subNoteEditor.contentEditable = true;
-                 subNoteTitle.contentEditable = true;
-                 subNoteEditor.focus();
-                 showModal(subNoteModal);
+                subNoteTitle.textContent = subnoteData.title || '';
+                subNoteEditor.innerHTML = subnoteData.content || '<p><br></p>';
+                wrapOrphanListItems(subNoteEditor);
+                const modalContent = subNoteModal.querySelector('.notes-modal-content');
+                modalContent.classList.remove('readonly-mode');
+                subNoteEditor.contentEditable = true;
+                subNoteTitle.contentEditable = true;
+                subNoteEditor.focus();
+                showModal(subNoteModal);
                  return;
              }
 
@@ -4244,6 +4281,7 @@ document.addEventListener('DOMContentLoaded', function () {
                  // Populate sub-note modal fields
                 subNoteTitle.textContent = subnoteData.title || '';
                 subNoteEditor.innerHTML = subnoteData.content || '<p><br></p>';
+                wrapOrphanListItems(subNoteEditor);
                 const modalContent = subNoteModal.querySelector('.notes-modal-content');
                 modalContent.classList.add('readonly-mode');
                 subNoteEditor.contentEditable = false;
@@ -4307,6 +4345,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 openNoteStyleModal();
             }
+        });
+
+        notesEditor.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const data = e.clipboardData.getData('text/html') || e.clipboardData.getData('text/plain');
+            const temp = document.createElement('div');
+            temp.innerHTML = data;
+            wrapOrphanListItems(temp);
+            document.execCommand('insertHTML', false, temp.innerHTML);
         });
 
         noteStyleTabPre.addEventListener('click', () => {
@@ -4681,7 +4728,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 selection.removeAllRanges();
                 selection.addRange(savedEditorSelection);
             }
-            document.execCommand('insertHTML', false, formatAiResponse(aiToolsGeneratedText));
+            const temp = document.createElement('div');
+            temp.innerHTML = formatAiResponse(aiToolsGeneratedText);
+            wrapOrphanListItems(temp);
+            document.execCommand('insertHTML', false, temp.innerHTML);
             hideModal(aiToolsModal);
             notesEditor.focus();
         });
