@@ -351,6 +351,58 @@ document.addEventListener('DOMContentLoaded', function () {
     const applyNoteStyleBtn = getElem('apply-note-style-btn');
     const cancelNoteStyleBtn = getElem('cancel-note-style-btn');
 
+    // --- Normalize pasted lists ---
+    function normalizePastedLists(html) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        const allLis = Array.from(doc.querySelectorAll('li'));
+        allLis.forEach(li => {
+            const parent = li.parentElement;
+            if (!parent || (parent.tagName !== 'UL' && parent.tagName !== 'OL')) {
+                const ul = doc.createElement('ul');
+                if (parent) {
+                    parent.insertBefore(ul, li);
+                    let current = li;
+                    while (current && current.tagName === 'LI') {
+                        const next = current.nextElementSibling;
+                        ul.appendChild(current);
+                        if (!next || next.tagName !== 'LI') break;
+                        current = next;
+                    }
+                } else {
+                    doc.body.appendChild(ul);
+                    ul.appendChild(li);
+                }
+            }
+        });
+
+        doc.querySelectorAll('ul ul, ol ul, ul ol, ol ol').forEach(list => {
+            const parent = list.parentElement;
+            if (parent && (parent.tagName === 'UL' || parent.tagName === 'OL')) {
+                while (list.firstChild) parent.insertBefore(list.firstChild, list);
+                parent.removeChild(list);
+            }
+        });
+
+        return doc.body.innerHTML;
+    }
+
+    function handlePasteWithListFix(e) {
+        e.preventDefault();
+        const html = e.clipboardData.getData('text/html');
+        const text = e.clipboardData.getData('text/plain');
+        if (html) {
+            const cleaned = normalizePastedLists(html);
+            document.execCommand('insertHTML', false, cleaned);
+        } else if (text) {
+            document.execCommand('insertText', false, text);
+        }
+    }
+
+    if (notesEditor) notesEditor.addEventListener('paste', handlePasteWithListFix);
+    if (subNoteEditor) subNoteEditor.addEventListener('paste', handlePasteWithListFix);
+
     /*
      * Build the simplified toolbar for sub-note editing.  This toolbar intentionally omits
      * certain controls available in the main note editor, such as line height, image
