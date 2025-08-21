@@ -3586,11 +3586,13 @@ document.addEventListener('DOMContentLoaded', function () {
         let currentCoverList = null;
         let counter = 1;
         let lastElementWasCover = false;
+        let currentSectionId = null;
 
         for (const row of rows) {
             if (row.classList.contains('section-header-row')) {
                 const sectionTitle = row.querySelector('.section-title')?.textContent || '';
                 const sectionId = row.dataset.sectionHeader;
+                currentSectionId = sectionId;
                 const sectionTopicCount = document.querySelectorAll(`tr[data-section="${sectionId}"]`).length;
                 const header = document.createElement('h2');
                 header.textContent = sectionTitle;
@@ -3605,6 +3607,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const cover = document.createElement('div');
                 cover.className = 'section-cover-page';
+                cover.id = `print-section-${sectionId}`;
                 if (printArea.children.length > 0) {
                     cover.style.pageBreakBefore = 'always';
                 }
@@ -3639,6 +3642,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const title = row.cells[1]?.textContent.trim() || '';
                 const topicData = await db.get('topics', topicId);
                 const hasNotes = topicData && Array.isArray(topicData.notes) && topicData.notes.length > 0;
+                const sectionId = currentSectionId;
 
                 if (currentOl) {
                     const li = document.createElement('li');
@@ -3677,6 +3681,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const titleEl = document.createElement('h2');
                 titleEl.textContent = `${counter}. ${title}`;
+                const topLink = document.createElement('a');
+                topLink.href = `#print-section-${sectionId}`;
+                topLink.textContent = '🔝';
+                topLink.className = 'back-to-section';
+                titleEl.appendChild(topLink);
                 if (!hasNotes) {
                     titleEl.style.color = '#9ca3af';
                 }
@@ -3724,6 +3733,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const cover = document.createElement('div');
         cover.className = 'section-cover-page';
+        cover.id = `print-section-${sectionId}`;
         const titleText = sectionHeaderRow.querySelector('.section-title')?.textContent || '';
         const topicCount = topicRows.length;
         const titleEl = document.createElement('h1');
@@ -3777,6 +3787,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const titleEl = document.createElement('h2');
             titleEl.textContent = `${localCounter}. ${title}`;
+            const topLink = document.createElement('a');
+            topLink.href = `#print-section-${sectionId}`;
+            topLink.textContent = '🔝';
+            topLink.className = 'back-to-section';
+            titleEl.appendChild(topLink);
             if (!hasNotes) {
                 titleEl.style.color = '#9ca3af';
             }

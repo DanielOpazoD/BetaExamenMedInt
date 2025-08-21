@@ -738,6 +738,12 @@ table.resizable-table .table-resize-handle {
             font-size: 0.75rem;
         }
 
+        .back-to-section {
+            margin-left: 0.5rem;
+            font-size: 0.75rem;
+            text-decoration: none;
+        }
+
         .section-cover-page {
             text-align: center;
             margin-top: 4rem;
