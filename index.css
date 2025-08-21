@@ -764,7 +764,8 @@ table.resizable-table .table-resize-handle {
             margin-top: 2rem;
             text-align: left;
             column-count: 2;
-            list-style-position: inside;
+            list-style: none;
+            padding-left: 0;
         }
 
         .section-cover-topics li {

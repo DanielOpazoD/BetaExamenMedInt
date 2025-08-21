@@ -3628,7 +3628,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const list = document.createElement('ol');
                 list.className = 'section-cover-topics';
-                list.start = counter;
                 cover.appendChild(list);
                 currentCoverList = list;
 
@@ -3654,8 +3653,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (currentCoverList) {
                     const liCover = document.createElement('li');
                     const linkCover = document.createElement('a');
+                    const globalNum = counter;
                     linkCover.href = `#print-${topicId}`;
-                    linkCover.textContent = title;
+                    linkCover.textContent = `- ${globalNum}. ${title}`;
                     linkCover.className = hasNotes ? 'topic-developed' : 'topic-pending';
                     liCover.appendChild(linkCover);
                     currentCoverList.appendChild(liCover);
@@ -3746,10 +3746,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const list = document.createElement('ol');
         list.className = 'section-cover-topics';
-        const firstTopicId = topicRows[0]?.dataset.topicId;
-        if (firstTopicId) {
-            list.start = globalNumbers[firstTopicId];
-        }
         cover.appendChild(list);
 
         printArea.appendChild(cover);
@@ -3764,8 +3760,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const li = document.createElement('li');
             const link = document.createElement('a');
+            const globalNum = globalNumbers[topicId];
             link.href = `#print-${topicId}`;
-            link.textContent = title;
+            link.textContent = `- ${globalNum}. ${title}`;
             link.className = hasNotes ? 'topic-developed' : 'topic-pending';
             li.appendChild(link);
             list.appendChild(li);
