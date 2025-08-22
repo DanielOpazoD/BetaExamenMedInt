@@ -355,6 +355,17 @@ document.addEventListener('DOMContentLoaded', function () {
     function normalizePastedLists(html) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
+
+        // Unwrap containers that only wrap a single list
+        doc.querySelectorAll('blockquote, div').forEach(el => {
+            if (el.childElementCount === 1) {
+                const child = el.firstElementChild;
+                if (child && (child.tagName === 'UL' || child.tagName === 'OL')) {
+                    el.replaceWith(child);
+                }
+            }
+        });
+
         const allLis = Array.from(doc.querySelectorAll('li'));
         allLis.forEach(li => {
             const parent = li.parentElement;
@@ -399,6 +410,13 @@ document.addEventListener('DOMContentLoaded', function () {
         // Remove empty list items
         doc.querySelectorAll('li').forEach(li => {
             if (!li.textContent.trim()) li.remove();
+        });
+
+        // Strip attributes from list elements for consistent formatting
+        doc.querySelectorAll('ul, ol, li').forEach(el => {
+            [...el.attributes].forEach(attr => {
+                if (attr.name !== 'type') el.removeAttribute(attr.name);
+            });
         });
 
         return doc.body.innerHTML;
@@ -2158,6 +2176,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
         editorToolbar.appendChild(createButton('Disminuir sangría', outdentSVG, 'outdent'));
         editorToolbar.appendChild(createButton('Aumentar sangría', indentSVG, 'indent'));
+
+        const fixListsBtn = createButton('Normalizar listas', '🧾', null, null, () => {
+            notesEditor.innerHTML = normalizePastedLists(notesEditor.innerHTML);
+        });
+        editorToolbar.appendChild(fixListsBtn);
 
         const insertBlankLineAbove = () => {
             let blocks = getSelectedBlockElements();
