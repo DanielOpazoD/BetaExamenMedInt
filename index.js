@@ -316,6 +316,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const zoomInLightboxBtn = getElem('zoom-in-lightbox-btn');
     const zoomOutLightboxBtn = getElem('zoom-out-lightbox-btn');
     const downloadLightboxBtn = getElem('download-lightbox-btn');
+    const cropImageModal = getElem('crop-image-modal');
+    const cropCanvas = getElem('crop-canvas');
+    const cropOverlay = getElem('crop-overlay');
+    const cancelCropBtn = getElem('cancel-crop-btn');
+    const applyCropBtn = getElem('apply-crop-btn');
+    const cropCtx = cropCanvas.getContext ? cropCanvas.getContext('2d') : null;
 
     // Post-it Note Modal
     const postitNoteModal = getElem('postit-note-modal');
@@ -916,6 +922,13 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentCallout = null;
     let aiToolsGeneratedText = '';
     let lineEraseMode = false;
+    let cropScale = 1;
+    let cropTargetImage = null;
+    let isDraggingCrop = false;
+    let cropStartX = 0;
+    let cropStartY = 0;
+    let cropRect = { x: 0, y: 0, w: 0, h: 0 };
+    let cropImageObj = null;
 
     // Image selection handling within the sub-note editor
     if (subNoteEditor) {
@@ -2311,6 +2324,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const resizeMinusBtn = createButton('Disminuir tamaño de imagen (-10%)', '➖', null, null, () => resizeSelectedImage(0.9));
         editorToolbar.appendChild(resizeMinusBtn);
 
+        const cropImageBtn = createButton('Recortar imagen', '✂️', null, null, openCropModal);
+        editorToolbar.appendChild(cropImageBtn);
+
         // Eliminamos el botón de inserción de tablas y el separador asociado
 
         // Print/Save
@@ -2438,6 +2454,31 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             showAlert("Por favor, selecciona una imagen primero para cambiar su tamaño.");
         }
+    }
+
+    function openCropModal() {
+        const img = selectedImageForResize;
+        if (!img) {
+            showAlert("Por favor, selecciona una imagen primero para recortarla.");
+            return;
+        }
+        cropTargetImage = img;
+        cropImageObj = new Image();
+        cropImageObj.onload = () => {
+            const maxW = 800;
+            const maxH = 600;
+            cropScale = Math.min(maxW / cropImageObj.width, maxH / cropImageObj.height, 1);
+            cropCanvas.width = cropImageObj.width * cropScale;
+            cropCanvas.height = cropImageObj.height * cropScale;
+            if (cropCtx) {
+                cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+                cropCtx.drawImage(cropImageObj, 0, 0, cropCanvas.width, cropCanvas.height);
+            }
+            cropRect = { x: 0, y: 0, w: 0, h: 0 };
+            cropOverlay.classList.add('hidden');
+            showModal(cropImageModal);
+        };
+        cropImageObj.src = img.src;
     }
 
     function updateAllTotals() {
@@ -4498,6 +4539,65 @@ document.addEventListener('DOMContentLoaded', function () {
                         }
                     }
                 }
+            });
+        }
+
+        // Crop Image Modal Listeners
+        if (cancelCropBtn) {
+            cancelCropBtn.addEventListener('click', () => {
+                hideModal(cropImageModal);
+                cropOverlay.classList.add('hidden');
+            });
+        }
+        if (applyCropBtn) {
+            applyCropBtn.addEventListener('click', () => {
+                if (cropRect.w === 0 || cropRect.h === 0 || !cropImageObj) {
+                    showAlert('Selecciona un área para recortar.');
+                    return;
+                }
+                const sx = cropRect.x / cropScale;
+                const sy = cropRect.y / cropScale;
+                const sw = cropRect.w / cropScale;
+                const sh = cropRect.h / cropScale;
+                const outCanvas = document.createElement('canvas');
+                outCanvas.width = sw;
+                outCanvas.height = sh;
+                const outCtx = outCanvas.getContext('2d');
+                outCtx.drawImage(cropImageObj, sx, sy, sw, sh, 0, 0, sw, sh);
+                if (cropTargetImage) {
+                    cropTargetImage.src = outCanvas.toDataURL('image/png');
+                }
+                hideModal(cropImageModal);
+                cropOverlay.classList.add('hidden');
+            });
+        }
+        if (cropCanvas) {
+            cropCanvas.addEventListener('mousedown', (e) => {
+                isDraggingCrop = true;
+                cropStartX = e.offsetX;
+                cropStartY = e.offsetY;
+                cropRect = { x: cropStartX, y: cropStartY, w: 0, h: 0 };
+                cropOverlay.classList.remove('hidden');
+                cropOverlay.style.left = `${cropRect.x}px`;
+                cropOverlay.style.top = `${cropRect.y}px`;
+                cropOverlay.style.width = '0px';
+                cropOverlay.style.height = '0px';
+            });
+            cropCanvas.addEventListener('mousemove', (e) => {
+                if (!isDraggingCrop) return;
+                const x = e.offsetX;
+                const y = e.offsetY;
+                cropRect.x = Math.min(cropStartX, x);
+                cropRect.y = Math.min(cropStartY, y);
+                cropRect.w = Math.abs(x - cropStartX);
+                cropRect.h = Math.abs(y - cropStartY);
+                cropOverlay.style.left = `${cropRect.x}px`;
+                cropOverlay.style.top = `${cropRect.y}px`;
+                cropOverlay.style.width = `${cropRect.w}px`;
+                cropOverlay.style.height = `${cropRect.h}px`;
+            });
+            document.addEventListener('mouseup', () => {
+                isDraggingCrop = false;
             });
         }
 
