@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Temario para Examen Final de Medicina Interna</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/cropperjs@1.5.13/dist/cropper.min.css">
     <link rel="stylesheet" href="index.css">
 <script type="importmap">
 {
@@ -489,7 +490,7 @@
 
     <!-- Modal for Image Lightbox Viewer -->
     <div id="image-lightbox-modal" class="modal-overlay">
-        <div id="image-lightbox-content" class="relative w-full h-full p-4 flex items-center justify-center">
+        <div id="image-lightbox-content" class="relative w-full h-full p-4 flex flex-col items-center justify-center">
             <button id="close-lightbox-btn" class="absolute top-4 right-4 text-white text-4xl font-bold z-20" style="text-shadow: 0 0 8px rgba(0,0,0,0.8);">&times;</button>
             <button id="prev-lightbox-btn" class="absolute left-4 top-1/2 -translate-y-1/2 text-white text-4xl font-bold z-20 p-4" style="text-shadow: 0 0 8px rgba(0,0,0,0.8);">&#10094;</button>
             <button id="next-lightbox-btn" class="absolute right-4 top-1/2 -translate-y-1/2 text-white text-4xl font-bold z-20 p-4" style="text-shadow: 0 0 8px rgba(0,0,0,0.8);">&#10095;</button>
@@ -510,10 +511,22 @@
             </div>
             <div class="relative max-w-[90vw] max-h-[85vh] overflow-auto">
                 <img id="lightbox-image" src="" alt="Vista de imagen" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-transform duration-200 ease-in-out">
-                <div id="lightbox-caption" class="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center text-white text-center text-sm p-2 rounded-lg" style="background-color: rgba(0,0,0,0.6);">
-                    <span id="lightbox-caption-text" class="flex-grow"></span>
-                    <button id="delete-caption-btn" class="ml-2 text-red-300 hover:text-red-500 text-lg font-bold">&times;</button>
-                </div>
+            </div>
+            <div id="lightbox-caption" class="mt-4 flex items-center text-white text-center text-sm p-2 rounded-lg" style="background-color: rgba(0,0,0,0.6);">
+                <span id="lightbox-caption-text" class="flex-grow"></span>
+                <button id="delete-caption-btn" class="ml-2 text-red-300 hover:text-red-500 text-lg font-bold">&times;</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="image-cropper-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-xl">
+            <div class="mb-4 flex justify-center">
+                <img id="cropper-image" src="" alt="Imagen a recortar" class="max-w-full">
+            </div>
+            <div class="flex justify-end gap-2">
+                <button id="crop-image-cancel-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cancelar</button>
+                <button id="crop-image-confirm-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Aplicar</button>
             </div>
         </div>
     </div>
@@ -653,6 +666,7 @@
 
     <div id="print-area" class="hidden"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://unpkg.com/cropperjs@1.5.13/dist/cropper.min.js"></script>
 <script src="index.js" type="module"></script>
 </body>
 </html>
