@@ -366,51 +366,65 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        const allLis = Array.from(doc.querySelectorAll('li'));
-        allLis.forEach(li => {
-            const parent = li.parentElement;
-            if (!parent || (parent.tagName !== 'UL' && parent.tagName !== 'OL')) {
-                const ul = doc.createElement('ul');
-                if (parent) {
-                    parent.insertBefore(ul, li);
-                    let current = li;
-                    while (current && current.tagName === 'LI') {
-                        const next = current.nextElementSibling;
-                        ul.appendChild(current);
-                        if (!next || next.tagName !== 'LI') break;
-                        current = next;
-                    }
-                } else {
-                    doc.body.appendChild(ul);
-                    ul.appendChild(li);
-                }
-            }
-        });
+        // Wrap any stray <li> elements in a new <ul>
+        const wrapOrphanLis = () => {
+            const orphans = Array.from(doc.querySelectorAll('li')).filter(li => {
+                const parent = li.parentElement;
+                return !parent || (parent.tagName !== 'UL' && parent.tagName !== 'OL');
+            });
 
-        // Remove redundant nested lists that are direct children of another list
-        doc.querySelectorAll('ul ul, ol ul, ul ol, ol ol').forEach(list => {
-            const parent = list.parentElement;
-            if (parent && (parent.tagName === 'UL' || parent.tagName === 'OL')) {
-                while (list.firstChild) parent.insertBefore(list.firstChild, list);
-                list.remove();
+            orphans.forEach(li => {
+                const parent = li.parentElement || doc.body;
+                const wrapper = doc.createElement('ul');
+                parent.insertBefore(wrapper, li);
+
+                let current = li;
+                while (current && current.tagName === 'LI') {
+                    const next = current.nextElementSibling;
+                    wrapper.appendChild(current);
+                    current = (next && next.tagName === 'LI') ? next : null;
+                }
+            });
+        };
+
+        wrapOrphanLis();
+
+        // Repeatedly flatten redundant nested lists that are not inside an <li>
+        const flattenLists = () => {
+            let nested = doc.querySelector('ul ul, ul ol, ol ul, ol ol');
+            while (nested) {
+                const parent = nested.parentElement;
+                if (parent && (parent.tagName === 'UL' || parent.tagName === 'OL')) {
+                    while (nested.firstChild) parent.insertBefore(nested.firstChild, nested);
+                    nested.remove();
+                } else {
+                    nested = nested.nextElementSibling;
+                }
+                nested = doc.querySelector('ul ul, ul ol, ol ul, ol ol');
             }
-        });
+        };
+
+        flattenLists();
 
         // Merge adjacent lists of the same type
-        const bodyChildren = Array.from(doc.body.children);
-        for (let i = 1; i < bodyChildren.length; i++) {
-            const prev = bodyChildren[i - 1];
-            const curr = bodyChildren[i];
-            if (prev.tagName && prev.tagName === curr.tagName && (curr.tagName === 'UL' || curr.tagName === 'OL')) {
-                while (curr.firstChild) prev.appendChild(curr.firstChild);
-                curr.remove();
+        const mergeSiblings = () => {
+            let node = doc.body.firstElementChild;
+            while (node) {
+                let next = node.nextElementSibling;
+                if (next && node.tagName === next.tagName && (node.tagName === 'UL' || node.tagName === 'OL')) {
+                    while (next.firstChild) node.appendChild(next.firstChild);
+                    next.remove();
+                    continue; // re-check with new next sibling
+                }
+                node = next;
             }
-        }
+        };
 
-        // Remove empty list items
-        doc.querySelectorAll('li').forEach(li => {
-            if (!li.textContent.trim()) li.remove();
-        });
+        mergeSiblings();
+
+        // Remove empty list items and lists
+        doc.querySelectorAll('li').forEach(li => { if (!li.textContent.trim()) li.remove(); });
+        doc.querySelectorAll('ul, ol').forEach(list => { if (!list.querySelector('li')) list.remove(); });
 
         // Strip attributes from list elements for consistent formatting
         doc.querySelectorAll('ul, ol, li').forEach(el => {
