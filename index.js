@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let templateSortMode = 'recent';
     let templateTagFilter = null;
     let templatePage = 0;
-    const TEMPLATES_PER_PAGE = 12;
+    const TEMPLATES_PER_PAGE = 20;
     let undoTimer = null;
     let deletedFavorite = null;
     let htmlFavorites = [];
@@ -2849,7 +2849,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const editBtn = document.createElement('button');
             editBtn.textContent = '✏️';
-            editBtn.className = 'p-1';
+            editBtn.className = 'p-0.5 text-xs';
             editBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 htmlFavoriteName.value = fav.name;
@@ -2861,7 +2861,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const delBtn = document.createElement('button');
             delBtn.textContent = '🗑️';
-            delBtn.className = 'p-1';
+            delBtn.className = 'p-0.5 text-xs';
             delBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 deleteFavorite(htmlFavorites.indexOf(fav));
