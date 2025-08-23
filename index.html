@@ -43,6 +43,7 @@
                         <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v3.75A2.25 2.25 0 0117.25 20.25H6.75A2.25 2.25 0 014.5 17.25V6.75A2.25 2.25 0 016.75 4.5H12l4.5 4.5v2.25" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l3-3 3 3m-3-3v10.5" /></svg>
                     </button>
                     <input type="file" id="import-file-input" accept=".json" class="hidden">
+                    <button id="open-templates-btn" class="px-3 py-2 bg-orange-600 text-white font-semibold rounded-lg shadow-md hover:bg-orange-700 flex items-center" title="Biblioteca de plantillas" aria-label="Biblioteca de plantillas">📄</button>
                     <div class="h-6 border-l mx-2"></div>
                     <div class="relative">
                         <button id="settings-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="Configuración del tema/apariencia" aria-label="Configuración del tema/apariencia">
@@ -652,7 +653,46 @@
     <button id="open-ai-panel" class="fixed bottom-4 right-4 p-3 bg-indigo-600 text-white rounded-full shadow-lg" aria-label="Abrir asistente de IA">🤖</button>
 
     <div id="print-area" class="hidden"></div>
+
+    <!-- Template Manager Modal -->
+    <div id="templates-modal" class="modal-overlay hidden">
+        <div class="modal-content w-full max-w-4xl">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <button id="templates-edit-toggle" class="px-2 py-1 border rounded">Editar</button>
+                    <input id="template-search" type="text" placeholder="Buscar..." class="border rounded p-1">
+                    <div class="flex items-center gap-1">
+                        <button id="tags-left" class="px-1">◀</button>
+                        <div id="template-tags" class="flex overflow-x-auto max-w-[200px] space-x-1"></div>
+                        <button id="tags-right" class="px-1">▶</button>
+                    </div>
+                    <select id="template-sort" class="border rounded p-1">
+                        <option value="recent">Más nuevas</option>
+                        <option value="uses">Más usadas</option>
+                        <option value="az">A-Z</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="add-template-btn" class="px-2 py-1 bg-blue-600 text-white rounded">Guardar</button>
+                    <button id="template-import-btn" class="px-2 py-1 bg-sky-600 text-white rounded">Importar</button>
+                    <button id="template-export-btn" class="px-2 py-1 bg-green-600 text-white rounded">Exportar</button>
+                    <button id="close-templates-btn" class="px-2 py-1 bg-gray-500 text-white rounded">Cerrar</button>
+                    <input type="file" id="template-import-file" accept=".json" class="hidden">
+                </div>
+            </div>
+            <div id="templates-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-[60vh] overflow-y-auto mb-3"></div>
+            <div class="flex justify-between items-center">
+                <button id="template-prev" class="px-2 py-1 border rounded">Anterior</button>
+                <span id="template-page-info" class="text-sm"></span>
+                <button id="template-next" class="px-2 py-1 border rounded">Siguiente</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="template-toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded shadow hidden"></div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="index.js" type="module"></script>
+<script src="templates.js" type="module"></script>
 </body>
 </html>
