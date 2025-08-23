@@ -2829,28 +2829,9 @@ document.addEventListener('DOMContentLoaded', function () {
             card.className = 'relative group border border-border-color rounded-lg p-2 bg-secondary cursor-pointer';
 
             const title = document.createElement('div');
-            title.className = 'font-semibold mb-1 truncate';
+            title.className = 'font-semibold truncate';
             title.textContent = fav.name;
             card.appendChild(title);
-
-            const preview = document.createElement('div');
-            preview.className = 'text-xs text-text-secondary line-clamp-3';
-            const tmp = document.createElement('div');
-            tmp.innerHTML = fav.code;
-            preview.textContent = tmp.textContent.slice(0, 100);
-            card.appendChild(preview);
-
-            if (fav.tags.length) {
-                const tagCont = document.createElement('div');
-                tagCont.className = 'mt-2 flex flex-wrap gap-1';
-                fav.tags.forEach(t => {
-                    const chip = document.createElement('span');
-                    chip.className = 'px-1 bg-bg-tertiary rounded text-xs';
-                    chip.textContent = t;
-                    tagCont.appendChild(chip);
-                });
-                card.appendChild(tagCont);
-            }
 
             const star = document.createElement('button');
             star.className = 'absolute top-1 left-1 text-yellow-400';
