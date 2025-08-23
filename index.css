@@ -172,6 +172,16 @@
             height: auto;
         }
 
+        /* Caption below images */
+        #notes-editor .image-caption,
+        #print-area .image-caption {
+            display: block;
+            text-align: center;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
         /* Style the sub-note editor similar to the main notes editor */
         #subnote-editor {
             border: 1px solid var(--border-color);

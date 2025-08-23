@@ -1297,6 +1297,72 @@ document.addEventListener('DOMContentLoaded', function () {
         notesEditor.focus();
     }
 
+    /**
+     * Sets or removes a caption for the given image. If caption is empty, any
+     * existing caption element is removed.
+     * @param {HTMLImageElement} img
+     * @param {string} caption
+     */
+    function setImageCaption(img, caption) {
+        const fig = img.closest('figure');
+        let captionElem;
+        if (fig) {
+            captionElem = fig.querySelector('.image-caption');
+        } else if (img.nextElementSibling && img.nextElementSibling.classList && img.nextElementSibling.classList.contains('image-caption')) {
+            captionElem = img.nextElementSibling;
+        }
+        const text = caption.trim();
+        if (text) {
+            if (!captionElem) {
+                if (fig) {
+                    captionElem = document.createElement('figcaption');
+                    captionElem.className = 'image-caption';
+                    fig.appendChild(captionElem);
+                } else {
+                    captionElem = document.createElement('div');
+                    captionElem.className = 'image-caption';
+                    img.parentNode.insertBefore(captionElem, img.nextSibling);
+                }
+            }
+            captionElem.textContent = text;
+            img.dataset.caption = text;
+        } else {
+            if (captionElem) captionElem.remove();
+            img.dataset.caption = '';
+        }
+    }
+
+    /**
+     * Prompt the user to add or edit a caption for the selected image.
+     */
+    function addCaptionToSelectedImage() {
+        let img = selectedImageForResize;
+        if (!img) {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount) {
+                let node = sel.getRangeAt(0).startContainer;
+                if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+                if (node.tagName === 'IMG') {
+                    img = node;
+                } else if (node.querySelector) {
+                    const found = node.querySelector('img');
+                    if (found) img = found;
+                }
+            }
+        }
+        if (!img) {
+            alertMessage.textContent = 'Selecciona primero una imagen para añadir una nota al pie.';
+            alertTitle.textContent = 'Imagen no seleccionada';
+            showModal(alertModal);
+            return;
+        }
+        const current = img.dataset.caption || '';
+        const newCaption = prompt('Nota al pie de la imagen:', current);
+        if (newCaption === null) return;
+        setImageCaption(img, newCaption);
+        notesEditor.focus();
+    }
+
     // When loading a note into the editor, ensure any existing floating
     // images become draggable again.  This runs after setting the editor's
     // innerHTML in loadNoteIntoEditor().
@@ -2326,6 +2392,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
         editorToolbar.appendChild(createButton('Crear Galería de Imágenes', gallerySVG, null, null, openGalleryLinkEditor));
+
+        const captionBtn = createButton('Añadir nota al pie de imagen', '📝', null, null, addCaptionToSelectedImage);
+        editorToolbar.appendChild(captionBtn);
 
         const resizePlusBtn = createButton('Aumentar tamaño de imagen (+10%)', '➕', null, null, () => resizeSelectedImage(1.1));
         editorToolbar.appendChild(resizePlusBtn);
@@ -4711,6 +4780,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 } else if (imgObj.element) {
                     imgObj.element.dataset.caption = imgObj.caption;
+                    setImageCaption(imgObj.element, imgObj.caption);
                     if (currentNotesArray && currentNotesArray[activeNoteIndex]) {
                         saveCurrentNote();
                     }
@@ -4733,6 +4803,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         }
                     } else if (imgObj.element) {
                         imgObj.element.dataset.caption = '';
+                        setImageCaption(imgObj.element, '');
                         if (currentNotesArray && currentNotesArray[activeNoteIndex]) {
                             saveCurrentNote();
                         }
