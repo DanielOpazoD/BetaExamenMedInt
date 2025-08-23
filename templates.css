@@ -1,0 +1,7 @@
+#tag-scroll::-webkit-scrollbar { height: 6px; }
+#tag-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+.template-card { position: relative; }
+.template-actions { display: none; position: absolute; top: 4px; right: 4px; gap: 4px; }
+.template-card.editing .template-actions,
+.template-card:hover .template-actions { display: flex; }
+.favorite { color: #fbbf24; }
