@@ -2786,7 +2786,7 @@ document.addEventListener('DOMContentLoaded', function () {
         tagFilter.innerHTML = '';
         tags.forEach(tag => {
             const btn = document.createElement('button');
-            btn.className = `px-2 py-1 rounded-lg text-sm border border-border-color bg-secondary whitespace-nowrap ${templateTagFilter === tag ? 'bg-indigo-600 text-white' : ''}`;
+            btn.className = `px-1.5 py-0.5 rounded-lg text-xs border border-border-color bg-secondary whitespace-nowrap ${templateTagFilter === tag ? 'bg-indigo-600 text-white' : ''}`;
             btn.textContent = tag;
             btn.addEventListener('click', () => {
                 templateTagFilter = templateTagFilter === tag ? null : tag;
@@ -2826,10 +2826,10 @@ document.addEventListener('DOMContentLoaded', function () {
         htmlFavoritesList.innerHTML = '';
         pageItems.forEach(fav => {
             const card = document.createElement('div');
-            card.className = 'relative group border border-border-color rounded-lg p-2 bg-secondary cursor-pointer';
+            card.className = 'relative group border border-border-color rounded-lg p-1 bg-secondary cursor-pointer text-xs';
 
             const title = document.createElement('div');
-            title.className = 'font-semibold truncate';
+            title.className = 'font-semibold truncate text-xs';
             title.textContent = fav.name;
             card.appendChild(title);
 
