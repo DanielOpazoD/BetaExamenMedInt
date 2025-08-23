@@ -203,8 +203,30 @@ document.addEventListener('DOMContentLoaded', function () {
     const cancelHtmlBtn = getElem('cancel-html-btn');
     const saveHtmlFavoriteBtn = getElem('save-html-favorite-btn');
     const htmlFavoriteName = getElem('html-favorite-name');
+    const htmlFavoriteTags = getElem('html-favorite-tags');
     const htmlFavoritesList = getElem('html-favorites-list');
+    const templateSearch = getElem('template-search');
+    const templateSort = getElem('template-sort');
+    const toggleTemplateEdit = getElem('toggle-template-edit');
+    const exportHtmlFavoritesBtn = getElem('export-html-favorites');
+    const importHtmlFavoritesBtn = getElem('import-html-favorites');
+    const importHtmlFile = getElem('import-html-file');
+    const tagFilter = getElem('tag-filter');
+    const prevTemplatePage = getElem('prev-template-page');
+    const nextTemplatePage = getElem('next-template-page');
+    const templatePageInfo = getElem('template-page-info');
+    const htmlFavoriteToast = getElem('html-favorite-toast');
     let currentHtmlEditor = null;
+    let editingFavoriteIndex = null;
+    let favoritesEditMode = false;
+    let templateSearchQuery = '';
+    let templateSortMode = 'recent';
+    let templateTagFilter = null;
+    let templatePage = 0;
+    const TEMPLATES_PER_PAGE = 20;
+    let undoTimer = null;
+    let deletedFavorite = null;
+    let htmlFavorites = [];
 
     const selectedHtmlModal = getElem('selected-html-modal');
     const selectedHtmlOutput = getElem('selected-html-output');
@@ -2744,30 +2766,241 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function loadHtmlFavorites() {
         const data = await db.get('keyvalue', 'htmlFavorites');
-        return data ? data.value : [];
+        htmlFavorites = (data ? data.value : []).map(f => ({
+            name: f.name,
+            code: f.code,
+            tags: f.tags || [],
+            favorite: !!f.favorite,
+            uses: f.uses || 0,
+            created: f.created || Date.now()
+        }));
     }
 
-    async function populateHtmlFavorites() {
-        const favorites = await loadHtmlFavorites();
-        htmlFavoritesList.innerHTML = '';
-        favorites.forEach(fav => {
+    async function saveHtmlFavorites() {
+        await db.set('keyvalue', { key: 'htmlFavorites', value: htmlFavorites });
+    }
+
+    function renderTagFilter() {
+        const tags = new Set();
+        htmlFavorites.forEach(f => f.tags.forEach(t => tags.add(t)));
+        tagFilter.innerHTML = '';
+        tags.forEach(tag => {
             const btn = document.createElement('button');
-            btn.className = 'px-2 py-1 bg-secondary text-text-primary rounded border border-border-color hover:bg-bg-tertiary text-sm';
-            btn.textContent = fav.name;
+            btn.className = `px-1.5 py-0.5 rounded-lg text-xs border border-border-color bg-secondary whitespace-nowrap ${templateTagFilter === tag ? 'bg-indigo-600 text-white' : ''}`;
+            btn.textContent = tag;
             btn.addEventListener('click', () => {
-                htmlCodeInput.value = fav.code;
+                templateTagFilter = templateTagFilter === tag ? null : tag;
+                templatePage = 0;
+                populateHtmlFavorites();
             });
-            htmlFavoritesList.appendChild(btn);
+            tagFilter.appendChild(btn);
         });
+    }
+
+    function populateHtmlFavorites() {
+        let favorites = [...htmlFavorites];
+        renderTagFilter();
+
+        if (templateSearchQuery) {
+            favorites = favorites.filter(f => f.name.toLowerCase().includes(templateSearchQuery));
+        }
+        if (templateTagFilter) {
+            favorites = favorites.filter(f => f.tags.includes(templateTagFilter));
+        }
+
+        // sort favorites: favorites first
+        favorites.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0));
+        if (templateSortMode === 'az') {
+            favorites.sort((a, b) => a.name.localeCompare(b.name));
+        } else if (templateSortMode === 'used') {
+            favorites.sort((a, b) => (b.uses || 0) - (a.uses || 0));
+        } else {
+            favorites.sort((a, b) => (b.created || 0) - (a.created || 0));
+        }
+
+        const totalPages = Math.max(1, Math.ceil(favorites.length / TEMPLATES_PER_PAGE));
+        if (templatePage >= totalPages) templatePage = totalPages - 1;
+        const start = templatePage * TEMPLATES_PER_PAGE;
+        const pageItems = favorites.slice(start, start + TEMPLATES_PER_PAGE);
+
+        htmlFavoritesList.innerHTML = '';
+        pageItems.forEach(fav => {
+            const card = document.createElement('div');
+            card.className = 'relative group border border-border-color rounded-lg p-1 bg-secondary cursor-pointer text-xs';
+
+            const title = document.createElement('div');
+            title.className = 'font-semibold truncate text-xs';
+            title.textContent = fav.name;
+            card.appendChild(title);
+
+            const star = document.createElement('button');
+            star.className = 'absolute top-1 left-1 text-yellow-400';
+            star.textContent = fav.favorite ? '⭐' : '☆';
+            star.addEventListener('click', (e) => {
+                e.stopPropagation();
+                fav.favorite = !fav.favorite;
+                saveHtmlFavorites();
+                populateHtmlFavorites();
+            });
+            card.appendChild(star);
+
+            const actions = document.createElement('div');
+            actions.className = 'absolute top-1 right-1 gap-1 flex ' + (favoritesEditMode ? '' : 'opacity-0 group-hover:opacity-100');
+
+            const editBtn = document.createElement('button');
+            editBtn.textContent = '✏️';
+            editBtn.className = 'p-0.5 text-xs';
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                htmlFavoriteName.value = fav.name;
+                htmlFavoriteTags.value = fav.tags.join(',');
+                htmlCodeInput.value = fav.code;
+                editingFavoriteIndex = htmlFavorites.indexOf(fav);
+            });
+            actions.appendChild(editBtn);
+
+            const delBtn = document.createElement('button');
+            delBtn.textContent = '🗑️';
+            delBtn.className = 'p-0.5 text-xs';
+            delBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteFavorite(htmlFavorites.indexOf(fav));
+            });
+            actions.appendChild(delBtn);
+
+            card.appendChild(actions);
+
+            card.addEventListener('click', () => {
+                htmlCodeInput.value = fav.code;
+                fav.uses = (fav.uses || 0) + 1;
+                saveHtmlFavorites();
+            });
+
+            htmlFavoritesList.appendChild(card);
+        });
+
+        templatePageInfo.textContent = favorites.length === 0 ? '0/0' : `${templatePage + 1}/${totalPages}`;
+        prevTemplatePage.disabled = templatePage === 0;
+        nextTemplatePage.disabled = templatePage >= totalPages - 1;
     }
 
     function openHtmlCodeModal() {
         htmlCodeInput.value = '';
-       htmlFavoriteName.value = '';
-       populateHtmlFavorites();
-       showModal(htmlCodeModal);
-       setTimeout(() => htmlCodeInput.focus(), 0);
+        htmlFavoriteName.value = '';
+        htmlFavoriteTags.value = '';
+        templateSearchQuery = '';
+        templateSearch.value = '';
+        templateSortMode = 'recent';
+        templateSort.value = 'recent';
+        templateTagFilter = null;
+        templatePage = 0;
+        favoritesEditMode = false;
+        editingFavoriteIndex = null;
+        toggleTemplateEdit.classList.remove('bg-indigo-600','text-white');
+        loadHtmlFavorites().then(() => {
+            populateHtmlFavorites();
+        });
+        showModal(htmlCodeModal);
+        setTimeout(() => htmlCodeInput.focus(), 0);
     }
+
+    function showToast(message) {
+        htmlFavoriteToast.textContent = '';
+        htmlFavoriteToast.innerHTML = message;
+        htmlFavoriteToast.classList.remove('hidden');
+        if (undoTimer) clearTimeout(undoTimer);
+        undoTimer = setTimeout(() => {
+            htmlFavoriteToast.classList.add('hidden');
+        }, 5000);
+    }
+
+    function deleteFavorite(index) {
+        const [fav] = htmlFavorites.splice(index, 1);
+        deletedFavorite = { fav, index };
+        saveHtmlFavorites();
+        populateHtmlFavorites();
+        showToast(`Plantilla eliminada ✓ <button id="undo-template-delete" class="underline ml-2">Deshacer</button>`);
+        const undoBtn = getElem('undo-template-delete');
+        if (undoBtn) {
+            undoBtn.addEventListener('click', () => {
+                if (deletedFavorite) {
+                    htmlFavorites.splice(deletedFavorite.index, 0, deletedFavorite.fav);
+                    saveHtmlFavorites();
+                    populateHtmlFavorites();
+                    deletedFavorite = null;
+                }
+                htmlFavoriteToast.classList.add('hidden');
+            });
+        }
+    }
+
+    templateSearch.addEventListener('input', (e) => {
+        templateSearchQuery = e.target.value.toLowerCase();
+        templatePage = 0;
+        populateHtmlFavorites();
+    });
+
+    templateSort.addEventListener('change', (e) => {
+        templateSortMode = e.target.value;
+        populateHtmlFavorites();
+    });
+
+    toggleTemplateEdit.addEventListener('click', () => {
+        favoritesEditMode = !favoritesEditMode;
+        toggleTemplateEdit.classList.toggle('bg-indigo-600');
+        toggleTemplateEdit.classList.toggle('text-white');
+        populateHtmlFavorites();
+    });
+
+    prevTemplatePage.addEventListener('click', () => {
+        if (templatePage > 0) {
+            templatePage--;
+            populateHtmlFavorites();
+        }
+    });
+
+    nextTemplatePage.addEventListener('click', () => {
+        templatePage++;
+        populateHtmlFavorites();
+    });
+
+    exportHtmlFavoritesBtn.addEventListener('click', async () => {
+        await loadHtmlFavorites();
+        const blob = new Blob([JSON.stringify(htmlFavorites, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'html-favorites.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    importHtmlFavoritesBtn.addEventListener('click', () => importHtmlFile.click());
+
+    importHtmlFile.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+            if (Array.isArray(data)) {
+                htmlFavorites = data.map(f => ({
+                    name: f.name,
+                    code: f.code,
+                    tags: f.tags || [],
+                    favorite: !!f.favorite,
+                    uses: f.uses || 0,
+                    created: f.created || Date.now()
+                }));
+                await saveHtmlFavorites();
+                populateHtmlFavorites();
+            }
+        } catch (err) {
+            console.error('Error importing favorites', err);
+        } finally {
+            importHtmlFile.value = '';
+        }
+    });
 
     insertHtmlBtn.addEventListener('click', () => {
         const html = htmlCodeInput.value;
@@ -2804,12 +3037,19 @@ document.addEventListener('DOMContentLoaded', function () {
     saveHtmlFavoriteBtn.addEventListener('click', async () => {
         const name = htmlFavoriteName.value.trim();
         const code = htmlCodeInput.value;
+        const tags = htmlFavoriteTags.value.split(',').map(t => t.trim()).filter(Boolean);
         if (!name || !code) return;
-        const favorites = await loadHtmlFavorites();
-        favorites.push({ name, code });
-        await db.set('keyvalue', { key: 'htmlFavorites', value: favorites });
+        await loadHtmlFavorites();
+        if (editingFavoriteIndex !== null) {
+            htmlFavorites[editingFavoriteIndex] = { ...htmlFavorites[editingFavoriteIndex], name, code, tags };
+            editingFavoriteIndex = null;
+        } else {
+            htmlFavorites.push({ name, code, tags, favorite: false, uses: 0, created: Date.now() });
+        }
+        await saveHtmlFavorites();
         await populateHtmlFavorites();
         htmlFavoriteName.value = '';
+        htmlFavoriteTags.value = '';
     });
 
     function gatherNotesContext() {
