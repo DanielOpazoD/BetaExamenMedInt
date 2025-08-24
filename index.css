@@ -254,7 +254,9 @@
 
 /* Tooltip para mostrar el contenido de la nota en línea */
 .inline-note-tooltip {
-    position: absolute;
+    position: fixed;
+    top: 20px;
+    left: 20px;
     background-color: var(--bg-secondary);
     color: var(--text-primary);
     border: 1px solid var(--border-color);

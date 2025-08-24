@@ -3334,11 +3334,25 @@ document.addEventListener('DOMContentLoaded', function () {
         // Keep existing postits and quick note data
         const existingPostits = currentNotesArray[activeNoteIndex].postits || {};
         const existingQuickNote = currentNotesArray[activeNoteIndex].quickNote || '';
+
+        // Build an updated set of postits based on icons present in the editor
+        const updatedPostits = {};
+        notesEditor.querySelectorAll('.inline-note').forEach(icon => {
+            const id = icon.dataset.subnoteId || icon.dataset.postitId;
+            if (!id) return;
+            if (existingPostits[id]) {
+                updatedPostits[id] = existingPostits[id];
+            } else {
+                // Ensure newly added icons have an associated placeholder entry
+                updatedPostits[id] = { title: '', content: '' };
+            }
+        });
+
         currentNotesArray[activeNoteIndex] = {
             title: currentTitle,
             content: currentContent,
             lastEdited: new Date().toISOString(),
-            postits: existingPostits,
+            postits: updatedPostits,
             quickNote: existingQuickNote
         };
 
@@ -3638,9 +3652,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         document.body.appendChild(tooltip);
-        const rect = icon.getBoundingClientRect();
-        tooltip.style.top = `${rect.bottom + window.scrollY + 4}px`;
-        tooltip.style.left = `${rect.left + window.scrollX}px`;
+        // Display tooltip from a fixed location in the viewport
+        tooltip.style.top = '20px';
+        tooltip.style.left = '20px';
         icon._tooltip = tooltip;
     }
 
