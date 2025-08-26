@@ -869,23 +869,51 @@ table.resizable-table .table-resize-handle {
 /* Tabs for multiple open notes */
 #note-tabs-bar {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 40px;
   display: flex;
   align-items: center;
   background-color: var(--tab-bar-bg, #1f2937);
   color: #fff;
   z-index: 1200;
+  font-size: 0.85rem;
 }
+
+.tab-bar-top {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 32px;
+  flex-direction: row;
+}
+.tab-bar-bottom {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 32px;
+  flex-direction: row;
+}
+.tab-bar-left {
+  top: 0;
+  left: 0;
+  width: 32px;
+  height: 100%;
+  flex-direction: column;
+}
+.tab-bar-right {
+  top: 0;
+  right: 0;
+  width: 32px;
+  height: 100%;
+  flex-direction: column;
+}
+
 #note-tabs-wrapper {
   flex: 1;
   overflow: hidden;
+  height: 100%;
 }
 #note-tabs {
   display: flex;
-  overflow-x: auto;
+  overflow: auto;
   scrollbar-width: none;
 }
 #note-tabs::-webkit-scrollbar {
@@ -894,12 +922,18 @@ table.resizable-table .table-resize-handle {
 .note-tab {
   display: flex;
   align-items: center;
-  height: 40px;
-  padding: 0 8px;
+  height: 32px;
+  padding: 0 6px;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.1);
   margin-right: 4px;
   border-radius: 4px 4px 0 0;
+}
+#note-tabs-bar.tab-bar-left .note-tab,
+#note-tabs-bar.tab-bar-right .note-tab {
+  margin-right: 0;
+  margin-bottom: 4px;
+  border-radius: 4px 0 0 4px;
 }
 .note-tab.active {
   background: rgba(255, 255, 255, 0.25);
@@ -910,26 +944,45 @@ table.resizable-table .table-resize-handle {
   cursor: pointer;
 }
 .tab-nav {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
 }
-#tab-color-select {
-  margin-left: 8px;
-  margin-right: 8px;
-  background-color: rgba(0, 0, 0, 0.3);
-  color: #fff;
-  border: none;
+
+#tab-config-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: #fff;
+  color: #000;
+  padding: 8px;
   border-radius: 4px;
-  height: 24px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  font-size: 0.75rem;
+  z-index: 1300;
 }
 
-/* Restore button visibility */
-#restore-note-btn.hidden { display: none; }
-
-body {
-  padding-top: 40px;
+#show-tab-bar-btn {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--tab-bar-bg, #1f2937);
+  color: #fff;
+  z-index: 1200;
+  cursor: pointer;
 }
+
+  /* Restore button visibility */
+  #restore-note-btn.hidden { display: none; }
+
+  body {
+    padding-top: 32px;
+  }

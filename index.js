@@ -223,12 +223,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const noteTabs = getElem('note-tabs');
     const tabsPrev = getElem('tabs-prev');
     const tabsNext = getElem('tabs-next');
+    const tabConfigBtn = getElem('tab-config-btn');
+    const tabConfigPanel = getElem('tab-config-panel');
+    const tabBarToggle = getElem('tab-bar-toggle');
     const tabColorSelect = getElem('tab-color-select');
+    const tabPositionSelect = getElem('tab-position-select');
+    const showTabBarBtn = getElem('show-tab-bar-btn');
     const minimizeNoteBtn = getElem('minimize-note-btn');
     const restoreNoteBtn = getElem('restore-note-btn');
 
     let openNoteTabs = [];
     let activeTabId = null;
+    let tabPosition = 'top';
 
     if (minimizeNoteBtn && restoreNoteBtn) {
         minimizeNoteBtn.addEventListener('click', () => {
@@ -241,22 +247,84 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    if (tabConfigBtn && tabConfigPanel) {
+        tabConfigBtn.addEventListener('click', () => {
+            tabConfigPanel.classList.toggle('hidden');
+        });
+    }
+
+    if (tabBarToggle) {
+        tabBarToggle.addEventListener('change', () => {
+            const show = tabBarToggle.checked;
+            noteTabsBar.classList.toggle('hidden', !show || openNoteTabs.length === 0);
+            showTabBarBtn.classList.toggle('hidden', show);
+            if (!show) tabConfigPanel.classList.add('hidden');
+        });
+    }
+
+    if (showTabBarBtn) {
+        showTabBarBtn.addEventListener('click', () => {
+            tabBarToggle.checked = true;
+            noteTabsBar.classList.toggle('hidden', openNoteTabs.length === 0);
+            showTabBarBtn.classList.add('hidden');
+        });
+    }
+
     if (tabColorSelect) {
         tabColorSelect.addEventListener('change', (e) => {
             noteTabsBar.style.setProperty('--tab-bar-bg', e.target.value);
+            showTabBarBtn.style.backgroundColor = e.target.value;
         });
+        noteTabsBar.style.setProperty('--tab-bar-bg', tabColorSelect.value);
+        showTabBarBtn.style.backgroundColor = tabColorSelect.value;
+    }
+
+    function setTabBarPosition(pos) {
+        tabPosition = pos;
+        const classes = ['tab-bar-top','tab-bar-bottom','tab-bar-left','tab-bar-right'];
+        noteTabsBar.classList.remove(...classes);
+        noteTabsBar.classList.add('tab-bar-' + pos);
+        noteTabs.style.flexDirection = (pos === 'left' || pos === 'right') ? 'column' : 'row';
+        document.body.style.paddingTop = document.body.style.paddingBottom = document.body.style.paddingLeft = document.body.style.paddingRight = '';
+        if (pos === 'top') document.body.style.paddingTop = '32px';
+        if (pos === 'bottom') document.body.style.paddingBottom = '32px';
+        if (pos === 'left') document.body.style.paddingLeft = '32px';
+        if (pos === 'right') document.body.style.paddingRight = '32px';
+        tabsPrev.textContent = (pos === 'left' || pos === 'right') ? '▲' : '◀';
+        tabsNext.textContent = (pos === 'left' || pos === 'right') ? '▼' : '▶';
+        updateTabNav();
+    }
+
+    if (tabPositionSelect) {
+        tabPositionSelect.addEventListener('change', (e) => setTabBarPosition(e.target.value));
+        setTabBarPosition(tabPositionSelect.value);
+    }
+
+    function isVertical() {
+        return tabPosition === 'left' || tabPosition === 'right';
     }
 
     function updateTabNav() {
         if (!noteTabs || !tabsPrev || !tabsNext) return;
-        const overflow = noteTabs.scrollWidth > noteTabs.clientWidth;
+        const overflow = isVertical()
+            ? noteTabs.scrollHeight > noteTabs.clientHeight
+            : noteTabs.scrollWidth > noteTabs.clientWidth;
         tabsPrev.classList.toggle('hidden', !overflow);
         tabsNext.classList.toggle('hidden', !overflow);
     }
 
+    function scrollTabs(delta) {
+        if (!noteTabs) return;
+        if (isVertical()) {
+            noteTabs.scrollBy({ top: delta, behavior: 'smooth' });
+        } else {
+            noteTabs.scrollBy({ left: delta, behavior: 'smooth' });
+        }
+    }
+
     if (tabsPrev && tabsNext && noteTabs) {
-        tabsPrev.addEventListener('click', () => noteTabs.scrollBy({ left: -100, behavior: 'smooth' }));
-        tabsNext.addEventListener('click', () => noteTabs.scrollBy({ left: 100, behavior: 'smooth' }));
+        tabsPrev.addEventListener('click', () => scrollTabs(-100));
+        tabsNext.addEventListener('click', () => scrollTabs(100));
         noteTabs.addEventListener('scroll', updateTabNav);
         window.addEventListener('resize', updateTabNav);
     }
@@ -3623,7 +3691,9 @@ document.addEventListener('DOMContentLoaded', function () {
             noteTabs.appendChild(tabBtn);
         });
         if (noteTabsBar) {
-            noteTabsBar.classList.toggle('hidden', openNoteTabs.length === 0);
+            const show = openNoteTabs.length > 0 && (!tabBarToggle || tabBarToggle.checked);
+            noteTabsBar.classList.toggle('hidden', !show);
+            showTabBarBtn.classList.toggle('hidden', show || openNoteTabs.length === 0);
         }
         updateTabNav();
     }
@@ -4099,14 +4169,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 topicWrapper.appendChild(titleEl);
 
                 if (hasNotes) {
-                    topicData.notes.forEach(note => {
-                        const noteContent = document.createElement('div');
-                        noteContent.innerHTML = note.content;
-                        noteContent.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
-                            link.outerHTML = `<span>${link.innerHTML}</span>`;
-                        });
-                        topicWrapper.appendChild(noteContent);
+                    const note = topicData.notes[0];
+                    const noteContent = document.createElement('div');
+                    noteContent.innerHTML = note.content;
+                    noteContent.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
+                        link.outerHTML = `<span>${link.innerHTML}</span>`;
                     });
+                    topicWrapper.appendChild(noteContent);
                 } else {
                     const placeholder = document.createElement('p');
                     placeholder.textContent = 'Tema no desarrollado.';
@@ -4205,16 +4274,15 @@ document.addEventListener('DOMContentLoaded', function () {
             topicWrapper.appendChild(titleEl);
 
             if (hasNotes) {
-                topicData.notes.forEach(note => {
-                    const noteContent = document.createElement('div');
-                    noteContent.innerHTML = note.content;
-                    // Sanitize links for printing
-                    // Convert sub-note and post-it links back to plain text for printing
-                    noteContent.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
-                        link.outerHTML = `<span>${link.innerHTML}</span>`;
-                    });
-                    topicWrapper.appendChild(noteContent);
+                const note = topicData.notes[0];
+                const noteContent = document.createElement('div');
+                noteContent.innerHTML = note.content;
+                // Sanitize links for printing
+                // Convert sub-note and post-it links back to plain text for printing
+                noteContent.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
+                    link.outerHTML = `<span>${link.innerHTML}</span>`;
                 });
+                topicWrapper.appendChild(noteContent);
             } else {
                 const placeholder = document.createElement('p');
                 placeholder.textContent = 'Tema no desarrollado.';

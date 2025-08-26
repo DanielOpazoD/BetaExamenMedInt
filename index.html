@@ -18,18 +18,33 @@
 <link rel="stylesheet" href="/index.css">
 </head>
 <body class="antialiased">
-    <div id="note-tabs-bar" class="hidden">
+    <button id="show-tab-bar-btn" class="hidden" title="Mostrar pestañas">☰</button>
+    <div id="note-tabs-bar" class="hidden tab-bar-top">
         <button id="tabs-prev" class="tab-nav hidden">◀</button>
         <div id="note-tabs-wrapper">
             <div id="note-tabs"></div>
         </div>
         <button id="tabs-next" class="tab-nav hidden">▶</button>
-        <select id="tab-color-select" title="Color de pestañas">
-            <option value="#1f2937">Oscuro</option>
-            <option value="#1e3a8a">Azul</option>
-            <option value="#14532d">Verde</option>
-            <option value="#7f1d1d">Rojo</option>
-        </select>
+        <button id="tab-config-btn" class="tab-nav" title="Configuración">⚙️</button>
+        <div id="tab-config-panel" class="hidden">
+            <label><input type="checkbox" id="tab-bar-toggle" checked> Mostrar barra</label>
+            <label>Color: 
+                <select id="tab-color-select">
+                    <option value="#1f2937">Oscuro</option>
+                    <option value="#1e3a8a">Azul</option>
+                    <option value="#14532d">Verde</option>
+                    <option value="#7f1d1d">Rojo</option>
+                </select>
+            </label>
+            <label>Posición:
+                <select id="tab-position-select">
+                    <option value="top">Arriba</option>
+                    <option value="bottom">Abajo</option>
+                    <option value="left">Izquierda</option>
+                    <option value="right">Derecha</option>
+                </select>
+            </label>
+        </div>
     </div>
 
     <div class="max-w-7xl mx-auto bg-secondary rounded-xl shadow-lg overflow-hidden my-8">
