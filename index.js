@@ -219,7 +219,11 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentHtmlEditor = null;
     let editingFavoriteIndex = null;
 
+    const noteTabsBar = getElem('note-tabs-bar');
     const noteTabs = getElem('note-tabs');
+    const tabsPrev = getElem('tabs-prev');
+    const tabsNext = getElem('tabs-next');
+    const tabColorSelect = getElem('tab-color-select');
     const minimizeNoteBtn = getElem('minimize-note-btn');
     const restoreNoteBtn = getElem('restore-note-btn');
 
@@ -235,6 +239,26 @@ document.addEventListener('DOMContentLoaded', function () {
             notesModal.classList.add('visible');
             restoreNoteBtn.classList.add('hidden');
         });
+    }
+
+    if (tabColorSelect) {
+        tabColorSelect.addEventListener('change', (e) => {
+            noteTabsBar.style.setProperty('--tab-bar-bg', e.target.value);
+        });
+    }
+
+    function updateTabNav() {
+        if (!noteTabs || !tabsPrev || !tabsNext) return;
+        const overflow = noteTabs.scrollWidth > noteTabs.clientWidth;
+        tabsPrev.classList.toggle('hidden', !overflow);
+        tabsNext.classList.toggle('hidden', !overflow);
+    }
+
+    if (tabsPrev && tabsNext && noteTabs) {
+        tabsPrev.addEventListener('click', () => noteTabs.scrollBy({ left: -100, behavior: 'smooth' }));
+        tabsNext.addEventListener('click', () => noteTabs.scrollBy({ left: 100, behavior: 'smooth' }));
+        noteTabs.addEventListener('scroll', updateTabNav);
+        window.addEventListener('resize', updateTabNav);
     }
     let favoritesEditMode = false;
     let templateSearchQuery = '';
@@ -3598,6 +3622,10 @@ document.addEventListener('DOMContentLoaded', function () {
             tabBtn.addEventListener('click', () => switchToTab(tab.id));
             noteTabs.appendChild(tabBtn);
         });
+        if (noteTabsBar) {
+            noteTabsBar.classList.toggle('hidden', openNoteTabs.length === 0);
+        }
+        updateTabNav();
     }
 
     function saveActiveTab() {

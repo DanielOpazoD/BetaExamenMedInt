@@ -18,6 +18,19 @@
 <link rel="stylesheet" href="/index.css">
 </head>
 <body class="antialiased">
+    <div id="note-tabs-bar" class="hidden">
+        <button id="tabs-prev" class="tab-nav hidden">◀</button>
+        <div id="note-tabs-wrapper">
+            <div id="note-tabs"></div>
+        </div>
+        <button id="tabs-next" class="tab-nav hidden">▶</button>
+        <select id="tab-color-select" title="Color de pestañas">
+            <option value="#1f2937">Oscuro</option>
+            <option value="#1e3a8a">Azul</option>
+            <option value="#14532d">Verde</option>
+            <option value="#7f1d1d">Rojo</option>
+        </select>
+    </div>
 
     <div class="max-w-7xl mx-auto bg-secondary rounded-xl shadow-lg overflow-hidden my-8">
         <div class="p-6 sm:p-8">
@@ -340,7 +353,6 @@
                           <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                         </svg>
                     </button>
-                    <div id="note-tabs" class="flex border-b border-border-color"></div>
                      <div class="flex justify-between items-center mb-4 flex-shrink-0 pl-10">
                         <h3 id="notes-modal-title" class="text-xl font-bold text-primary truncate" contenteditable="true"></h3>
                         <div class="flex items-center gap-1">
