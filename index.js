@@ -464,13 +464,35 @@ document.addEventListener('DOMContentLoaded', function () {
     const subNoteModal = getElem('subnote-modal');
     const subNoteTitle = getElem('subnote-title');
     const subNoteEditor = getElem('subnote-editor');
+    const toggleHtmlPasteBtn = getElem('toggle-html-paste-btn');
+
+    let htmlPasteEnabled = false;
+
+    function encodeHtml(html) {
+        const div = document.createElement('div');
+        div.textContent = html;
+        return div.innerHTML;
+    }
+
+    if (toggleHtmlPasteBtn) {
+        toggleHtmlPasteBtn.addEventListener('click', () => {
+            htmlPasteEnabled = !htmlPasteEnabled;
+            toggleHtmlPasteBtn.classList.toggle('active', htmlPasteEnabled);
+        });
+    }
 
     [notesEditor, subNoteEditor].forEach(editor => {
         if (editor) {
             editor.addEventListener('paste', (e) => {
                 e.preventDefault();
-                const text = (e.clipboardData || window.clipboardData).getData('text/plain');
-                document.execCommand('insertText', false, text);
+                const clipboard = e.clipboardData || window.clipboardData;
+                if (htmlPasteEnabled) {
+                    const html = clipboard.getData('text/html') || clipboard.getData('text/plain');
+                    document.execCommand('insertHTML', false, encodeHtml(html));
+                } else {
+                    const text = clipboard.getData('text/plain');
+                    document.execCommand('insertText', false, text);
+                }
             });
         }
     });
