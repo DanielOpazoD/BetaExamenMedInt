@@ -464,13 +464,36 @@ document.addEventListener('DOMContentLoaded', function () {
     const subNoteModal = getElem('subnote-modal');
     const subNoteTitle = getElem('subnote-title');
     const subNoteEditor = getElem('subnote-editor');
+    const toggleHtmlPasteBtn = getElem('toggle-html-paste-btn');
+
+    let htmlPasteEnabled = false;
+
+    function sanitizeHtml(html) {
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        div.querySelectorAll('script,style').forEach(el => el.remove());
+        return div.innerHTML;
+    }
+
+    if (toggleHtmlPasteBtn) {
+        toggleHtmlPasteBtn.addEventListener('click', () => {
+            htmlPasteEnabled = !htmlPasteEnabled;
+            toggleHtmlPasteBtn.classList.toggle('active', htmlPasteEnabled);
+        });
+    }
 
     [notesEditor, subNoteEditor].forEach(editor => {
         if (editor) {
             editor.addEventListener('paste', (e) => {
                 e.preventDefault();
-                const text = (e.clipboardData || window.clipboardData).getData('text/plain');
-                document.execCommand('insertText', false, text);
+                const clipboard = e.clipboardData || window.clipboardData;
+                const html = clipboard.getData('text/html');
+                if (htmlPasteEnabled && html) {
+                    document.execCommand('insertHTML', false, sanitizeHtml(html));
+                } else {
+                    const text = clipboard.getData('text/plain');
+                    document.execCommand('insertText', false, text);
+                }
             });
         }
     });
