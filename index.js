@@ -279,6 +279,9 @@ document.addEventListener('DOMContentLoaded', function () {
         showTabBarBtn.style.backgroundColor = tabColorSelect.value;
     }
 
+    const H_BAR_SIZE = 32;
+    const V_BAR_SIZE = 150;
+
     function setTabBarPosition(pos) {
         tabPosition = pos;
         const classes = ['tab-bar-top','tab-bar-bottom','tab-bar-left','tab-bar-right'];
@@ -286,10 +289,10 @@ document.addEventListener('DOMContentLoaded', function () {
         noteTabsBar.classList.add('tab-bar-' + pos);
         noteTabs.style.flexDirection = (pos === 'left' || pos === 'right') ? 'column' : 'row';
         document.body.style.paddingTop = document.body.style.paddingBottom = document.body.style.paddingLeft = document.body.style.paddingRight = '';
-        if (pos === 'top') document.body.style.paddingTop = '32px';
-        if (pos === 'bottom') document.body.style.paddingBottom = '32px';
-        if (pos === 'left') document.body.style.paddingLeft = '32px';
-        if (pos === 'right') document.body.style.paddingRight = '32px';
+        if (pos === 'top') document.body.style.paddingTop = `${H_BAR_SIZE}px`;
+        if (pos === 'bottom') document.body.style.paddingBottom = `${H_BAR_SIZE}px`;
+        if (pos === 'left') document.body.style.paddingLeft = `${V_BAR_SIZE}px`;
+        if (pos === 'right') document.body.style.paddingRight = `${V_BAR_SIZE}px`;
         tabsPrev.textContent = (pos === 'left' || pos === 'right') ? '▲' : '◀';
         tabsNext.textContent = (pos === 'left' || pos === 'right') ? '▼' : '▶';
         updateTabNav();

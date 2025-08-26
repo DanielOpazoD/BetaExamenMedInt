@@ -894,14 +894,14 @@ table.resizable-table .table-resize-handle {
 .tab-bar-left {
   top: 0;
   left: 0;
-  width: 32px;
+  width: 150px;
   height: 100%;
   flex-direction: column;
 }
 .tab-bar-right {
   top: 0;
   right: 0;
-  width: 32px;
+  width: 150px;
   height: 100%;
   flex-direction: column;
 }
@@ -928,12 +928,16 @@ table.resizable-table .table-resize-handle {
   background: rgba(255, 255, 255, 0.1);
   margin-right: 4px;
   border-radius: 4px 4px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 #note-tabs-bar.tab-bar-left .note-tab,
 #note-tabs-bar.tab-bar-right .note-tab {
   margin-right: 0;
   margin-bottom: 4px;
   border-radius: 4px 0 0 4px;
+  width: 100%;
 }
 .note-tab.active {
   background: rgba(255, 255, 255, 0.25);
@@ -954,8 +958,6 @@ table.resizable-table .table-resize-handle {
 
 #tab-config-panel {
   position: absolute;
-  top: 100%;
-  right: 0;
   background: #fff;
   color: #000;
   padding: 8px;
@@ -963,6 +965,26 @@ table.resizable-table .table-resize-handle {
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
   font-size: 0.75rem;
   z-index: 1300;
+}
+
+#note-tabs-bar.tab-bar-top #tab-config-panel {
+  top: 100%;
+  right: 0;
+}
+
+#note-tabs-bar.tab-bar-bottom #tab-config-panel {
+  bottom: 100%;
+  right: 0;
+}
+
+#note-tabs-bar.tab-bar-left #tab-config-panel {
+  top: 0;
+  left: 100%;
+}
+
+#note-tabs-bar.tab-bar-right #tab-config-panel {
+  top: 0;
+  right: 100%;
 }
 
 #show-tab-bar-btn {
