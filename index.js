@@ -113,6 +113,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const notesModalTitle = getElem('notes-modal-title');
     const notesEditor = getElem('notes-editor');
     const editorToolbar = notesModal.querySelector('.editor-toolbar');
+    const notesTabs = getElem('notes-tabs');
+    const minimizeNoteBtn = getElem('minimize-note-btn');
+    const restoreNoteBtn = getElem('restore-note-btn');
     const saveNoteBtn = getElem('save-note-btn');
     const saveAndCloseNoteBtn = getElem('save-and-close-note-btn');
     const cancelNoteBtn = getElem('cancel-note-btn');
@@ -355,6 +358,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveCloseSubnoteBtn = getElem('save-close-subnote-btn');
     const saveSubnoteBtn = getElem('save-subnote-btn');
     const cancelSubnoteBtn = getElem('cancel-subnote-btn');
+
+    const handlePlainPaste = (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+        document.execCommand('insertText', false, text);
+    };
+    notesEditor.addEventListener('paste', handlePlainPaste);
+    if (subNoteEditor) subNoteEditor.addEventListener('paste', handlePlainPaste);
     const toggleSubnoteReadOnlyBtn = getElem('toggle-subnote-readonly-btn');
 
     // Note style modal elements
@@ -654,7 +665,7 @@ document.addEventListener('DOMContentLoaded', function () {
         lhPlaceholder.disabled = true;
         lhPlaceholder.selected = true;
         selectSNLineHeight.appendChild(lhPlaceholder);
-        const lineHeights = { 'Grande': '2.0', 'Normal': '', 'Pequeño': '1.4', 'Muy Pequeño': '1.2', 'Extremo Pequeño': '1.0' };
+        const lineHeights = { 'Grande': '2.0', 'Normal': '1.6', 'Pequeño': '1.4', 'Muy Pequeño': '1.2', 'Extremo Pequeño': '1.0' };
         for (const [name, value] of Object.entries(lineHeights)) {
             const option = document.createElement('option');
             option.value = value;
@@ -677,6 +688,39 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         subNoteToolbar.appendChild(selectSNLineHeight);
+
+        const decreaseSNLineHeightBtn = document.createElement('button');
+        decreaseSNLineHeightBtn.className = 'toolbar-btn';
+        decreaseSNLineHeightBtn.textContent = '−';
+        decreaseSNLineHeightBtn.title = 'Disminuir interlineado';
+        const increaseSNLineHeightBtn = document.createElement('button');
+        increaseSNLineHeightBtn.className = 'toolbar-btn';
+        increaseSNLineHeightBtn.textContent = '+';
+        increaseSNLineHeightBtn.title = 'Aumentar interlineado';
+
+        const adjustSNLineHeight = (delta) => {
+            const elements = getSelectedBlocksSN();
+            if (elements.length > 0) {
+                elements.forEach(block => {
+                    if (block && subNoteEditor.contains(block)) {
+                        const computed = getComputedStyle(block);
+                        const current = parseFloat(computed.lineHeight);
+                        const fontSize = parseFloat(computed.fontSize);
+                        let lh = current / fontSize;
+                        if (isNaN(lh) || lh === 0) lh = 1.6;
+                        lh = Math.max(1.0, lh + delta);
+                        block.style.lineHeight = lh.toFixed(1);
+                    }
+                });
+                subNoteEditor.focus();
+            }
+        };
+
+        decreaseSNLineHeightBtn.addEventListener('click', () => adjustSNLineHeight(-0.1));
+        increaseSNLineHeightBtn.addEventListener('click', () => adjustSNLineHeight(0.1));
+        subNoteToolbar.appendChild(decreaseSNLineHeightBtn);
+        subNoteToolbar.appendChild(increaseSNLineHeightBtn);
+
         subNoteToolbar.appendChild(createSNSeparator());
         // Color palettes (text, highlight, line highlight)
         const textColors = ['#000000'];
@@ -1944,7 +1988,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         const orderedLineHeights = {
             'Grande': '2.0',
-            'Normal': '',
+            'Normal': '1.6',
             'Pequeño': '1.4',
             'Muy Pequeño': '1.2',
             'Extremo Pequeño': '1.0'
@@ -1974,6 +2018,37 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(selectLineHeight);
 
+        const decreaseLineHeightBtn = document.createElement('button');
+        decreaseLineHeightBtn.className = 'toolbar-btn';
+        decreaseLineHeightBtn.textContent = '−';
+        decreaseLineHeightBtn.title = 'Disminuir interlineado';
+        const increaseLineHeightBtn = document.createElement('button');
+        increaseLineHeightBtn.className = 'toolbar-btn';
+        increaseLineHeightBtn.textContent = '+';
+        increaseLineHeightBtn.title = 'Aumentar interlineado';
+
+        function adjustLineHeight(delta) {
+            const elements = getSelectedBlockElements();
+            if (elements.length > 0) {
+                elements.forEach(block => {
+                    if (block && notesEditor.contains(block)) {
+                        const computed = getComputedStyle(block);
+                        const current = parseFloat(computed.lineHeight);
+                        const fontSize = parseFloat(computed.fontSize);
+                        let lh = current / fontSize;
+                        if (isNaN(lh) || lh === 0) lh = 1.6;
+                        lh = Math.max(1.0, lh + delta);
+                        block.style.lineHeight = lh.toFixed(1);
+                    }
+                });
+                notesEditor.focus();
+            }
+        }
+
+        decreaseLineHeightBtn.addEventListener('click', () => adjustLineHeight(-0.1));
+        increaseLineHeightBtn.addEventListener('click', () => adjustLineHeight(0.1));
+        editorToolbar.appendChild(decreaseLineHeightBtn);
+        editorToolbar.appendChild(increaseLineHeightBtn);
 
         editorToolbar.appendChild(createSeparator());
 
@@ -3319,6 +3394,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Note Modal Functions ---
     function closeNotesModal() {
         hideModal(notesModal);
+        if (restoreNoteBtn) restoreNoteBtn.classList.add('hidden');
+        if (notesTabs) notesTabs.innerHTML = '';
         activeNoteIcon = null;
         currentNoteRow = null;
         currentNotesArray = [];
@@ -3432,10 +3509,11 @@ document.addEventListener('DOMContentLoaded', function () {
             li.appendChild(btn);
             notesList.appendChild(li);
         });
-        
+
         if(notesModalCounter) {
             notesModalCounter.textContent = `${activeNoteIndex + 1} / ${currentNotesArray.length}`;
         }
+        renderTabs();
     }
 
     function loadNoteIntoEditor(index) {
@@ -3446,10 +3524,10 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             index = 0; // fallback to the first note
         }
-        
+
         activeNoteIndex = index;
         const note = currentNotesArray[index];
-        
+
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
         notesEditor.querySelectorAll('table').forEach(initTableResize);
@@ -3457,6 +3535,23 @@ document.addEventListener('DOMContentLoaded', function () {
         renderNotesList();
         notesEditor.focus();
         updateNoteInfo();
+    }
+
+    function renderTabs() {
+        if (!notesTabs) return;
+        notesTabs.innerHTML = '';
+        currentNotesArray.forEach((note, idx) => {
+            const tab = document.createElement('button');
+            tab.className = 'note-tab';
+            tab.dataset.index = idx;
+            tab.textContent = note.title || `Nota ${idx + 1}`;
+            tab.addEventListener('click', () => {
+                saveCurrentNote();
+                loadNoteIntoEditor(idx);
+            });
+            if (idx === activeNoteIndex) tab.classList.add('active');
+            notesTabs.appendChild(tab);
+        });
     }
     
     function addNewNote(shouldSaveCurrent = true) {
@@ -4308,6 +4403,16 @@ document.addEventListener('DOMContentLoaded', function () {
             saveCurrentNote();
             closeNotesModal();
         });
+        if (minimizeNoteBtn && restoreNoteBtn) {
+            minimizeNoteBtn.addEventListener('click', () => {
+                hideModal(notesModal);
+                restoreNoteBtn.classList.remove('hidden');
+            });
+            restoreNoteBtn.addEventListener('click', () => {
+                showModal(notesModal);
+                restoreNoteBtn.classList.add('hidden');
+            });
+        }
         
         unmarkNoteBtn.addEventListener('click', async () => {
             const confirmed = await showConfirmation("¿Estás seguro de que quieres borrar todo el contenido de esta nota?");
