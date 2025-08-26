@@ -468,9 +468,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let htmlPasteEnabled = false;
 
-    function encodeHtml(html) {
+    function sanitizeHtml(html) {
         const div = document.createElement('div');
-        div.textContent = html;
+        div.innerHTML = html;
+        div.querySelectorAll('script,style').forEach(el => el.remove());
         return div.innerHTML;
     }
 
@@ -486,9 +487,9 @@ document.addEventListener('DOMContentLoaded', function () {
             editor.addEventListener('paste', (e) => {
                 e.preventDefault();
                 const clipboard = e.clipboardData || window.clipboardData;
-                if (htmlPasteEnabled) {
-                    const html = clipboard.getData('text/html') || clipboard.getData('text/plain');
-                    document.execCommand('insertHTML', false, encodeHtml(html));
+                const html = clipboard.getData('text/html');
+                if (htmlPasteEnabled && html) {
+                    document.execCommand('insertHTML', false, sanitizeHtml(html));
                 } else {
                     const text = clipboard.getData('text/plain');
                     document.execCommand('insertText', false, text);
