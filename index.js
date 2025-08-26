@@ -218,6 +218,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const htmlFavoriteToast = getElem('html-favorite-toast');
     let currentHtmlEditor = null;
     let editingFavoriteIndex = null;
+
+    const noteTabs = getElem('note-tabs');
+    const minimizeNoteBtn = getElem('minimize-note-btn');
+    const restoreNoteBtn = getElem('restore-note-btn');
+
+    let openNoteTabs = [];
+    let activeTabId = null;
+
+    if (minimizeNoteBtn && restoreNoteBtn) {
+        minimizeNoteBtn.addEventListener('click', () => {
+            notesModal.classList.remove('visible');
+            restoreNoteBtn.classList.remove('hidden');
+        });
+        restoreNoteBtn.addEventListener('click', () => {
+            notesModal.classList.add('visible');
+            restoreNoteBtn.classList.add('hidden');
+        });
+    }
     let favoritesEditMode = false;
     let templateSearchQuery = '';
     let templateSortMode = 'recent';
@@ -351,6 +369,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const subNoteModal = getElem('subnote-modal');
     const subNoteTitle = getElem('subnote-title');
     const subNoteEditor = getElem('subnote-editor');
+
+    [notesEditor, subNoteEditor].forEach(editor => {
+        if (editor) {
+            editor.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+                document.execCommand('insertText', false, text);
+            });
+        }
+    });
     const subNoteToolbar = getElem('subnote-toolbar');
     const saveCloseSubnoteBtn = getElem('save-close-subnote-btn');
     const saveSubnoteBtn = getElem('save-subnote-btn');
@@ -654,7 +682,7 @@ document.addEventListener('DOMContentLoaded', function () {
         lhPlaceholder.disabled = true;
         lhPlaceholder.selected = true;
         selectSNLineHeight.appendChild(lhPlaceholder);
-        const lineHeights = { 'Grande': '2.0', 'Normal': '', 'Pequeño': '1.4', 'Muy Pequeño': '1.2', 'Extremo Pequeño': '1.0' };
+        const lineHeights = { 'Grande': '2.0', 'Normal': '1.6', 'Pequeño': '1.4', 'Muy Pequeño': '1.2', 'Extremo Pequeño': '1.0' };
         for (const [name, value] of Object.entries(lineHeights)) {
             const option = document.createElement('option');
             option.value = value;
@@ -677,6 +705,24 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         subNoteToolbar.appendChild(selectSNLineHeight);
+
+        const adjustSNLineHeight = (delta) => {
+            const blocks = getSelectedBlocksSN();
+            blocks.forEach(block => {
+                if (block && subNoteEditor.contains(block)) {
+                    const computed = window.getComputedStyle(block);
+                    const fontSize = parseFloat(computed.fontSize);
+                    let lh = parseFloat(computed.lineHeight) / fontSize;
+                    if (isNaN(lh)) lh = 1.6;
+                    lh = Math.max(1, lh + delta);
+                    block.style.lineHeight = lh.toFixed(1);
+                }
+            });
+            subNoteEditor.focus();
+        };
+
+        subNoteToolbar.appendChild(createSNButton('Reducir interlineado', '-', null, null, () => adjustSNLineHeight(-0.2)));
+        subNoteToolbar.appendChild(createSNButton('Aumentar interlineado', '+', null, null, () => adjustSNLineHeight(0.2)));
         subNoteToolbar.appendChild(createSNSeparator());
         // Color palettes (text, highlight, line highlight)
         const textColors = ['#000000'];
@@ -1944,7 +1990,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         const orderedLineHeights = {
             'Grande': '2.0',
-            'Normal': '',
+            'Normal': '1.6',
             'Pequeño': '1.4',
             'Muy Pequeño': '1.2',
             'Extremo Pequeño': '1.0'
@@ -1973,6 +2019,24 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         editorToolbar.appendChild(selectLineHeight);
+
+        const adjustLineHeight = (delta) => {
+            const blocks = getSelectedBlockElements();
+            blocks.forEach(block => {
+                if (block && notesEditor.contains(block)) {
+                    const computed = window.getComputedStyle(block);
+                    const fontSize = parseFloat(computed.fontSize);
+                    let lh = parseFloat(computed.lineHeight) / fontSize;
+                    if (isNaN(lh)) lh = 1.6;
+                    lh = Math.max(1, lh + delta);
+                    block.style.lineHeight = lh.toFixed(1);
+                }
+            });
+            notesEditor.focus();
+        };
+
+        editorToolbar.appendChild(createButton('Reducir interlineado', '-', null, null, () => adjustLineHeight(-0.2)));
+        editorToolbar.appendChild(createButton('Aumentar interlineado', '+', null, null, () => adjustLineHeight(0.2)));
 
 
         editorToolbar.appendChild(createSeparator());
@@ -3348,6 +3412,9 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             currentNoteRow.dataset.notes = JSON.stringify(currentNotesArray);
         }
+
+        const currentTab = openNoteTabs.find(t => t.id === activeTabId);
+        if (currentTab) currentTab.notesArray = currentNotesArray;
         
         const hasContent = currentNotesArray.some(n => (n.content && n.content.trim() !== '' && n.content.trim() !== '<p><br></p>'));
         if (activeNoteIcon) {
@@ -3449,6 +3516,9 @@ document.addEventListener('DOMContentLoaded', function () {
         
         activeNoteIndex = index;
         const note = currentNotesArray[index];
+
+        const currentTab = openNoteTabs.find(t => t.id === activeTabId);
+        if (currentTab) currentTab.activeIndex = index;
         
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
@@ -3507,6 +3577,75 @@ document.addEventListener('DOMContentLoaded', function () {
         infoWordCount.textContent = words.length;
         infoNoteSize.textContent = formatBytes(new Blob([note.content]).size);
         infoLastEdited.textContent = note.lastEdited ? new Date(note.lastEdited).toLocaleString() : 'N/A';
+    }
+
+    function renderNoteTabs() {
+        if (!noteTabs) return;
+        noteTabs.innerHTML = '';
+        openNoteTabs.forEach(tab => {
+            const tabBtn = document.createElement('button');
+            tabBtn.className = 'note-tab' + (tab.id === activeTabId ? ' active' : '');
+            tabBtn.textContent = tab.title;
+            tabBtn.dataset.tabId = tab.id;
+            const close = document.createElement('span');
+            close.className = 'close-tab';
+            close.textContent = '×';
+            close.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeTab(tab.id);
+            });
+            tabBtn.appendChild(close);
+            tabBtn.addEventListener('click', () => switchToTab(tab.id));
+            noteTabs.appendChild(tabBtn);
+        });
+    }
+
+    function saveActiveTab() {
+        if (!activeTabId) return;
+        const tab = openNoteTabs.find(t => t.id === activeTabId);
+        if (!tab) return;
+        saveCurrentNote();
+        tab.notesArray = currentNotesArray;
+        tab.activeIndex = activeNoteIndex;
+    }
+
+    function loadTab(tab) {
+        currentNoteRow = tab.row;
+        activeNoteIcon = tab.icon;
+        currentNotesArray = tab.notesArray;
+        activeNoteIndex = tab.activeIndex || 0;
+        loadNoteIntoEditor(activeNoteIndex);
+    }
+
+    function switchToTab(id) {
+        saveActiveTab();
+        const tab = openNoteTabs.find(t => t.id === id);
+        if (!tab) return;
+        activeTabId = id;
+        loadTab(tab);
+        renderNoteTabs();
+        showModal(notesModal);
+    }
+
+    function closeTab(id) {
+        const index = openNoteTabs.findIndex(t => t.id === id);
+        if (index === -1) return;
+        if (openNoteTabs[index].id === activeTabId) {
+            saveActiveTab();
+            openNoteTabs.splice(index, 1);
+            if (openNoteTabs.length > 0) {
+                activeTabId = openNoteTabs[0].id;
+                loadTab(openNoteTabs[0]);
+                renderNoteTabs();
+            } else {
+                activeTabId = null;
+                hideModal(notesModal);
+                renderNoteTabs();
+            }
+        } else {
+            openNoteTabs.splice(index, 1);
+            renderNoteTabs();
+        }
     }
 
     function createSubnoteLink() {
@@ -4123,7 +4262,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 activeNoteIcon = target.closest('.note-icon');
                 currentNoteRow = activeNoteIcon.closest('tr');
                 const noteType = activeNoteIcon.dataset.noteType;
-                
+                const noteId = currentNoteRow.dataset.topicId || `section-${Date.now()}`;
+
                 let notesDataString;
                 if (noteType === 'section') {
                     notesDataString = currentNoteRow.dataset.sectionNote || '[]';
@@ -4131,26 +4271,35 @@ document.addEventListener('DOMContentLoaded', function () {
                     notesDataString = currentNoteRow.dataset.notes || '[]';
                 }
 
+                let parsed = [];
                 try {
-                    currentNotesArray = JSON.parse(notesDataString);
+                    parsed = JSON.parse(notesDataString);
                 } catch (err) {
                     console.error("Error parsing notes data:", err);
-                    currentNotesArray = [];
                 }
 
-                // Ensure readonly mode is off when opening
+                let tab = openNoteTabs.find(t => t.id === noteId);
+                const title = currentNoteRow.cells[1]?.textContent.trim() || 'Nota';
+                if (!tab) {
+                    tab = { id: noteId, row: currentNoteRow, icon: activeNoteIcon, notesArray: parsed, activeIndex: 0, title };
+                    openNoteTabs.push(tab);
+                } else {
+                    tab.notesArray = parsed;
+                    tab.row = currentNoteRow;
+                    tab.icon = activeNoteIcon;
+                }
+                activeTabId = noteId;
+                loadTab(tab);
+                renderNoteTabs();
+                notesSidePanel.classList.remove('open');
+                notesPanelToggle.classList.remove('open');
+                notesMainContent.style.width = '';
+                notesSidePanel.style.width = '220px';
+
                 const modalContent = notesModal.querySelector('.notes-modal-content');
                 modalContent.classList.remove('readonly-mode');
                 notesEditor.contentEditable = true;
                 notesModalTitle.contentEditable = true;
-
-                loadNoteIntoEditor(0);
-                
-                // Collapse side panel by default
-                notesSidePanel.classList.remove('open');
-                notesPanelToggle.classList.remove('open');
-                notesMainContent.style.width = ''; // Reset width
-                notesSidePanel.style.width = '220px'; // Reset width
 
                 showModal(notesModal);
                 return;

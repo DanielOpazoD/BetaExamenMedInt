@@ -340,6 +340,7 @@
                           <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                         </svg>
                     </button>
+                    <div id="note-tabs" class="flex border-b border-border-color"></div>
                      <div class="flex justify-between items-center mb-4 flex-shrink-0 pl-10">
                         <h3 id="notes-modal-title" class="text-xl font-bold text-primary truncate" contenteditable="true"></h3>
                         <div class="flex items-center gap-1">
@@ -360,6 +361,9 @@
                             <input type="file" id="import-note-file-input" class="hidden" accept=".html,.txt">
                             <button id="export-note-btn" class="toolbar-btn" title="Exportar a HTML">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                            </button>
+                            <button id="minimize-note-btn" class="toolbar-btn" title="Minimizar nota">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-minus w-5 h-5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                             </button>
                         </div>
                     </div>
@@ -679,6 +683,7 @@
         </div>
     </div>
 
+    <button id="restore-note-btn" class="hidden fixed bottom-4 left-4 p-3 bg-blue-600 text-white rounded-full shadow-lg" aria-label="Restaurar nota">📝</button>
     <button id="open-ai-panel" class="fixed bottom-4 right-4 p-3 bg-indigo-600 text-white rounded-full shadow-lg" aria-label="Abrir asistente de IA">🤖</button>
 
     <div id="print-area" class="hidden"></div>
