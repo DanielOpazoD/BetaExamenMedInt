@@ -696,9 +696,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 if (managerCallback) {
                     const manageBtn = document.createElement('button');
-                    manageBtn.className = 'symbol-btn';
-                    manageBtn.title = 'Administrar caracteres';
-                    manageBtn.textContent = '⚙️';
+                    manageBtn.className = 'symbol-edit-btn toolbar-btn';
+                    manageBtn.textContent = 'Editar';
                     manageBtn.addEventListener('click', () => {
                         content.classList.remove('visible');
                         managerCallback();
@@ -714,6 +713,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
                     if (d !== content) d.classList.remove('visible');
                 });
+                renderSNSyms();
                 content.classList.toggle('visible');
             });
             return dropdown;
@@ -972,10 +972,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         subNoteToolbar.appendChild(createSNSeparator());
         // Symbols and special characters
-        const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
-        subNoteToolbar.appendChild(createSNSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
-        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
-        subNoteToolbar.appendChild(createSNSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω', () => {
+        subNoteToolbar.appendChild(createSNSymbolDropdown(EMOJI_CATEGORIES['Sugeridos'], 'Insertar Símbolo', '📌', () => {
+            EMOJI_CATEGORIES['Sugeridos'] = defaultSuggestedIcons.concat(customIconsList);
+            renderIconManager();
+            showModal(iconManagerModal);
+        }));
+        subNoteToolbar.appendChild(createSNSymbolDropdown(globalSpecialChars, 'Caracteres Especiales', 'Ω', () => {
             renderCharManager();
             showModal(charManagerModal);
         }));
@@ -2029,7 +2031,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return group;
         };
 
-        const createSymbolDropdown = (symbols, title, icon) => {
+        const createSymbolDropdown = (symbols, title, icon, managerCallback) => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
             const btn = document.createElement('button');
@@ -2052,6 +2054,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     content.appendChild(symBtn);
                 });
+                if (managerCallback) {
+                    const manageBtn = document.createElement('button');
+                    manageBtn.className = 'symbol-edit-btn toolbar-btn';
+                    manageBtn.textContent = 'Editar';
+                    manageBtn.addEventListener('click', () => {
+                        content.classList.remove('visible');
+                        managerCallback();
+                    });
+                    content.appendChild(manageBtn);
+                }
             };
             renderSymbols();
             dropdown.appendChild(content);
@@ -2062,6 +2074,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 otherOpen.forEach(d => {
                     if (d !== content) d.classList.remove('visible');
                 });
+                renderSymbols();
                 content.classList.toggle('visible');
             });
             return dropdown;
@@ -2529,11 +2542,16 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createSeparator());
 
         // Symbols
-        const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
-        editorToolbar.appendChild(createSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
+        editorToolbar.appendChild(createSymbolDropdown(EMOJI_CATEGORIES['Sugeridos'], 'Insertar Símbolo', '📌', () => {
+            EMOJI_CATEGORIES['Sugeridos'] = defaultSuggestedIcons.concat(customIconsList);
+            renderIconManager();
+            showModal(iconManagerModal);
+        }));
 
-        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
-        editorToolbar.appendChild(createSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
+        editorToolbar.appendChild(createSymbolDropdown(globalSpecialChars, 'Caracteres Especiales', 'Ω', () => {
+            renderCharManager();
+            showModal(charManagerModal);
+        }));
     }
 
     function rgbToHex(rgb) {

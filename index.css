@@ -328,12 +328,21 @@
         .color-submenu.visible { display: grid; }
 
         .symbol-dropdown { position: relative; display: inline-block; }
-        .symbol-dropdown-content { display: none; position: absolute; left: 100%; top: 0; background-color: var(--bg-secondary); min-width: 280px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 10; border-radius: 8px; border: 1px solid var(--border-color); padding: 8px; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 4px; max-height: none; overflow: visible; }
+        .symbol-dropdown-content { display: none; position: absolute; right: 100%; top: 0; margin-right: 8px; background-color: var(--bg-secondary); min-width: 280px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1010; border-radius: 8px; border: 1px solid var(--border-color); padding: 8px; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 4px; max-height: none; overflow: visible; }
         .symbol-dropdown-content.visible { display: grid; }
         .symbol-btn {
             font-size: 18px;
             text-align: center;
             font-family: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Symbol", sans-serif;
+        }
+
+        .symbol-edit-btn {
+            grid-column: 1 / -1;
+            margin-top: 4px;
+            padding: 4px 8px;
+            font-size: 14px;
+            background-color: var(--bg-tertiary);
+            border-radius: 4px;
         }
 
         .symbol-dropdown-content.flex-dropdown.visible {
