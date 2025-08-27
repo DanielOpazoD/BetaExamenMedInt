@@ -674,7 +674,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return group;
         };
 
-        const createSNSymbolDropdown = (symbols, title, icon, managerCallback) => {
+        const createSNSymbolDropdown = (symbolsSource, title, icon, managerCallback) => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
             const btn = document.createElement('button');
@@ -686,6 +686,7 @@ document.addEventListener('DOMContentLoaded', function () {
             content.className = 'symbol-dropdown-content';
             const renderSNSyms = () => {
                 content.innerHTML = '';
+                const symbols = typeof symbolsSource === 'function' ? symbolsSource() : symbolsSource;
                 symbols.forEach((sym) => {
                     const sBtn = createSNButton(sym, sym, 'insertText', sym);
                     sBtn.classList.add('symbol-btn');
@@ -972,12 +973,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         subNoteToolbar.appendChild(createSNSeparator());
         // Symbols and special characters
-        subNoteToolbar.appendChild(createSNSymbolDropdown(EMOJI_CATEGORIES['Sugeridos'], 'Insertar Símbolo', '📌', () => {
+        subNoteToolbar.appendChild(createSNSymbolDropdown(() => EMOJI_CATEGORIES['Sugeridos'], 'Insertar Símbolo', '📌', () => {
             EMOJI_CATEGORIES['Sugeridos'] = defaultSuggestedIcons.concat(customIconsList);
             renderIconManager();
             showModal(iconManagerModal);
         }));
-        subNoteToolbar.appendChild(createSNSymbolDropdown(globalSpecialChars, 'Caracteres Especiales', 'Ω', () => {
+        subNoteToolbar.appendChild(createSNSymbolDropdown(() => globalSpecialChars, 'Caracteres Especiales', 'Ω', () => {
             renderCharManager();
             showModal(charManagerModal);
         }));
@@ -2031,7 +2032,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return group;
         };
 
-        const createSymbolDropdown = (symbols, title, icon, managerCallback) => {
+        const createSymbolDropdown = (symbolsSource, title, icon, managerCallback) => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
             const btn = document.createElement('button');
@@ -2046,6 +2047,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // configuración y no desde este menú desplegable.
             const renderSymbols = () => {
                 content.innerHTML = '';
+                const symbols = typeof symbolsSource === 'function' ? symbolsSource() : symbolsSource;
                 symbols.forEach((sym) => {
                     const symBtn = createButton(sym, sym, 'insertText', sym);
                     symBtn.classList.add('symbol-btn');
@@ -2542,13 +2544,13 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createSeparator());
 
         // Symbols
-        editorToolbar.appendChild(createSymbolDropdown(EMOJI_CATEGORIES['Sugeridos'], 'Insertar Símbolo', '📌', () => {
+        editorToolbar.appendChild(createSymbolDropdown(() => EMOJI_CATEGORIES['Sugeridos'], 'Insertar Símbolo', '📌', () => {
             EMOJI_CATEGORIES['Sugeridos'] = defaultSuggestedIcons.concat(customIconsList);
             renderIconManager();
             showModal(iconManagerModal);
         }));
 
-        editorToolbar.appendChild(createSymbolDropdown(globalSpecialChars, 'Caracteres Especiales', 'Ω', () => {
+        editorToolbar.appendChild(createSymbolDropdown(() => globalSpecialChars, 'Caracteres Especiales', 'Ω', () => {
             renderCharManager();
             showModal(charManagerModal);
         }));
