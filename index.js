@@ -694,6 +694,18 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     content.appendChild(sBtn);
                 });
+
+                // Botón para administrar caracteres
+                const manageBtn = document.createElement('button');
+                manageBtn.textContent = 'Editar';
+                manageBtn.className = 'toolbar-btn';
+                manageBtn.style.gridColumn = '1 / -1';
+                manageBtn.addEventListener('click', () => {
+                    renderCharManager();
+                    showModal(charManagerModal);
+                    content.classList.remove('visible');
+                });
+                content.appendChild(manageBtn);
             };
             renderSNSyms();
             dropdown.appendChild(content);
@@ -2051,6 +2063,18 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     content.appendChild(symBtn);
                 });
+
+                // Botón para administrar caracteres
+                const manageBtn = document.createElement('button');
+                manageBtn.textContent = 'Editar';
+                manageBtn.className = 'toolbar-btn';
+                manageBtn.style.gridColumn = '1 / -1';
+                manageBtn.addEventListener('click', () => {
+                    renderCharManager();
+                    showModal(charManagerModal);
+                    content.classList.remove('visible');
+                });
+                content.appendChild(manageBtn);
             };
             renderSymbols();
             dropdown.appendChild(content);
