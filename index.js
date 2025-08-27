@@ -690,7 +690,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return group;
         };
 
-        const createSNSymbolDropdown = (symbols, title, icon) => {
+        const createSNSymbolDropdown = (symbolsSource, title, icon, managerCallback) => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
             const btn = document.createElement('button');
@@ -702,6 +702,7 @@ document.addEventListener('DOMContentLoaded', function () {
             content.className = 'symbol-dropdown-content';
             const renderSNSyms = () => {
                 content.innerHTML = '';
+                const symbols = typeof symbolsSource === 'function' ? symbolsSource() : symbolsSource;
                 symbols.forEach((sym) => {
                     const sBtn = createSNButton(sym, sym, 'insertText', sym);
                     sBtn.classList.add('symbol-btn');
@@ -710,6 +711,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     content.appendChild(sBtn);
                 });
+                if (managerCallback) {
+                    const manageBtn = document.createElement('button');
+                    manageBtn.className = 'symbol-edit-btn toolbar-btn';
+                    manageBtn.textContent = 'Editar';
+                    manageBtn.addEventListener('click', () => {
+                        content.classList.remove('visible');
+                        managerCallback();
+                    });
+                    content.appendChild(manageBtn);
+                }
             };
             renderSNSyms();
             dropdown.appendChild(content);
@@ -719,6 +730,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
                     if (d !== content) d.classList.remove('visible');
                 });
+                renderSNSyms();
                 content.classList.toggle('visible');
             });
             return dropdown;
@@ -977,10 +989,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
         subNoteToolbar.appendChild(createSNSeparator());
         // Symbols and special characters
-        const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
-        subNoteToolbar.appendChild(createSNSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
-        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
-        subNoteToolbar.appendChild(createSNSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
+        subNoteToolbar.appendChild(createSNSymbolDropdown(() => EMOJI_CATEGORIES['Sugeridos'], 'Insertar Símbolo', '📌', () => {
+            EMOJI_CATEGORIES['Sugeridos'] = defaultSuggestedIcons.concat(customIconsList);
+            renderIconManager();
+            showModal(iconManagerModal);
+        }));
+        subNoteToolbar.appendChild(createSNSymbolDropdown(() => globalSpecialChars, 'Caracteres Especiales', 'Ω', () => {
+            renderCharManager();
+            showModal(charManagerModal);
+        }));
         // Image from URL
         subNoteToolbar.appendChild(createSNButton('Insertar Imagen desde URL', '🖼️', null, null, () => {
             const url = prompt('Ingresa la URL de la imagen:');
@@ -1020,9 +1037,6 @@ document.addEventListener('DOMContentLoaded', function () {
             window.print();
         }));
     }
-    // Initialize sub-note toolbar on load
-    setupSubnoteToolbar();
-
     // Save and close sub-note
     if (saveCloseSubnoteBtn) {
         saveCloseSubnoteBtn.addEventListener('click', () => {
@@ -1035,8 +1049,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     title: subNoteTitle.textContent.trim(),
                     content: subNoteEditor.innerHTML
                 };
-                // Persist changes to note
-                saveCurrentNote();
+                // Note will be saved when the main note is saved
             }
             hideModal(subNoteModal);
             activeSubnoteLink = null;
@@ -1055,7 +1068,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     title: subNoteTitle.textContent.trim(),
                     content: subNoteEditor.innerHTML
                 };
-                saveCurrentNote();
             }
             // Do not close the modal, keep editing
         });
@@ -1257,17 +1269,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Open character manager modal when user clicks the char manager gear.
-    // Currently there is no dedicated open button in the UI; you can create
-    // one if desired.  For demonstration purposes, we bind it to the icon
-    // manager open button when the user holds Shift.
-    if (openIconManagerBtn && charManagerModal) {
-        openIconManagerBtn.addEventListener('dblclick', (e) => {
-            e.preventDefault();
-            renderCharManager();
-            showModal(charManagerModal);
-        });
-    }
     if (closeCharManagerBtn) {
         closeCharManagerBtn.addEventListener('click', () => hideModal(charManagerModal));
     }
@@ -1737,7 +1738,10 @@ document.addEventListener('DOMContentLoaded', function () {
     defaultSuggestedIcons = Array.isArray(EMOJI_CATEGORIES['Sugeridos']) ? [...EMOJI_CATEGORIES['Sugeridos']] : [];
     customIconsList = [];
     globalSpecialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
-    
+
+    // Initialize sub-note toolbar on load
+    setupSubnoteToolbar();
+
     // --- Core Logic Functions ---
 
     function formatBytes(bytes, decimals = 2) {
@@ -2044,7 +2048,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return group;
         };
 
-        const createSymbolDropdown = (symbols, title, icon) => {
+        const createSymbolDropdown = (symbolsSource, title, icon, managerCallback) => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
             const btn = document.createElement('button');
@@ -2059,6 +2063,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // configuración y no desde este menú desplegable.
             const renderSymbols = () => {
                 content.innerHTML = '';
+                const symbols = typeof symbolsSource === 'function' ? symbolsSource() : symbolsSource;
                 symbols.forEach((sym) => {
                     const symBtn = createButton(sym, sym, 'insertText', sym);
                     symBtn.classList.add('symbol-btn');
@@ -2067,6 +2072,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     content.appendChild(symBtn);
                 });
+                if (managerCallback) {
+                    const manageBtn = document.createElement('button');
+                    manageBtn.className = 'symbol-edit-btn toolbar-btn';
+                    manageBtn.textContent = 'Editar';
+                    manageBtn.addEventListener('click', () => {
+                        content.classList.remove('visible');
+                        managerCallback();
+                    });
+                    content.appendChild(manageBtn);
+                }
             };
             renderSymbols();
             dropdown.appendChild(content);
@@ -2077,6 +2092,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 otherOpen.forEach(d => {
                     if (d !== content) d.classList.remove('visible');
                 });
+                renderSymbols();
                 content.classList.toggle('visible');
             });
             return dropdown;
@@ -2544,11 +2560,16 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createSeparator());
 
         // Symbols
-        const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
-        editorToolbar.appendChild(createSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
+        editorToolbar.appendChild(createSymbolDropdown(() => EMOJI_CATEGORIES['Sugeridos'], 'Insertar Símbolo', '📌', () => {
+            EMOJI_CATEGORIES['Sugeridos'] = defaultSuggestedIcons.concat(customIconsList);
+            renderIconManager();
+            showModal(iconManagerModal);
+        }));
 
-        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
-        editorToolbar.appendChild(createSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
+        editorToolbar.appendChild(createSymbolDropdown(() => globalSpecialChars, 'Caracteres Especiales', 'Ω', () => {
+            renderCharManager();
+            showModal(charManagerModal);
+        }));
     }
 
     function rgbToHex(rgb) {
@@ -3652,7 +3673,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function loadNoteIntoEditor(index) {
         if (index < 0 || index >= currentNotesArray.length) {
             if (currentNotesArray.length === 0) {
-               addNewNote(false);
+               addNewNote();
                return;
             }
             index = 0; // fallback to the first note
@@ -3673,11 +3694,7 @@ document.addEventListener('DOMContentLoaded', function () {
         updateNoteInfo();
     }
     
-    function addNewNote(shouldSaveCurrent = true) {
-        if (shouldSaveCurrent) {
-            saveCurrentNote();
-        }
-        
+    function addNewNote() {
         const newIndex = currentNotesArray.length;
         currentNotesArray.push({
             title: `Nota ${newIndex + 1}`,
@@ -3704,7 +3721,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (currentNotesArray.length === 0) {
-            addNewNote(false);
+            addNewNote();
         } else {
             loadNoteIntoEditor(newIndexToShow);
         }
@@ -3754,7 +3771,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!activeTabId) return;
         const tab = openNoteTabs.find(t => t.id === activeTabId);
         if (!tab) return;
-        saveCurrentNote();
         tab.notesArray = currentNotesArray;
         tab.activeIndex = activeNoteIndex;
     }
@@ -3831,7 +3847,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 currentNotesArray[activeNoteIndex].postits = {};
             }
             currentNotesArray[activeNoteIndex].postits[uniqueId] = { title: '', content: '' };
-            saveCurrentNote();
         }
     }
 
@@ -3859,7 +3874,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 currentNotesArray[activeNoteIndex].postits = {};
             }
             currentNotesArray[activeNoteIndex].postits[uniqueId] = { title: '', content: '' };
-            saveCurrentNote();
         }
     }
 
@@ -4626,7 +4640,7 @@ document.addEventListener('DOMContentLoaded', function () {
             notesPanelToggle.classList.toggle('open');
         });
         
-        addNotePanelBtn.addEventListener('click', () => addNewNote(true));
+        addNotePanelBtn.addEventListener('click', () => addNewNote());
         notesList.addEventListener('click', (e) => {
             const itemBtn = e.target.closest('.note-item-btn');
             const deleteBtn = e.target.closest('.delete-note-btn');
@@ -4636,7 +4650,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 const index = parseInt(deleteBtn.dataset.index, 10);
                 deleteNote(index);
             } else if (itemBtn) {
-                saveCurrentNote(); // Save current before switching
                 const index = parseInt(itemBtn.dataset.index, 10);
                 loadNoteIntoEditor(index);
             }
@@ -4907,7 +4920,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 currentNotesArray[activeNoteIndex].quickNote = postitNoteTextarea.value;
                 hideModal(postitNoteModal);
                 editingQuickNote = false;
-                saveCurrentNote();
                 return;
             }
         });
@@ -4920,7 +4932,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     currentNotesArray[activeNoteIndex].quickNote = '';
                     hideModal(postitNoteModal);
                     editingQuickNote = false;
-                    saveCurrentNote();
                 }
             }
         });
@@ -5003,14 +5014,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 updateLightboxView();
                 if (activeGalleryLinkForLightbox) {
                     activeGalleryLinkForLightbox.dataset.images = JSON.stringify(lightboxImages);
-                    if (currentNotesArray && currentNotesArray[activeNoteIndex]) {
-                        saveCurrentNote();
-                    }
                 } else if (imgObj.element) {
                     imgObj.element.dataset.caption = imgObj.caption;
-                    if (currentNotesArray && currentNotesArray[activeNoteIndex]) {
-                        saveCurrentNote();
-                    }
                 }
             });
         }
@@ -5022,17 +5027,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (imgObj) {
                     imgObj.caption = '';
                     updateLightboxView();
-                    // Persist the updated images data back to the link and save note
                     if (activeGalleryLinkForLightbox) {
                         activeGalleryLinkForLightbox.dataset.images = JSON.stringify(lightboxImages);
-                        if (currentNotesArray && currentNotesArray[activeNoteIndex]) {
-                            saveCurrentNote();
-                        }
                     } else if (imgObj.element) {
                         imgObj.element.dataset.caption = '';
-                        if (currentNotesArray && currentNotesArray[activeNoteIndex]) {
-                            saveCurrentNote();
-                        }
                     }
                 }
             });
@@ -5339,8 +5337,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         });
-
-        window.addEventListener('beforeunload', saveState);
 
     }
 
