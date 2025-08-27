@@ -3501,10 +3501,20 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Note Modal Functions ---
     function closeNotesModal() {
         hideModal(notesModal);
-        activeNoteIcon = null;
-        currentNoteRow = null;
-        currentNotesArray = [];
-        activeNoteIndex = 0;
+        // Do not reset the current note state if tabs are still open.
+        // Resetting `currentNotesArray` here would later cause
+        // `saveActiveTab()` to overwrite the tab's content with an empty
+        // array when a tab is closed after the modal is hidden.  This led to
+        // situations where closing multiple tabs erased note contents.  By
+        // clearing the state only when no tabs remain, we preserve the note
+        // data until it is intentionally closed.
+        if (openNoteTabs.length === 0) {
+            activeNoteIcon = null;
+            currentNoteRow = null;
+            currentNotesArray = [];
+            activeNoteIndex = 0;
+            activeTabId = null;
+        }
     }
 
     function saveCurrentNote() {
