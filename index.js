@@ -175,6 +175,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const iconPickerModal = getElem('icon-picker-modal');
     const iconPickerCategories = getElem('icon-picker-categories');
     const emojiGrid = getElem('emoji-grid');
+    const editIconsBtn = getElem('edit-icons-btn');
     const cancelIconPickerBtn = getElem('cancel-icon-picker-btn');
 
     // Custom icon input elements
@@ -1233,13 +1234,17 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Open icon manager modal
+    const openIconManager = () => {
+        // Ensure the combined list includes custom icons appended to the default
+        EMOJI_CATEGORIES['Sugeridos'] = defaultSuggestedIcons.concat(customIconsList);
+        renderIconManager();
+        showModal(iconManagerModal);
+    };
     if (openIconManagerBtn) {
-        openIconManagerBtn.addEventListener('click', () => {
-            // Ensure the combined list includes custom icons appended to the default
-            EMOJI_CATEGORIES['Sugeridos'] = defaultSuggestedIcons.concat(customIconsList);
-            renderIconManager();
-            showModal(iconManagerModal);
-        });
+        openIconManagerBtn.addEventListener('click', openIconManager);
+    }
+    if (editIconsBtn) {
+        editIconsBtn.addEventListener('click', openIconManager);
     }
     // Close icon manager modal
     if (closeIconManagerBtn) {
@@ -2078,6 +2083,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     content.appendChild(symBtn);
                 });
+                const editCharsBtn = document.createElement('button');
+                editCharsBtn.className = 'symbol-btn';
+                editCharsBtn.textContent = '✏️';
+                editCharsBtn.title = 'Editar caracteres';
+                editCharsBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    renderCharManager();
+                    showModal(charManagerModal);
+                });
+                content.appendChild(editCharsBtn);
             };
             renderSymbols();
             dropdown.appendChild(content);
