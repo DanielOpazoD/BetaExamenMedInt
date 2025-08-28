@@ -2650,6 +2650,27 @@ document.addEventListener('DOMContentLoaded', function () {
         closeNoteStyleModal();
     }
 
+    function normalizeCalloutLists() {
+        notesEditor.querySelectorAll('ul, ol').forEach(list => {
+            const items = Array.from(list.children);
+            if (items.length && items.every(li => li.classList.contains('note-callout'))) {
+                const first = items[0];
+                const wrapper = document.createElement('div');
+                wrapper.className = 'note-callout';
+                const style = first.getAttribute('style');
+                if (style) wrapper.setAttribute('style', style);
+                list.parentNode.insertBefore(wrapper, list);
+                wrapper.appendChild(list);
+                items.forEach(li => {
+                    li.classList.remove('note-callout');
+                    ['backgroundColor','borderColor','borderWidth','borderRadius','padding','margin','boxShadow'].forEach(prop => {
+                        li.style[prop] = '';
+                    });
+                });
+            }
+        });
+    }
+
     function openAiToolsModal() {
         const selection = window.getSelection();
         if (selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
@@ -4858,6 +4879,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 openNoteStyleModal(callout);
             }
         });
+
+        notesEditor.addEventListener('input', normalizeCalloutLists);
 
         notesEditor.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
