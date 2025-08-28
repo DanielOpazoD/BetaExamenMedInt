@@ -850,6 +850,14 @@ table.resizable-table .table-resize-handle {
     padding: 8px;
     margin: 8px 0;
 }
+.note-callout-content {
+    outline: none;
+}
+.note-callout ul,
+.note-callout ol {
+    margin: 0;
+    padding-left: 1.25rem;
+}
 .note-resizable {
     resize: horizontal;
     overflow: auto;

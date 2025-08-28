@@ -2619,14 +2619,25 @@ document.addEventListener('DOMContentLoaded', function () {
                     savedEditorSelection.insertNode(callout);
                 }
             } else if (savedEditorSelection) {
-                callout.textContent = 'Escribe una nota...';
                 savedEditorSelection.insertNode(callout);
             } else {
-                callout.textContent = 'Escribe una nota...';
                 notesEditor.appendChild(callout);
             }
             currentCallout = callout;
         }
+        if (!currentCallout.querySelector('.note-callout-content')) {
+            const inner = document.createElement('div');
+            inner.className = 'note-callout-content';
+            inner.contentEditable = 'true';
+            while (currentCallout.firstChild) {
+                inner.appendChild(currentCallout.firstChild);
+            }
+            if (!inner.textContent.trim()) {
+                inner.textContent = 'Escribe una nota...';
+            }
+            currentCallout.appendChild(inner);
+        }
+        currentCallout.contentEditable = 'false';
         currentCallout.classList.remove(...PREDEF_CLASSES);
         if (opts.presetClass) currentCallout.classList.add(opts.presetClass);
         currentCallout.style.backgroundColor = opts.backgroundColor;
@@ -2640,12 +2651,14 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             currentCallout.classList.remove('note-shadow');
         }
+        const inner = currentCallout.querySelector('.note-callout-content');
         const range = document.createRange();
-        range.selectNodeContents(currentCallout);
+        range.selectNodeContents(inner);
         range.collapse(false);
         const selection = window.getSelection();
         selection.removeAllRanges();
         selection.addRange(range);
+        inner.focus();
         notesEditor.focus();
         closeNoteStyleModal();
     }
