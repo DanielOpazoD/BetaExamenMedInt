@@ -719,7 +719,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
                     if (d !== content) d.classList.remove('visible');
                 });
+                const willShow = !content.classList.contains('visible');
                 content.classList.toggle('visible');
+                if (willShow) {
+                    content.style.left = '100%';
+                    content.style.right = 'auto';
+                    const contentRect = content.getBoundingClientRect();
+                    const containerRect = dropdown.parentElement.getBoundingClientRect();
+                    if (contentRect.right > containerRect.right) {
+                        content.style.left = 'auto';
+                        content.style.right = '100%';
+                    }
+                }
             });
             return dropdown;
         };
@@ -2077,7 +2088,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 otherOpen.forEach(d => {
                     if (d !== content) d.classList.remove('visible');
                 });
+                const willShow = !content.classList.contains('visible');
                 content.classList.toggle('visible');
+                if (willShow) {
+                    // Posicionar inicialmente a la derecha del botón
+                    content.style.left = '100%';
+                    content.style.right = 'auto';
+                    const contentRect = content.getBoundingClientRect();
+                    const containerRect = dropdown.parentElement.getBoundingClientRect();
+                    // Si se desborda, mostrar a la izquierda
+                    if (contentRect.right > containerRect.right) {
+                        content.style.left = 'auto';
+                        content.style.right = '100%';
+                    }
+                }
             });
             return dropdown;
         };
