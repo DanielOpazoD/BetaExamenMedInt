@@ -953,8 +953,8 @@ document.addEventListener('DOMContentLoaded', function () {
         // Indent/outdent
         const outdentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-decrease w-5 h-5"><polyline points="7 8 3 12 7 16"/><line x1="21" x2="3" y1="12" y2="12"/><line x1="21" x2="3" y1="6" y2="6"/><line x1="21" x2="3" y1="18" y2="18"/></svg>`;
         const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
-        subNoteToolbar.appendChild(createSNButton('Disminuir sangría', outdentSVG, 'outdent'));
-        subNoteToolbar.appendChild(createSNButton('Aumentar sangría', indentSVG, 'indent'));
+        subNoteToolbar.appendChild(createSNButton('Disminuir sangría', outdentSVG, null, null, () => adjustIndent(-1, subNoteEditor)));
+        subNoteToolbar.appendChild(createSNButton('Aumentar sangría', indentSVG, null, null, () => adjustIndent(1, subNoteEditor)));
         // Collapsible list item
         const collapsibleListSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-tree w-5 h-5"><path d="M21 7H9"/><path d="M21 12H9"/><path d="M21 17H9"/><path d="M3 17v-6a4 4 0 0 1 4-4h4"/></svg>`;
         const collapsibleListHTML = `<details class="collapsible-list"><summary>Elemento</summary><div>Texto...<br></div></details><p><br></p>`;
@@ -1924,6 +1924,61 @@ document.addEventListener('DOMContentLoaded', function () {
             return btn;
         };
 
+        const sanitizeCalloutContent = (container) => {
+            if (!container) return;
+            container.querySelectorAll('font').forEach(el => {
+                const frag = document.createDocumentFragment();
+                while (el.firstChild) frag.appendChild(el.firstChild);
+                el.replaceWith(frag);
+            });
+            container.querySelectorAll('[style]').forEach(el => el.removeAttribute('style'));
+            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+            let text;
+            while ((text = walker.nextNode())) {
+                text.nodeValue = text.nodeValue.replace(/\u00a0/g, ' ');
+            }
+            const lines = [];
+            let current = [];
+            Array.from(container.childNodes).forEach(node => {
+                if (node.nodeName === 'BR') {
+                    lines.push(current);
+                    current = [];
+                    node.remove();
+                } else {
+                    current.push(node);
+                }
+            });
+            lines.push(current);
+            if (lines.length > 1) {
+                container.innerHTML = '';
+                lines.forEach(nodes => {
+                    const p = document.createElement('p');
+                    nodes.forEach(n => p.appendChild(n));
+                    if (p.textContent.trim()) container.appendChild(p);
+                });
+            }
+        };
+
+        const adjustIndent = (delta, root) => {
+            const sel = window.getSelection();
+            if (!sel.rangeCount) return;
+            let node = sel.getRangeAt(0).startContainer;
+            if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+            if (!root.contains(node)) return;
+            const callout = node.closest('.note-callout-content');
+            sanitizeCalloutContent(callout);
+            let block = node.closest('p, li, div');
+            if (!block || !root.contains(block)) {
+                block = document.createElement('p');
+                sel.getRangeAt(0).surroundContents(block);
+            }
+            const currentClass = Array.from(block.classList).find(c => c.startsWith('indent-'));
+            let level = currentClass ? parseInt(currentClass.split('-')[1], 10) : 0;
+            if (currentClass) block.classList.remove(currentClass);
+            level = Math.max(0, Math.min(5, level + delta));
+            if (level > 0) block.classList.add(`indent-${level}`);
+        };
+
         const createSeparator = () => {
             const sep = document.createElement('div');
             sep.className = 'toolbar-separator';
@@ -2332,8 +2387,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const outdentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-decrease w-5 h-5"><polyline points="7 8 3 12 7 16"/><line x1="21" x2="3" y1="12" y2="12"/><line x1="21" x2="3" y1="6" y2="6"/><line x1="21" x2="3" y1="18" y2="18"/></svg>`;
         const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
-        editorToolbar.appendChild(createButton('Disminuir sangría', outdentSVG, 'outdent'));
-        editorToolbar.appendChild(createButton('Aumentar sangría', indentSVG, 'indent'));
+        editorToolbar.appendChild(createButton('Disminuir sangría', outdentSVG, null, null, () => adjustIndent(-1, notesEditor)));
+        editorToolbar.appendChild(createButton('Aumentar sangría', indentSVG, null, null, () => adjustIndent(1, notesEditor)));
 
         const insertBlankLineAbove = () => {
             let blocks = getSelectedBlockElements();
@@ -2619,14 +2674,27 @@ document.addEventListener('DOMContentLoaded', function () {
                     savedEditorSelection.insertNode(callout);
                 }
             } else if (savedEditorSelection) {
-                callout.textContent = 'Escribe una nota...';
                 savedEditorSelection.insertNode(callout);
             } else {
-                callout.textContent = 'Escribe una nota...';
                 notesEditor.appendChild(callout);
             }
             currentCallout = callout;
         }
+        if (!currentCallout.querySelector('.note-callout-content')) {
+            const innerContent = document.createElement('div');
+            innerContent.className = 'note-callout-content';
+            innerContent.contentEditable = 'true';
+            while (currentCallout.firstChild) {
+                innerContent.appendChild(currentCallout.firstChild);
+            }
+            if (!innerContent.textContent.trim()) {
+                innerContent.textContent = 'Escribe una nota...';
+            }
+            currentCallout.appendChild(innerContent);
+        }
+        const inner = currentCallout.querySelector('.note-callout-content');
+        sanitizeCalloutContent(inner);
+        currentCallout.contentEditable = 'false';
         currentCallout.classList.remove(...PREDEF_CLASSES);
         if (opts.presetClass) currentCallout.classList.add(opts.presetClass);
         currentCallout.style.backgroundColor = opts.backgroundColor;
@@ -2641,11 +2709,12 @@ document.addEventListener('DOMContentLoaded', function () {
             currentCallout.classList.remove('note-shadow');
         }
         const range = document.createRange();
-        range.selectNodeContents(currentCallout);
+        range.selectNodeContents(inner);
         range.collapse(false);
         const selection = window.getSelection();
         selection.removeAllRanges();
         selection.addRange(range);
+        inner.focus();
         notesEditor.focus();
         closeNoteStyleModal();
     }

@@ -850,6 +850,21 @@ table.resizable-table .table-resize-handle {
     padding: 8px;
     margin: 8px 0;
 }
+.note-callout-content {
+    outline: none;
+}
+.note-callout ul,
+.note-callout ol {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+/* Indentation levels applied via classes instead of inline spaces */
+.indent-1 { margin-left: 1rem; }
+.indent-2 { margin-left: 2rem; }
+.indent-3 { margin-left: 3rem; }
+.indent-4 { margin-left: 4rem; }
+.indent-5 { margin-left: 5rem; }
 .note-resizable {
     resize: horizontal;
     overflow: auto;
