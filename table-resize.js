@@ -110,7 +110,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
     if (!row) return -1;
     for (let i = 0; i < row.cells.length; i++) {
       left += row.cells[i].offsetWidth;
-      if (Math.abs(x - left) <= 4) return i;
+      if (Math.abs(x - left) <= 6) return i;
     }
     return -1;
   }
@@ -119,7 +119,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
     let top = 0;
     for (let i = 0; i < table.rows.length; i++) {
       top += table.rows[i].offsetHeight;
-      if (Math.abs(y - top) <= 4) return i;
+      if (Math.abs(y - top) <= 6) return i;
     }
     return -1;
   }

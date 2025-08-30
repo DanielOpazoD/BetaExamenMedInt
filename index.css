@@ -105,7 +105,7 @@
         .modal-content { background: var(--modal-bg); color: var(--modal-text); padding: 1.5rem; border-radius: 0.5rem; width: 95%; box-shadow: 0 5px 15px rgba(0,0,0,0.3); transform: translateY(-20px); transition: transform 0.3s ease; display: flex; flex-direction: column; }
         .modal-overlay.visible .modal-content { transform: translateY(0); }
         
-        .notes-modal-content { max-width: 900px; height: 95vh; max-height: 95vh; padding: 0; }
+        .notes-modal-content { max-width: 900px; height: 95vh; max-height: 95vh; padding: 0; overflow: visible; }
 
         #subnote-modal .notes-modal-content {
             padding: 1rem;
@@ -151,9 +151,10 @@
             border-top-left-radius: 0.5rem;
             border-top-right-radius: 0.5rem;
             display: flex;
-            flex-wrap: wrap; 
+            flex-wrap: wrap;
             align-items: center;
             gap: 1px;
+            overflow: visible;
         }
         #notes-editor { border: 1px solid var(--border-color); padding: 12px; flex-grow: 1; overflow-y: auto; border-bottom-left-radius: 0.5rem; border-bottom-right-radius: 0.5rem; line-height: 1.6; background-color: var(--bg-secondary); }
         #notes-editor:focus { outline: none; }
@@ -385,12 +386,12 @@ table.resizable-table th {
 
 table.resizable-table .table-resize-handle {
     position: absolute;
-    width: 8px;
-    height: 8px;
+    width: 12px;
+    height: 12px;
     right: 0;
     bottom: 0;
     cursor: se-resize;
-    background: transparent;
+    background: var(--bg-secondary);
     border-right: 2px solid var(--text-muted);
     border-bottom: 2px solid var(--text-muted);
     opacity: 0.7;
