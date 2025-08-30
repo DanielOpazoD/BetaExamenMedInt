@@ -340,11 +340,19 @@ document.addEventListener('DOMContentLoaded', function () {
     let undoTimer = null;
     let deletedFavorite = null;
     let htmlFavorites = [];
+    let drugs = [];
 
     const selectedHtmlModal = getElem('selected-html-modal');
     const selectedHtmlOutput = getElem('selected-html-output');
     const copySelectedHtmlBtn = getElem('copy-selected-html-btn');
     const closeSelectedHtmlBtn = getElem('close-selected-html-btn');
+
+    const patientNameInput = getElem('patient-name');
+    const patientRutInput = getElem('patient-rut');
+    const drugNameInput = getElem('drug-name');
+    const drugDoseInput = getElem('drug-dose');
+    const addDrugBtn = getElem('add-drug-btn');
+    const drugsTableBody = getElem('drugs-table-body');
 
     // Table grid element
     const tableGridEl = getElem('table-grid');
@@ -398,6 +406,33 @@ document.addEventListener('DOMContentLoaded', function () {
             insertTableWithDimensions(rows, cols);
         });
     }
+
+    function renderDrugsTable() {
+        if (!drugsTableBody) return;
+        drugsTableBody.innerHTML = '';
+        drugs.forEach(d => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td class="border px-2">${d.name}</td><td class="border px-2">${d.dose}</td>`;
+            drugsTableBody.appendChild(tr);
+        });
+    }
+
+    addDrugBtn?.addEventListener('click', () => {
+        const name = drugNameInput.value.trim();
+        const doseStr = drugDoseInput.value.trim();
+        // parseFloat permite dosis decimales como 0.6 mg/día
+        const dose = parseFloat(doseStr.replace(',', '.'));
+        if (!name || isNaN(dose)) return;
+        drugs.push({ name, dose: doseStr });
+        drugNameInput.value = '';
+        drugDoseInput.value = '';
+        renderDrugsTable();
+        saveState();
+    });
+
+    [patientNameInput, patientRutInput].forEach(el => {
+        el?.addEventListener('input', () => saveState());
+    });
 
     // --- Customizable Icon and Character Lists ---
     // These variables will be initialized later, after EMOJI_CATEGORIES is
@@ -2843,7 +2878,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 theme: document.documentElement.dataset.theme,
                 iconStyle: document.documentElement.dataset.iconStyle,
             },
-            headers: {}
+            headers: {},
+            patient: {
+                name: patientNameInput?.value || '',
+                rut: patientRutInput?.value || ''
+            },
+            drugs: [...drugs]
         };
 
         document.querySelectorAll('thead th[contenteditable="true"]').forEach((th, i) => {
@@ -2887,6 +2927,16 @@ document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('thead th[contenteditable="true"]').forEach((th, i) => {
                 if(state.headers[`h${i}`]) th.innerText = state.headers[`h${i}`];
             });
+        }
+
+        if (state.patient) {
+            if (patientNameInput) patientNameInput.value = state.patient.name || '';
+            if (patientRutInput) patientRutInput.value = state.patient.rut || '';
+        }
+
+        if (state.drugs) {
+            drugs = state.drugs;
+            renderDrugsTable();
         }
         
         if (state.topics) {
@@ -2960,6 +3010,8 @@ document.addEventListener('DOMContentLoaded', function () {
             
             const settingsPromise = db.set('keyvalue', { key: 'settings', value: state.settings });
             const headersPromise = db.set('keyvalue', { key: 'headers', value: state.headers });
+            const patientPromise = db.set('keyvalue', { key: 'patient', value: state.patient });
+            const drugsPromise = db.set('keyvalue', { key: 'drugs', value: state.drugs });
 
             const topicPromises = Object.entries(state.topics).map(([topicId, data]) => 
                 db.set('topics', { id: topicId, ...data })
@@ -2968,7 +3020,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 db.set('sections', { id: sectionId, ...data })
             );
 
-            await Promise.all([settingsPromise, headersPromise, ...topicPromises, ...sectionPromises]);
+            await Promise.all([settingsPromise, headersPromise, patientPromise, drugsPromise, ...topicPromises, ...sectionPromises]);
 
             showSaveConfirmation();
 
@@ -2988,6 +3040,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const sections = await db.getAll('sections');
             const settingsData = await db.get('keyvalue', 'settings');
             const headersData = await db.get('keyvalue', 'headers');
+            const patientData = await db.get('keyvalue', 'patient');
+            const drugsData = await db.get('keyvalue', 'drugs');
 
             const state = {
                 topics: topics.reduce((acc, topic) => {
@@ -2999,7 +3053,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     return acc;
                 }, {}),
                 settings: settingsData ? settingsData.value : {},
-                headers: headersData ? headersData.value : {}
+                headers: headersData ? headersData.value : {},
+                patient: patientData ? patientData.value : {},
+                drugs: drugsData ? drugsData.value : []
             };
             
             _loadStateFromObject(state);
