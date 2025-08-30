@@ -163,6 +163,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const aiCanvas = getElem('ai-canvas');
     const aiCanvasReasoning = getElem('ai-canvas-reasoning');
     let uploadedFileText = '';
+    let copiedFormat = null;
     
     // References modal elements
     const referencesModal = getElem('references-modal');
@@ -2089,6 +2090,81 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
 
+        const adjustLocalIndent = (delta, root) => {
+            const sel = window.getSelection();
+            if (!sel.rangeCount || sel.isCollapsed) return;
+            let range = sel.getRangeAt(0);
+            let span = range.commonAncestorContainer;
+            if (span.nodeType === Node.TEXT_NODE) span = span.parentElement;
+            if (!root.contains(span)) return;
+            if (range.startContainer !== range.endContainer || span.tagName !== 'SPAN') {
+                span = document.createElement('span');
+                range.surroundContents(span);
+                range = document.createRange();
+                range.selectNodeContents(span);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+            let currentClass = Array.from(span.classList).find(c => c.startsWith('inline-indent-'));
+            let level = currentClass ? parseInt(currentClass.split('-')[2], 10) : 0;
+            if (currentClass) span.classList.remove(currentClass);
+            level = Math.max(0, Math.min(5, level + delta));
+            if (level > 0) {
+                span.classList.add(`inline-indent-${level}`);
+            } else {
+                const parent = span.parentNode;
+                while (span.firstChild) parent.insertBefore(span.firstChild, span);
+                parent.removeChild(span);
+            }
+        };
+
+        const selectTableColumn = (root) => {
+            const sel = window.getSelection();
+            if (!sel.rangeCount) return;
+            let node = sel.getRangeAt(0).startContainer;
+            if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+            const cell = node.closest('td, th');
+            if (!cell) return;
+            const table = cell.closest('table');
+            if (!table || !root.contains(table)) return;
+            const colIndex = cell.cellIndex;
+            sel.removeAllRanges();
+            for (let i = 0; i < table.rows.length; i++) {
+                const c = table.rows[i].cells[colIndex];
+                if (!c) continue;
+                const range = document.createRange();
+                range.selectNodeContents(c);
+                sel.addRange(range);
+            }
+        };
+
+        const copyFormat = (root) => {
+            const sel = window.getSelection();
+            if (!sel.rangeCount || sel.isCollapsed) return;
+            let node = sel.getRangeAt(0).startContainer;
+            if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+            if (!root.contains(node)) return;
+            const styles = window.getComputedStyle(node);
+            copiedFormat = {
+                fontSize: styles.fontSize,
+                fontWeight: styles.fontWeight,
+                color: styles.color,
+                backgroundColor: styles.backgroundColor,
+                fontStyle: styles.fontStyle,
+                textDecoration: styles.textDecoration,
+            };
+        };
+
+        const applyFormat = (root) => {
+            if (!copiedFormat) return;
+            const sel = window.getSelection();
+            if (!sel.rangeCount || sel.isCollapsed) return;
+            const range = sel.getRangeAt(0);
+            const span = document.createElement('span');
+            Object.assign(span.style, copiedFormat);
+            range.surroundContents(span);
+        };
+
         const clearFormatting = () => {
             const sel = window.getSelection();
             if (!sel.rangeCount) return;
@@ -2389,6 +2465,8 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createButton('Rehacer', '↻', 'redo'));
 
         editorToolbar.appendChild(createButton('Limpiar formato', '❌', null, null, clearFormatting));
+        editorToolbar.appendChild(createButton('Copiar formato', '📋', null, null, () => copyFormat(notesEditor)));
+        editorToolbar.appendChild(createButton('Aplicar formato', '🖌️', null, null, () => applyFormat(notesEditor)));
 
         editorToolbar.appendChild(createSeparator());
 
@@ -2513,6 +2591,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
         editorToolbar.appendChild(createButton('Disminuir sangría', outdentSVG, null, null, () => adjustIndent(-1, notesEditor)));
         editorToolbar.appendChild(createButton('Aumentar sangría', indentSVG, null, null, () => adjustIndent(1, notesEditor)));
+        editorToolbar.appendChild(createButton('Disminuir sangría local', '⬅️', null, null, () => adjustLocalIndent(-1, notesEditor)));
+        editorToolbar.appendChild(createButton('Aumentar sangría local', '➡️', null, null, () => adjustLocalIndent(1, notesEditor)));
+        editorToolbar.appendChild(createButton('Seleccionar columna', '📊', null, null, () => selectTableColumn(notesEditor)));
 
         const insertBlankLineAbove = () => {
             let blocks = getSelectedBlockElements();
