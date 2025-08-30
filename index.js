@@ -452,6 +452,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const zoomOutLightboxBtn = getElem('zoom-out-lightbox-btn');
     const downloadLightboxBtn = getElem('download-lightbox-btn');
 
+    const imageCropperModal = getElem('image-cropper-modal');
+    const cropperImage = getElem('cropper-image');
+    const cropImageConfirmBtn = getElem('crop-image-confirm-btn');
+    const cropImageCancelBtn = getElem('crop-image-cancel-btn');
+
     // Post-it Note Modal
     const postitNoteModal = getElem('postit-note-modal');
     const postitNoteTextarea = getElem('postit-note-textarea');
@@ -1111,6 +1116,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeStatusFilter = 'all';
     let activeNoteIcon = null;
     let selectedImageForResize = null;
+    let cropper = null;
+    let imageToCrop = null;
     let saveTimeout;
     let activeReferencesCell = null;
     let activeIconPickerButton = null;
@@ -2610,6 +2617,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const resizeMinusBtn = createButton('Disminuir tamaño de imagen (-10%)', '➖', null, null, () => resizeSelectedImage(0.9));
         editorToolbar.appendChild(resizeMinusBtn);
 
+        const cropImageBtn = createButton('Recortar imagen', '✂️', null, null, openCropperForSelectedImage);
+        editorToolbar.appendChild(cropImageBtn);
+
         // Eliminamos el botón de inserción de tablas y el separador asociado
 
         // Print/Save
@@ -2752,6 +2762,52 @@ document.addEventListener('DOMContentLoaded', function () {
             showAlert("Por favor, selecciona una imagen primero para cambiar su tamaño.");
         }
     }
+
+    function openCropperForSelectedImage() {
+        let img = selectedImageForResize;
+        if (!img) {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+                const node = sel.anchorNode;
+                const parent = node && node.nodeType === 1 ? node : node.parentElement;
+                img = parent ? parent.querySelector('img') : null;
+            }
+        }
+        if (!img) {
+            showAlert('Por favor, selecciona una imagen primero para recortarla.');
+            return;
+        }
+        imageToCrop = img;
+        cropperImage.src = img.src;
+        showModal(imageCropperModal);
+        cropper = new window.Cropper(cropperImage, { viewMode: 1 });
+    }
+
+    cropImageConfirmBtn.addEventListener('click', () => {
+        if (cropper && imageToCrop) {
+            const canvas = cropper.getCroppedCanvas();
+            if (canvas) {
+                imageToCrop.src = canvas.toDataURL();
+            }
+        }
+        if (cropper) {
+            cropper.destroy();
+            cropper = null;
+        }
+        imageToCrop = null;
+        hideModal(imageCropperModal);
+        notesEditor.focus();
+    });
+
+    cropImageCancelBtn.addEventListener('click', () => {
+        if (cropper) {
+            cropper.destroy();
+            cropper = null;
+        }
+        imageToCrop = null;
+        hideModal(imageCropperModal);
+        notesEditor.focus();
+    });
 
     function updateAllTotals() {
         let grandLectura = 0;
