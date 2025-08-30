@@ -8,6 +8,8 @@
     <title>Temario para Examen Final de Medicina Interna</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="https://unpkg.com/cropperjs/dist/cropper.min.css">
+    <script src="https://unpkg.com/cropperjs/dist/cropper.min.js"></script>
 <script type="importmap">
 {
   "imports": {
@@ -553,31 +555,44 @@
 
     <!-- Modal for Image Lightbox Viewer -->
     <div id="image-lightbox-modal" class="modal-overlay">
-        <div id="image-lightbox-content" class="relative w-full h-full p-4 flex items-center justify-center">
+        <div id="image-lightbox-content" class="relative w-full h-full p-4 flex flex-col items-center justify-center">
             <button id="close-lightbox-btn" class="absolute top-4 right-4 text-white text-4xl font-bold z-20" style="text-shadow: 0 0 8px rgba(0,0,0,0.8);">&times;</button>
             <button id="prev-lightbox-btn" class="absolute left-4 top-1/2 -translate-y-1/2 text-white text-4xl font-bold z-20 p-4" style="text-shadow: 0 0 8px rgba(0,0,0,0.8);">&#10094;</button>
             <button id="next-lightbox-btn" class="absolute right-4 top-1/2 -translate-y-1/2 text-white text-4xl font-bold z-20 p-4" style="text-shadow: 0 0 8px rgba(0,0,0,0.8);">&#10095;</button>
-            <!-- Zoom, download and extra controls -->
-            <div id="lightbox-extra-controls" class="absolute bottom-4 right-4 flex items-center gap-3 z-20">
-                <button id="zoom-in-lightbox-btn" class="p-2 bg-black/50 text-white rounded-full hover:bg-black/70" title="Acercar">
-                    <!-- Lucide zoom-in icon -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-zoom-in"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><line x1="11" x2="11" y1="8" y2="14"/><line x1="8" x2="14" y1="11" y2="11"/></svg>
-                </button>
-                <button id="zoom-out-lightbox-btn" class="p-2 bg-black/50 text-white rounded-full hover:bg-black/70" title="Alejar">
-                    <!-- Lucide zoom-out icon -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-zoom-out"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><line x1="8" x2="14" y1="11" y2="11"/></svg>
-                </button>
-                <button id="download-lightbox-btn" class="p-2 bg-black/50 text-white rounded-full hover:bg-black/70" title="Descargar">
-                    <!-- Lucide download icon -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                </button>
-            </div>
             <div class="relative max-w-[90vw] max-h-[85vh] overflow-auto">
                 <img id="lightbox-image" src="" alt="Vista de imagen" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-transform duration-200 ease-in-out">
-                <div id="lightbox-caption" class="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center text-white text-center text-sm p-2 rounded-lg" style="background-color: rgba(0,0,0,0.6);">
-                    <span id="lightbox-caption-text" class="flex-grow"></span>
-                    <button id="delete-caption-btn" class="ml-2 text-red-300 hover:text-red-500 text-lg font-bold">&times;</button>
+                <!-- Zoom, download and extra controls -->
+                <div id="lightbox-extra-controls" class="absolute bottom-4 right-4 flex items-center gap-3 z-20">
+                    <button id="zoom-in-lightbox-btn" class="p-2 bg-black/50 text-white rounded-full hover:bg-black/70" title="Acercar">
+                        <!-- Lucide zoom-in icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-zoom-in"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><line x1="11" x2="11" y1="8" y2="14"/><line x1="8" x2="14" y1="11" y2="11"/></svg>
+                    </button>
+                    <button id="zoom-out-lightbox-btn" class="p-2 bg-black/50 text-white rounded-full hover:bg-black/70" title="Alejar">
+                        <!-- Lucide zoom-out icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-zoom-out"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><line x1="8" x2="14" y1="11" y2="11"/></svg>
+                    </button>
+                    <button id="download-lightbox-btn" class="p-2 bg-black/50 text-white rounded-full hover:bg-black/70" title="Descargar">
+                        <!-- Lucide download icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                    </button>
+                    <button id="crop-lightbox-btn" class="p-2 bg-black/50 text-white rounded-full hover:bg-black/70" title="Recortar">
+                        <!-- Lucide crop icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-crop"><path d="M6 2v2a2 2 0 0 0 2 2h2"/><path d="M8 2h8a2 2 0 0 1 2 2v8"/><path d="M18 22v-2a2 2 0 0 0-2-2h-2"/><path d="M16 22H8a2 2 0 0 1-2-2v-8"/></svg>
+                    </button>
                 </div>
+            </div>
+            <div id="lightbox-caption" class="flex items-center text-white text-center text-sm p-2 rounded-lg bg-black/60 mt-4">
+                <span id="lightbox-caption-text" class="flex-grow"></span>
+                <button id="delete-caption-btn" class="ml-2 text-red-300 hover:text-red-500 text-lg font-bold">&times;</button>
+            </div>
+        </div>
+    </div>
+    <div id="image-crop-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-3xl">
+            <img id="cropper-image" src="" class="max-h-[80vh] w-full object-contain" />
+            <div class="flex justify-end gap-2 mt-4">
+                <button id="cancel-crop-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cancelar</button>
+                <button id="apply-crop-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Aplicar</button>
             </div>
         </div>
     </div>

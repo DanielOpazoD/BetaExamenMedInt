@@ -451,6 +451,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const zoomInLightboxBtn = getElem('zoom-in-lightbox-btn');
     const zoomOutLightboxBtn = getElem('zoom-out-lightbox-btn');
     const downloadLightboxBtn = getElem('download-lightbox-btn');
+    const cropLightboxBtn = getElem('crop-lightbox-btn');
+    const imageCropModal = getElem('image-crop-modal');
+    const cropperImage = getElem('cropper-image');
+    const cancelCropBtn = getElem('cancel-crop-btn');
+    const applyCropBtn = getElem('apply-crop-btn');
 
     // Post-it Note Modal
     const postitNoteModal = getElem('postit-note-modal');
@@ -1121,6 +1126,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeGalleryRange = null;
     let lightboxImages = [];
     let currentLightboxIndex = 0;
+    let cropper = null;
     let currentNoteRow = null;
     let activeSubnoteLink = null;
     let currentInlineNoteIcon = 'ℹ️';
@@ -5083,6 +5089,52 @@ document.addEventListener('DOMContentLoaded', function () {
                 } catch(err) {
                     console.error('Error downloading image:', err);
                 }
+            });
+        }
+        if (cropLightboxBtn) {
+            cropLightboxBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const imgObj = lightboxImages[currentLightboxIndex];
+                if (!imgObj) return;
+                cropperImage.src = imgObj.url;
+                showModal(imageCropModal);
+                if (cropper) {
+                    cropper.destroy();
+                }
+                cropper = new Cropper(cropperImage, { viewMode: 1 });
+            });
+        }
+        if (cancelCropBtn) {
+            cancelCropBtn.addEventListener('click', () => {
+                if (cropper) {
+                    cropper.destroy();
+                    cropper = null;
+                }
+                hideModal(imageCropModal);
+            });
+        }
+        if (applyCropBtn) {
+            applyCropBtn.addEventListener('click', () => {
+                if (!cropper) return;
+                const canvas = cropper.getCroppedCanvas();
+                const dataUrl = canvas.toDataURL('image/png');
+                const imgObj = lightboxImages[currentLightboxIndex];
+                if (imgObj) {
+                    imgObj.url = dataUrl;
+                    if (imgObj.element) {
+                        imgObj.element.src = dataUrl;
+                    }
+                    if (activeGalleryLinkForLightbox) {
+                        activeGalleryLinkForLightbox.dataset.images = JSON.stringify(lightboxImages);
+                    }
+                    if (currentNotesArray && currentNotesArray[activeNoteIndex]) {
+                        saveCurrentNote();
+                    }
+                    updateLightboxView();
+                }
+                cropper.destroy();
+                cropper = null;
+                hideModal(imageCropModal);
             });
         }
         if (lightboxCaption) {
