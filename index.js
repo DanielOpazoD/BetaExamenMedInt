@@ -5094,6 +5094,30 @@ document.addEventListener('DOMContentLoaded', function () {
                     savedEditorSelection = selection.getRangeAt(0).cloneRange();
                 }
                 openNoteStyleModal();
+                return;
+            }
+
+            if (e.key === 'Enter' && !e.shiftKey) {
+                // After allowing the browser to create the new line, remove any
+                // formatting that might have been inherited from the previous
+                // block. This ensures the new line starts with default styles.
+                setTimeout(() => {
+                    const sel = window.getSelection();
+                    if (!sel.rangeCount) return;
+
+                    let node = sel.anchorNode;
+                    if (node && node.nodeType === Node.TEXT_NODE) {
+                        node = node.parentNode;
+                    }
+                    const block = node?.closest('p, h1, h2, h3, h4, h5, h6, div, blockquote, pre, li');
+                    if (block && block !== notesEditor && block.innerHTML === '<br>') {
+                        block.removeAttribute('style');
+                        block.removeAttribute('class');
+                        if (block.tagName !== 'LI') {
+                            document.execCommand('formatBlock', false, 'p');
+                        }
+                    }
+                }, 0);
             }
         });
 
