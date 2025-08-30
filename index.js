@@ -1967,10 +1967,15 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!root.contains(node)) return;
             const callout = node.closest('.note-callout-content');
             sanitizeCalloutContent(callout);
-            let block = node.closest('p, li, div');
+            // If selection is inside a table, adjust indent on the table itself
+            let block = node.closest('table');
             if (!block || !root.contains(block)) {
-                block = document.createElement('p');
-                sel.getRangeAt(0).surroundContents(block);
+                // Otherwise fall back to the nearest paragraph, list item or div
+                block = node.closest('p, li, div');
+                if (!block || !root.contains(block)) {
+                    block = document.createElement('p');
+                    sel.getRangeAt(0).surroundContents(block);
+                }
             }
             const currentClass = Array.from(block.classList).find(c => c.startsWith('indent-'));
             let level = currentClass ? parseInt(currentClass.split('-')[1], 10) : 0;
