@@ -160,16 +160,49 @@
         #notes-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; cursor: pointer; }
         #notes-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
 
+        #notes-editor figure.image-with-caption,
+        #subnote-editor figure.image-with-caption,
+        #print-area figure.image-with-caption {
+            display: inline-block;
+            text-align: center;
+            margin: 1rem auto;
+        }
+        #notes-editor figure.image-with-caption img,
+        #subnote-editor figure.image-with-caption img,
+        #print-area figure.image-with-caption img {
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+            height: auto;
+        }
+        #notes-editor figure.image-with-caption figcaption,
+        #subnote-editor figure.image-with-caption figcaption,
+        #print-area figure.image-with-caption figcaption {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
         /* Display multiple images in a row */
-        #notes-editor .image-row {
+        #notes-editor .image-row,
+        #subnote-editor .image-row {
             display: flex;
             gap: 0.5rem;
             flex-wrap: wrap;
         }
-        #notes-editor .image-row img {
+        #notes-editor .image-row > *,
+        #subnote-editor .image-row > * {
             flex: 1 1 0;
             max-width: 100%;
+        }
+        #notes-editor .image-row img,
+        #subnote-editor .image-row img {
+            max-width: 100%;
             height: auto;
+        }
+        #notes-editor .image-row figure,
+        #subnote-editor .image-row figure {
+            margin: 0;
         }
 
         /* Style the sub-note editor similar to the main notes editor */
@@ -823,6 +856,7 @@ table.resizable-table .table-resize-handle {
             }
             /* Ensure side-by-side images print in the same row */
             #notes-editor .image-row,
+            #subnote-editor .image-row,
             #print-area .image-row {
                 display: flex;
                 gap: 0.5rem;
@@ -830,11 +864,28 @@ table.resizable-table .table-resize-handle {
                 page-break-inside: avoid;
                 break-inside: avoid;
             }
-            #notes-editor .image-row img,
-            #print-area .image-row img {
+            #notes-editor .image-row > *,
+            #subnote-editor .image-row > *,
+            #print-area .image-row > * {
                 flex: 1 1 0;
                 max-width: 100%;
+            }
+            #notes-editor .image-row img,
+            #subnote-editor .image-row img,
+            #print-area .image-row img {
+                max-width: 100%;
                 height: auto;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            #notes-editor .image-row figure,
+            #subnote-editor .image-row figure,
+            #print-area .image-row figure {
+                margin: 0;
+            }
+            #notes-editor figure.image-with-caption,
+            #subnote-editor figure.image-with-caption,
+            #print-area figure.image-with-caption {
                 page-break-inside: avoid;
                 break-inside: avoid;
             }

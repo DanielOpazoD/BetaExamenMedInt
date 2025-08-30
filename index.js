@@ -1000,6 +1000,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.execCommand('insertImage', false, url);
             }
         }));
+        subNoteToolbar.appendChild(createSNButton('Agregar nota al pie de imagen', '📝', null, null, addCaptionToSelectedImage));
         // Gallery link insertion
         const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
         subNoteToolbar.appendChild(createSNButton('Crear Galería de Imágenes', gallerySVG, null, null, () => {
@@ -2610,6 +2611,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const resizeMinusBtn = createButton('Disminuir tamaño de imagen (-10%)', '➖', null, null, () => resizeSelectedImage(0.9));
         editorToolbar.appendChild(resizeMinusBtn);
 
+        const captionBtn = createButton('Agregar nota al pie de imagen', '📝', null, null, addCaptionToSelectedImage);
+        editorToolbar.appendChild(captionBtn);
+
         // Eliminamos el botón de inserción de tablas y el separador asociado
 
         // Print/Save
@@ -2750,6 +2754,67 @@ document.addEventListener('DOMContentLoaded', function () {
             selectedImageForResize.style.height = 'auto'; // Keep aspect ratio
         } else {
             showAlert("Por favor, selecciona una imagen primero para cambiar su tamaño.");
+        }
+    }
+
+    function addCaptionToSelectedImage() {
+        let img = selectedImageForResize;
+        if (!img) {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+                let node = sel.getRangeAt(0).startContainer;
+                if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+                if (node.tagName === 'IMG') {
+                    img = node;
+                } else if (node.querySelector) {
+                    const found = node.querySelector('img');
+                    if (found) img = found;
+                }
+            }
+        }
+        if (!img) {
+            showAlert("Por favor, selecciona una imagen para agregar una nota al pie.");
+            return;
+        }
+        const note = prompt('Nota al pie de la imagen:', img.dataset.caption || '');
+        if (note === null) return;
+        const captionText = note.trim();
+        if (captionText) {
+            let fig = img.closest('figure');
+            if (!fig) {
+                fig = document.createElement('figure');
+                fig.classList.add('image-with-caption');
+                fig.contentEditable = 'false';
+                img.parentNode.insertBefore(fig, img);
+                fig.appendChild(img);
+                const spacer = document.createTextNode('\u00A0');
+                fig.parentNode.insertBefore(spacer, fig.nextSibling);
+            } else {
+                fig.classList.add('image-with-caption');
+            }
+            img.dataset.caption = captionText;
+            let fc = fig.querySelector('figcaption');
+            if (!fc) {
+                fc = document.createElement('figcaption');
+                fig.appendChild(fc);
+            }
+            fc.textContent = captionText;
+        } else {
+            img.dataset.caption = '';
+            const fig = img.closest('figure');
+            if (fig) {
+                const fc = fig.querySelector('figcaption');
+                if (fc) fc.remove();
+                fig.classList.remove('image-with-caption');
+            }
+        }
+        if (notesEditor.contains(img)) {
+            notesEditor.focus();
+            if (currentNotesArray && currentNotesArray[activeNoteIndex]) {
+                saveCurrentNote();
+            }
+        } else if (subNoteEditor && subNoteEditor.contains(img)) {
+            subNoteEditor.focus();
         }
     }
 
