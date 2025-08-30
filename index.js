@@ -790,7 +790,7 @@ document.addEventListener('DOMContentLoaded', function () {
         subNoteToolbar.appendChild(createSNButton('Superíndice', 'X²', 'superscript'));
         // Erase format
         const eraserSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eraser w-5 h-5"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21H7Z"/><path d="M22 21H7"/><path d="m5 12 5 5"/></svg>`;
-        subNoteToolbar.appendChild(createSNButton('Borrar formato', eraserSVG, 'removeFormat'));
+        subNoteToolbar.appendChild(createSNButton('Limpiar formato', eraserSVG, null, null, clearFormattingSN));
         // Font size selector
         const selectSNSize = document.createElement('select');
         selectSNSize.className = 'toolbar-select';
@@ -907,6 +907,21 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             return [startBlock];
         };
+
+        function clearFormattingSN() {
+            document.execCommand('removeFormat');
+            const blocks = getSelectedBlocksSN();
+            blocks.forEach(block => {
+                if (block && subNoteEditor.contains(block)) {
+                    block.removeAttribute('style');
+                    block.removeAttribute('class');
+                    if (block.tagName === 'BLOCKQUOTE') {
+                        while (block.firstChild) block.parentNode.insertBefore(block.firstChild, block);
+                        block.remove();
+                    }
+                }
+            });
+        }
         const applySubnoteLineHighlight = (color) => {
             let elements = getSelectedBlocksSN();
             if (elements.length === 0 || (elements.length === 1 && !elements[0])) {
@@ -1984,6 +1999,21 @@ document.addEventListener('DOMContentLoaded', function () {
             if (level > 0) block.classList.add(`indent-${level}`);
         };
 
+        const clearFormatting = () => {
+            const sel = window.getSelection();
+            if (!sel.rangeCount) return;
+            document.execCommand('removeFormat');
+            const blocks = getSelectedBlockElements();
+            blocks.forEach(block => {
+                block.removeAttribute('style');
+                block.removeAttribute('class');
+                if (block.tagName === 'BLOCKQUOTE') {
+                    while (block.firstChild) block.parentNode.insertBefore(block.firstChild, block);
+                    block.remove();
+                }
+            });
+        };
+
         const createSeparator = () => {
             const sep = document.createElement('div');
             sep.className = 'toolbar-separator';
@@ -2269,7 +2299,7 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createButton('Rehacer', '↻', 'redo'));
 
         const eraserSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eraser w-5 h-5"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21H7Z"/><path d="M22 21H7"/><path d="m5 12 5 5"/></svg>`;
-        editorToolbar.appendChild(createButton('Borrar formato', eraserSVG, 'removeFormat'));
+        editorToolbar.appendChild(createButton('Limpiar formato', eraserSVG, null, null, clearFormatting));
 
         editorToolbar.appendChild(createSeparator());
 
