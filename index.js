@@ -788,9 +788,8 @@ document.addEventListener('DOMContentLoaded', function () {
         subNoteToolbar.appendChild(createSNButton('Subrayado', '<u>U</u>', 'underline'));
         subNoteToolbar.appendChild(createSNButton('Tachado', '<s>S</s>', 'strikeThrough'));
         subNoteToolbar.appendChild(createSNButton('Superíndice', 'X²', 'superscript'));
-        // Erase format
-        const eraserSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eraser w-5 h-5"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21H7Z"/><path d="M22 21H7"/><path d="m5 12 5 5"/></svg>`;
-        subNoteToolbar.appendChild(createSNButton('Borrar formato', eraserSVG, 'removeFormat'));
+        // Clear formatting
+        subNoteToolbar.appendChild(createSNButton('Limpiar formato', '❌', null, null, clearFormattingSN));
         // Font size selector
         const selectSNSize = document.createElement('select');
         selectSNSize.className = 'toolbar-select';
@@ -907,6 +906,21 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             return [startBlock];
         };
+
+        function clearFormattingSN() {
+            document.execCommand('removeFormat');
+            const blocks = getSelectedBlocksSN();
+            blocks.forEach(block => {
+                if (block && subNoteEditor.contains(block)) {
+                    block.removeAttribute('style');
+                    block.removeAttribute('class');
+                    if (block.tagName === 'BLOCKQUOTE') {
+                        while (block.firstChild) block.parentNode.insertBefore(block.firstChild, block);
+                        block.remove();
+                    }
+                }
+            });
+        }
         const applySubnoteLineHighlight = (color) => {
             let elements = getSelectedBlocksSN();
             if (elements.length === 0 || (elements.length === 1 && !elements[0])) {
@@ -1981,7 +1995,49 @@ document.addEventListener('DOMContentLoaded', function () {
             let level = currentClass ? parseInt(currentClass.split('-')[1], 10) : 0;
             if (currentClass) block.classList.remove(currentClass);
             level = Math.max(0, Math.min(5, level + delta));
-            if (level > 0) block.classList.add(`indent-${level}`);
+            if (level > 0) {
+                block.classList.add(`indent-${level}`);
+            } else if (delta < 0) {
+                // Remove any lingering indentation styles or wrappers
+                let target = block;
+                while (target && target !== root) {
+                    // Clear inline indentation styles
+                    ['margin-left', 'padding-left', 'text-indent'].forEach(prop => {
+                        target.style.removeProperty(prop);
+                    });
+                    const styleAttr = target.getAttribute('style');
+                    if (!styleAttr || styleAttr.trim() === '') {
+                        target.removeAttribute('style');
+                    }
+                    // Remove indent utility classes
+                    Array.from(target.classList).forEach(cls => {
+                        if (cls.startsWith('indent-')) target.classList.remove(cls);
+                    });
+                    if (target.tagName === 'BLOCKQUOTE') {
+                        const parent = target.parentNode;
+                        while (target.firstChild) parent.insertBefore(target.firstChild, target);
+                        target.remove();
+                        target = parent;
+                    } else {
+                        target = target.parentElement;
+                    }
+                }
+            }
+        };
+
+        const clearFormatting = () => {
+            const sel = window.getSelection();
+            if (!sel.rangeCount) return;
+            document.execCommand('removeFormat');
+            const blocks = getSelectedBlockElements();
+            blocks.forEach(block => {
+                block.removeAttribute('style');
+                block.removeAttribute('class');
+                if (block.tagName === 'BLOCKQUOTE') {
+                    while (block.firstChild) block.parentNode.insertBefore(block.firstChild, block);
+                    block.remove();
+                }
+            });
         };
 
         const createSeparator = () => {
@@ -2268,8 +2324,7 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createButton('Deshacer', '↺', 'undo'));
         editorToolbar.appendChild(createButton('Rehacer', '↻', 'redo'));
 
-        const eraserSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eraser w-5 h-5"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21H7Z"/><path d="M22 21H7"/><path d="m5 12 5 5"/></svg>`;
-        editorToolbar.appendChild(createButton('Borrar formato', eraserSVG, 'removeFormat'));
+        editorToolbar.appendChild(createButton('Limpiar formato', '❌', null, null, clearFormatting));
 
         editorToolbar.appendChild(createSeparator());
 
