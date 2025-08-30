@@ -4116,6 +4116,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const tooltipHideDelay = 300;
     const tooltipHideMargin = 8;
+    const tooltipFixedTop = 20;
+    const tooltipFixedLeft = 20;
     let lastMousePos = { x: 0, y: 0 };
     document.addEventListener('mousemove', (e) => {
         lastMousePos.x = e.clientX;
@@ -4178,9 +4180,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         document.body.appendChild(tooltip);
-        const rect = icon.getBoundingClientRect();
-        tooltip.style.top = `${rect.bottom + window.scrollY + 4}px`;
-        tooltip.style.left = `${rect.left + window.scrollX}px`;
+        tooltip.style.top = `${tooltipFixedTop}px`;
+        tooltip.style.left = `${tooltipFixedLeft}px`;
         icon._tooltip = tooltip;
     }
 
@@ -4902,19 +4903,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Note content import/export
         exportNoteBtn.addEventListener('click', () => {
-            // Clone the editor content so we can strip sub-note links before exporting
             const clone = notesEditor.cloneNode(true);
-            // Remove any sub-note or legacy post-it links entirely from the exported HTML
-            clone.querySelectorAll('a.subnote-link, a.postit-link').forEach(link => {
-                const parent = link.parentNode;
-                while (link.firstChild) {
-                    parent.insertBefore(link.firstChild, link);
-                }
-                parent.removeChild(link);
-            });
             const noteContent = clone.innerHTML;
             const noteTitle = (notesModalTitle.textContent || 'nota').trim().replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${notesModalTitle.textContent}</title><style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap'); body { font-family: 'Inter', sans-serif; line-height: 1.6; padding: 1rem; } ul, ol { list-style: none; padding-left: 1.25rem; }</style></head><body>${noteContent}</body></html>`;
+            const postitsData = (currentNotesArray[activeNoteIndex] && currentNotesArray[activeNoteIndex].postits) || {};
+            const postitsJson = JSON.stringify(postitsData).replace(/</g, '\\u003c');
+            const styles = `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap'); body { font-family: 'Inter', sans-serif; line-height: 1.6; padding: 1rem; } ul, ol { list-style: none; padding-left: 1.25rem; } .inline-note{ vertical-align: super; font-size: 0.8em; cursor: pointer; color: inherit; } .inline-note-tooltip{ position: fixed; top: ${tooltipFixedTop}px; left: ${tooltipFixedLeft}px; background-color: var(--bg-secondary, #fefefe); color: var(--text-primary, #000); border: 1px solid var(--border-color, #ccc); padding: 0.25rem 0.5rem; border-radius: 0.375rem; box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width: 90vw; max-height: 80vh; z-index: 2000; pointer-events: auto; resize: both; overflow: auto; display: none; }`;
+            const script = `(function(){const postits=${postitsJson};const tooltip=document.createElement('div');tooltip.className='inline-note-tooltip';document.body.appendChild(tooltip);function show(icon){const id=icon.dataset.subnoteId||icon.dataset.postitId;const data=postits[id];if(!data||!data.content)return;tooltip.innerHTML=data.content;tooltip.style.display='block';}function hide(){tooltip.style.display='none';}document.addEventListener('mouseover',e=>{const icon=e.target.closest('.inline-note, .subnote-link, .postit-link');if(icon)show(icon);});document.addEventListener('mouseout',e=>{const icon=e.target.closest('.inline-note, .subnote-link, .postit-link');if(icon&&!icon.contains(e.relatedTarget))hide();});})();`;
+            const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${notesModalTitle.textContent}</title><style>${styles}</style></head><body>${noteContent}<script>${script}</script></body></html>`;
             const blob = new Blob([html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
