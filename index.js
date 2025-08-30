@@ -987,6 +987,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             elements.forEach((block, index) => {
                 if (block && subNoteEditor.contains(block)) {
+                    const isTableEl = ['TABLE', 'TR', 'TD', 'TH'].includes(block.tagName);
                     if (color === 'transparent') {
                         block.style.backgroundColor = '';
                         block.style.paddingLeft = '';
@@ -997,14 +998,23 @@ document.addEventListener('DOMContentLoaded', function () {
                         block.style.borderBottomRightRadius = '';
                     } else {
                         block.style.backgroundColor = color;
-                        block.style.paddingLeft = '6px';
-                        block.style.paddingRight = '6px';
-                        const first = index === 0;
-                        const last = index === elements.length - 1;
-                        block.style.borderTopLeftRadius = first ? '6px' : '0';
-                        block.style.borderTopRightRadius = first ? '6px' : '0';
-                        block.style.borderBottomLeftRadius = last ? '6px' : '0';
-                        block.style.borderBottomRightRadius = last ? '6px' : '0';
+                        if (!isTableEl) {
+                            block.style.paddingLeft = '6px';
+                            block.style.paddingRight = '6px';
+                            const first = index === 0;
+                            const last = index === elements.length - 1;
+                            block.style.borderTopLeftRadius = first ? '6px' : '0';
+                            block.style.borderTopRightRadius = first ? '6px' : '0';
+                            block.style.borderBottomLeftRadius = last ? '6px' : '0';
+                            block.style.borderBottomRightRadius = last ? '6px' : '0';
+                        } else {
+                            block.style.paddingLeft = '';
+                            block.style.paddingRight = '';
+                            block.style.borderTopLeftRadius = '0';
+                            block.style.borderTopRightRadius = '0';
+                            block.style.borderBottomLeftRadius = '0';
+                            block.style.borderBottomRightRadius = '0';
+                        }
                     }
                 }
             });
@@ -2409,6 +2419,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             elements.forEach((block, index) => {
                 if (block && notesEditor.contains(block)) {
+                    const isTableEl = ['TABLE', 'TR', 'TD', 'TH'].includes(block.tagName);
                     if (color === 'transparent') {
                         // Remove highlight and reset borders and margins on clear
                         block.style.backgroundColor = '';
@@ -2422,18 +2433,29 @@ document.addEventListener('DOMContentLoaded', function () {
                         block.style.borderBottomRightRadius = '';
                     } else {
                         block.style.backgroundColor = color;
-                        block.style.paddingLeft = '6px';
-                        block.style.paddingRight = '6px';
-                        // Remove default margins to fuse adjacent highlighted lines
-                        block.style.marginTop = '0px';
-                        block.style.marginBottom = '0px';
-                        // Set border radius based on position in selection
-                        const first = index === 0;
-                        const last = index === elements.length - 1;
-                        block.style.borderTopLeftRadius = first ? '6px' : '0';
-                        block.style.borderTopRightRadius = first ? '6px' : '0';
-                        block.style.borderBottomLeftRadius = last ? '6px' : '0';
-                        block.style.borderBottomRightRadius = last ? '6px' : '0';
+                        if (!isTableEl) {
+                            block.style.paddingLeft = '6px';
+                            block.style.paddingRight = '6px';
+                            // Remove default margins to fuse adjacent highlighted lines
+                            block.style.marginTop = '0px';
+                            block.style.marginBottom = '0px';
+                            // Set border radius based on position in selection
+                            const first = index === 0;
+                            const last = index === elements.length - 1;
+                            block.style.borderTopLeftRadius = first ? '6px' : '0';
+                            block.style.borderTopRightRadius = first ? '6px' : '0';
+                            block.style.borderBottomLeftRadius = last ? '6px' : '0';
+                            block.style.borderBottomRightRadius = last ? '6px' : '0';
+                        } else {
+                            block.style.paddingLeft = '';
+                            block.style.paddingRight = '';
+                            block.style.marginTop = '';
+                            block.style.marginBottom = '';
+                            block.style.borderTopLeftRadius = '0';
+                            block.style.borderTopRightRadius = '0';
+                            block.style.borderBottomLeftRadius = '0';
+                            block.style.borderBottomRightRadius = '0';
+                        }
                     }
                 }
             });
@@ -5000,12 +5022,13 @@ document.addEventListener('DOMContentLoaded', function () {
                      }
                  }
                  subNoteTitle.textContent = subnoteData.title || '';
-                 subNoteEditor.innerHTML = subnoteData.content || '<p><br></p>';
-                 const modalContent = subNoteModal.querySelector('.notes-modal-content');
-                 modalContent.classList.remove('readonly-mode');
-                 subNoteEditor.contentEditable = true;
-                 subNoteTitle.contentEditable = true;
-                 subNoteEditor.focus();
+                subNoteEditor.innerHTML = subnoteData.content || '<p><br></p>';
+                subNoteEditor.querySelectorAll('table').forEach(initTableResize);
+                const modalContent = subNoteModal.querySelector('.notes-modal-content');
+                modalContent.classList.remove('readonly-mode');
+                subNoteEditor.contentEditable = true;
+                subNoteTitle.contentEditable = true;
+                subNoteEditor.focus();
                  showModal(subNoteModal);
                  return;
              }
@@ -5032,6 +5055,7 @@ document.addEventListener('DOMContentLoaded', function () {
                  // Populate sub-note modal fields
                 subNoteTitle.textContent = subnoteData.title || '';
                 subNoteEditor.innerHTML = subnoteData.content || '<p><br></p>';
+                subNoteEditor.querySelectorAll('table').forEach(initTableResize);
                 const modalContent = subNoteModal.querySelector('.notes-modal-content');
                 modalContent.classList.add('readonly-mode');
                 subNoteEditor.contentEditable = false;
