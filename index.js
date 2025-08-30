@@ -2598,6 +2598,61 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(floatImageBtn);
 
+        const captionImageBtn = createButton('Añadir nota al pie de la imagen', '🖼️📝', null, null, () => {
+            let img = selectedImageForResize;
+            if (!img) {
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount) {
+                    let node = sel.getRangeAt(0).startContainer;
+                    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+                    if (node.tagName === 'IMG') {
+                        img = node;
+                    } else if (node.querySelector) {
+                        const found = node.querySelector('img');
+                        if (found) img = found;
+                    }
+                }
+            }
+            if (!img) {
+                alertMessage.textContent = 'Selecciona primero una imagen para añadir la nota.';
+                alertTitle.textContent = 'Imagen no seleccionada';
+                showModal(alertModal);
+                return;
+            }
+            const newCaption = prompt('Nota al pie de la imagen:', img.dataset.caption || '');
+            if (newCaption === null) return;
+            const captionText = newCaption.trim();
+            if (!captionText) {
+                delete img.dataset.caption;
+                const fig = img.closest('figure');
+                const fc = fig ? fig.querySelector('figcaption') : null;
+                if (fc) fc.remove();
+                return;
+            }
+            img.dataset.caption = captionText;
+            let fig = img.closest('figure');
+            if (!fig) {
+                fig = document.createElement('figure');
+                fig.contentEditable = 'false';
+                img.parentNode.insertBefore(fig, img);
+                fig.appendChild(img);
+                const spacer = document.createTextNode('\u00A0');
+                fig.parentNode.insertBefore(spacer, fig.nextSibling);
+            }
+            let fc = fig.querySelector('figcaption');
+            if (!fc) {
+                fc = document.createElement('figcaption');
+                fc.className = 'image-caption';
+                fc.contentEditable = 'true';
+                fc.addEventListener('input', () => {
+                    img.dataset.caption = fc.textContent.trim();
+                });
+                fig.appendChild(fc);
+            }
+            fc.textContent = captionText;
+        });
+        editorToolbar.appendChild(captionImageBtn);
+
         const sideBySideBtn = createButton('Alinear imágenes en fila', '🖼️🖼️', null, null, wrapSelectedImagesSideBySide);
         editorToolbar.appendChild(sideBySideBtn);
 
