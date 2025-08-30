@@ -1995,7 +1995,34 @@ document.addEventListener('DOMContentLoaded', function () {
             let level = currentClass ? parseInt(currentClass.split('-')[1], 10) : 0;
             if (currentClass) block.classList.remove(currentClass);
             level = Math.max(0, Math.min(5, level + delta));
-            if (level > 0) block.classList.add(`indent-${level}`);
+            if (level > 0) {
+                block.classList.add(`indent-${level}`);
+            } else if (delta < 0) {
+                // Remove any lingering indentation styles or wrappers
+                let target = block;
+                while (target && target !== root) {
+                    // Clear inline indentation styles
+                    ['margin-left', 'padding-left', 'text-indent'].forEach(prop => {
+                        target.style.removeProperty(prop);
+                    });
+                    const styleAttr = target.getAttribute('style');
+                    if (!styleAttr || styleAttr.trim() === '') {
+                        target.removeAttribute('style');
+                    }
+                    // Remove indent utility classes
+                    Array.from(target.classList).forEach(cls => {
+                        if (cls.startsWith('indent-')) target.classList.remove(cls);
+                    });
+                    if (target.tagName === 'BLOCKQUOTE') {
+                        const parent = target.parentNode;
+                        while (target.firstChild) parent.insertBefore(target.firstChild, target);
+                        target.remove();
+                        target = parent;
+                    } else {
+                        target = target.parentElement;
+                    }
+                }
+            }
         };
 
         const clearFormatting = () => {
