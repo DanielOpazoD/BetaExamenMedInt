@@ -535,6 +535,106 @@ document.addEventListener('DOMContentLoaded', function () {
     const applyNoteStyleBtn = getElem('apply-note-style-btn');
     const cancelNoteStyleBtn = getElem('cancel-note-style-btn');
 
+    // --- Normalize pasted lists ---
+    function normalizePastedLists(html) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        // Unwrap containers that only wrap a single list
+        doc.querySelectorAll('blockquote, div').forEach(el => {
+            if (el.childElementCount === 1) {
+                const child = el.firstElementChild;
+                if (child && (child.tagName === 'UL' || child.tagName === 'OL')) {
+                    el.replaceWith(child);
+                }
+            }
+        });
+
+        // Wrap any stray <li> elements in a new <ul>
+        const wrapOrphanLis = () => {
+            const orphans = Array.from(doc.querySelectorAll('li')).filter(li => {
+                const parent = li.parentElement;
+                return !parent || (parent.tagName !== 'UL' && parent.tagName !== 'OL');
+            });
+
+            orphans.forEach(li => {
+                const parent = li.parentElement || doc.body;
+                const wrapper = doc.createElement('ul');
+                parent.insertBefore(wrapper, li);
+
+                let current = li;
+                while (current && current.tagName === 'LI') {
+                    const next = current.nextElementSibling;
+                    wrapper.appendChild(current);
+                    current = (next && next.tagName === 'LI') ? next : null;
+                }
+            });
+        };
+
+        wrapOrphanLis();
+
+        // Repeatedly flatten redundant nested lists that are not inside an <li>
+        const flattenLists = () => {
+            let nested = doc.querySelector('ul ul, ul ol, ol ul, ol ol');
+            while (nested) {
+                const parent = nested.parentElement;
+                if (parent && (parent.tagName === 'UL' || parent.tagName === 'OL')) {
+                    while (nested.firstChild) parent.insertBefore(nested.firstChild, nested);
+                    nested.remove();
+                } else {
+                    nested = nested.nextElementSibling;
+                }
+                nested = doc.querySelector('ul ul, ul ol, ol ul, ol ol');
+            }
+        };
+
+        flattenLists();
+
+        // Merge adjacent lists of the same type
+        const mergeSiblings = () => {
+            let node = doc.body.firstElementChild;
+            while (node) {
+                let next = node.nextElementSibling;
+                if (next && node.tagName === next.tagName && (node.tagName === 'UL' || node.tagName === 'OL')) {
+                    while (next.firstChild) node.appendChild(next.firstChild);
+                    next.remove();
+                    continue; // re-check with new next sibling
+                }
+                node = next;
+            }
+        };
+
+        mergeSiblings();
+
+        // Remove empty list items and lists
+        doc.querySelectorAll('li').forEach(li => { if (!li.textContent.trim()) li.remove(); });
+        doc.querySelectorAll('ul, ol').forEach(list => { if (!list.querySelector('li')) list.remove(); });
+
+        // Strip attributes from list elements for consistent formatting
+        doc.querySelectorAll('ul, ol, li').forEach(el => {
+            [...el.attributes].forEach(attr => {
+                if (attr.name !== 'type') el.removeAttribute(attr.name);
+            });
+        });
+
+        return doc.body.innerHTML;
+    }
+
+    function handlePasteWithListFix(e) {
+        e.preventDefault();
+        const html = e.clipboardData.getData('text/html');
+        const text = e.clipboardData.getData('text/plain');
+        if (html) {
+            const cleaned = normalizePastedLists(html);
+            document.execCommand('insertHTML', false, cleaned);
+        } else if (text) {
+            document.execCommand('insertText', false, text);
+        }
+    }
+
+    if (notesEditor) notesEditor.addEventListener('paste', handlePasteWithListFix);
+    if (subNoteEditor) subNoteEditor.addEventListener('paste', handlePasteWithListFix);
+
     /*
      * Build the simplified toolbar for sub-note editing.  This toolbar intentionally omits
      * certain controls available in the main note editor, such as line height, image
@@ -2389,6 +2489,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
         editorToolbar.appendChild(createButton('Disminuir sangría', outdentSVG, null, null, () => adjustIndent(-1, notesEditor)));
         editorToolbar.appendChild(createButton('Aumentar sangría', indentSVG, null, null, () => adjustIndent(1, notesEditor)));
+
+        const fixListsBtn = createButton('Normalizar listas', '🧾', null, null, () => {
+            notesEditor.innerHTML = normalizePastedLists(notesEditor.innerHTML);
+        });
+        editorToolbar.appendChild(fixListsBtn);
 
         const insertBlankLineAbove = () => {
             let blocks = getSelectedBlockElements();
