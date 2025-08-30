@@ -865,6 +865,11 @@ table.resizable-table .table-resize-handle {
 .indent-3 { margin-left: 3rem; }
 .indent-4 { margin-left: 4rem; }
 .indent-5 { margin-left: 5rem; }
+.inline-indent-1 { display: inline-block; margin-left: 1rem; }
+.inline-indent-2 { display: inline-block; margin-left: 2rem; }
+.inline-indent-3 { display: inline-block; margin-left: 3rem; }
+.inline-indent-4 { display: inline-block; margin-left: 4rem; }
+.inline-indent-5 { display: inline-block; margin-left: 5rem; }
 .note-resizable {
     resize: horizontal;
     overflow: auto;
