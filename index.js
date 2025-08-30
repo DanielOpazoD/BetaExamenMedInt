@@ -352,6 +352,41 @@ document.addEventListener('DOMContentLoaded', function () {
     // Flag to prevent multiple table insertions if user double-clicks or if events overlap
     let isInsertingTable = false;
 
+    /**
+     * Clean pasted HTML lists by ensuring all <li> elements are wrapped inside
+     * a parent <ul> or <ol> and flattening any list elements that are direct
+     * children of another list. This normalization prevents malformed list
+     * structures that can break indentation and styling when pasting from
+     * external sources.
+     */
+    function sanitizePastedLists(html) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        // Ensure every <li> has a proper list parent
+        doc.querySelectorAll('li').forEach(li => {
+            const parent = li.parentElement;
+            if (!parent || (parent.tagName !== 'UL' && parent.tagName !== 'OL')) {
+                const wrapper = doc.createElement('ul');
+                if (parent) {
+                    parent.replaceChild(wrapper, li);
+                }
+                wrapper.appendChild(li);
+            }
+        });
+
+        // Flatten lists that are direct children of other lists
+        doc.querySelectorAll('ul > ul, ol > ul, ul > ol, ol > ol').forEach(nested => {
+            const parent = nested.parentNode;
+            while (nested.firstChild) {
+                parent.insertBefore(nested.firstChild, nested);
+            }
+            parent.removeChild(nested);
+        });
+
+        return doc.body.innerHTML;
+    }
+
 
     /**
      * Initialize the table size selection grid.  This creates the 10x10 cells
@@ -4937,6 +4972,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 openNoteStyleModal();
             }
+        });
+
+        notesEditor.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const clipboard = e.clipboardData;
+            const html = clipboard.getData('text/html') || clipboard.getData('text/plain');
+            const cleaned = sanitizePastedLists(html);
+            document.execCommand('insertHTML', false, cleaned);
         });
 
         noteStyleTabPre.addEventListener('click', () => {
