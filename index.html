@@ -553,7 +553,7 @@
 
     <!-- Modal for Image Lightbox Viewer -->
     <div id="image-lightbox-modal" class="modal-overlay">
-        <div id="image-lightbox-content" class="relative w-full h-full p-4 flex items-center justify-center">
+        <div id="image-lightbox-content" class="relative w-full h-full p-4 flex flex-col items-center justify-center">
             <button id="close-lightbox-btn" class="absolute top-4 right-4 text-white text-4xl font-bold z-20" style="text-shadow: 0 0 8px rgba(0,0,0,0.8);">&times;</button>
             <button id="prev-lightbox-btn" class="absolute left-4 top-1/2 -translate-y-1/2 text-white text-4xl font-bold z-20 p-4" style="text-shadow: 0 0 8px rgba(0,0,0,0.8);">&#10094;</button>
             <button id="next-lightbox-btn" class="absolute right-4 top-1/2 -translate-y-1/2 text-white text-4xl font-bold z-20 p-4" style="text-shadow: 0 0 8px rgba(0,0,0,0.8);">&#10095;</button>
@@ -574,10 +574,25 @@
             </div>
             <div class="relative max-w-[90vw] max-h-[85vh] overflow-auto">
                 <img id="lightbox-image" src="" alt="Vista de imagen" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-transform duration-200 ease-in-out">
-                <div id="lightbox-caption" class="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center text-white text-center text-sm p-2 rounded-lg" style="background-color: rgba(0,0,0,0.6);">
-                    <span id="lightbox-caption-text" class="flex-grow"></span>
-                    <button id="delete-caption-btn" class="ml-2 text-red-300 hover:text-red-500 text-lg font-bold">&times;</button>
-                </div>
+            </div>
+            <div id="lightbox-caption" class="mt-2 flex items-center text-white text-center text-sm p-2 rounded-lg" style="background-color: rgba(0,0,0,0.6);">
+                <span id="lightbox-caption-text" class="flex-grow"></span>
+                <button id="delete-caption-btn" class="ml-2 text-red-300 hover:text-red-500 text-lg font-bold">&times;</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Image Cropping -->
+    <div id="crop-image-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-3xl">
+            <h3 class="text-lg font-bold mb-4">Recortar Imagen</h3>
+            <div class="relative max-h-[70vh] overflow-auto">
+                <canvas id="crop-canvas" class="border"></canvas>
+                <div id="crop-overlay" class="absolute border-2 border-blue-500 bg-blue-200/20 hidden"></div>
+            </div>
+            <div class="flex justify-end items-center gap-2 mt-4">
+                <button id="cancel-crop-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cancelar</button>
+                <button id="apply-crop-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Aplicar</button>
             </div>
         </div>
     </div>
