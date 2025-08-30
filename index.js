@@ -339,6 +339,64 @@ document.addEventListener('DOMContentLoaded', function () {
     const TEMPLATES_PER_PAGE = 20;
     let undoTimer = null;
     let deletedFavorite = null;
+    const DEFAULT_HTML_FAVORITES = [
+        {
+            name: "Verde Nota",
+            code: "<blockquote style=\"margin: 0px 0px 0px 40px; border: none; padding: 0px; line-height: 1.4;\"><div style=\"line-height: 1.4;\"><div style=\"line-height: 1.4;\"><div style=\"border-left-width: 4px; border-left-color: rgb(46, 125, 50); background: rgb(244, 250, 244); padding: 10px; margin: 8px 0px 8px -19px; border-radius: 6px; line-height: 1.4; width: 645px;\" class=\"note-resizable\"><div class=\"section-title\" style=\"font-weight: bold; color: rgb(0, 0, 0); font-family: sans-serif; line-height: 1.4;\"><br></div></div></div></div></blockquote><span style=\"background-color: rgb(230, 230, 250);\"><b><div></div></b></span>",
+            tags: [],
+            favorite: false,
+            uses: 0,
+            created: 1755964280115
+        },
+        {
+            name: "Gris nota",
+            code: "<p><br></p><div style=\"background: rgb(245, 245, 245); padding: 10px; border-radius: 6px; box-shadow: rgba(0, 0, 0, 0.1) 0px 2px 4px; line-height: 1.2; width: 660px; margin-left: 39px;\" class=\"note-resizable\"><font face=\"sans-serif\"><font size=\"2\" style=\"\"><b>➖</b></font></font></div>",
+            tags: [],
+            favorite: false,
+            uses: 3,
+            created: 1755964361117
+        },
+        {
+            name: "Azul Nota",
+            code: "<div><div style=\"border-left-width: 4px; border-left-color: rgb(25, 118, 210); background: rgb(244, 250, 255); padding: 10px; margin: 8px 0px 8px 20px; border-radius: 6px; font-family: sans-serif; width: 775px;\" class=\"note-resizable\"><span id=\"docs-internal-guid-286844bf-7fff-cd10-d707-b68257dda577\" style=\"\"><span style=\"font-family: Arial, sans-serif; color: rgb(0, 0, 0); background-color: transparent; font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-variant-position: normal; font-variant-emoji: normal; vertical-align: baseline; white-space-collapse: preserve;\"><b style=\"\">P</b></span></span></div></div><div></div>",
+            tags: [],
+            favorite: true,
+            uses: 3,
+            created: 1755964529820
+        },
+        {
+            name: "Múltiples notas amarillas",
+            code: "<!-- Contenedor flexible para varias notas en fila -->\n<div style=\"display:flex; gap:12px; flex-wrap:wrap; margin:8px 0;\">\n  <!-- Nota adhesiva 1 -->\n  <div style=\"background:#fffde7; color:#424242; font-family:sans-serif; font-size:14px; padding:10px; border-radius:6px; width:200px; box-shadow:2px 2px 4px rgba(0,0,0,0.2);\">\n    📌 Nota 1: Revisar creatinina.\n  </div>\n\n  <!-- Nota adhesiva 2 -->\n  <div style=\"background:#fffde7; color:#424242; font-family:sans-serif; font-size:14px; padding:10px; border-radius:6px; width:200px; box-shadow:2px 2px 4px rgba(0,0,0,0.2);\">\n    📌 Nota 2: Control de TA.\n  </div>\n\n  <!-- Nota adhesiva 3 -->\n  <div style=\"background:#fffde7; color:#424242; font-family:sans-serif; font-size:14px; padding:10px; border-radius:6px; width:200px; box-shadow:2px 2px 4px rgba(0,0,0,0.2);\">\n    📌 Nota 3: Solicitar HbA1c.\n  </div>\n</div>\n",
+            tags: [],
+            favorite: false,
+            uses: 3,
+            created: 1755965299761
+        },
+        {
+            name: "Etiquetas colores",
+            code: "<span style=\"font-family: sans-serif; display: inline-block; background: rgb(224, 247, 250); color: rgb(0, 96, 100); padding: 3px 8px; border-radius: 14px; margin: 2px; font-size: 12px;\">HTA</span><span style=\"color: rgb(38, 50, 56); font-family: sans-serif; font-size: 13px;\">&nbsp;</span><span style=\"font-family: sans-serif; display: inline-block; background: rgb(252, 228, 236); color: rgb(136, 14, 79); padding: 3px 8px; border-radius: 14px; margin: 2px; font-size: 12px;\">DM2</span><span style=\"color: rgb(38, 50, 56); font-family: sans-serif; font-size: 13px;\">&nbsp;</span><span style=\"font-family: sans-serif; display: inline-block; background: rgb(241, 248, 233); color: rgb(27, 94, 32); padding: 3px 8px; border-radius: 14px; margin: 2px; font-size: 12px;\">ERC</span><span style=\"color: rgb(38, 50, 56); font-family: sans-serif; font-size: 13px;\">&nbsp;</span><span style=\"font-family: sans-serif; display: inline-block; background: rgb(255, 243, 224); color: rgb(230, 81, 0); padding: 3px 8px; border-radius: 14px; margin: 2px; font-size: 12px;\">Lípidos</span><br><div></div>",
+            tags: [],
+            favorite: false,
+            uses: 3,
+            created: 1755966140116
+        },
+        {
+            name: "Secciones",
+            code: "<p><b>1. Introducción</b></p><hr id=\"null\"><p><b><br></b></p><p><b>2. Epidemiología</b></p><hr id=\"null\"><p><b><br></b></p><p><b>3. Etiología</b></p><hr id=\"null\"><p><b><br></b></p><p><b>4. Presentación clínica</b></p><hr id=\"null\"><p><b><br></b></p><p><b>5. Diagnostico</b></p><hr id=\"null\"><p><b><br></b></p><p><b>6. Tratamiento</b></p><hr id=\"null\"><p><b><br></b></p><p><b>Referencias</b></p>",
+            tags: [],
+            favorite: false,
+            uses: 2,
+            created: 1755969422021
+        },
+        {
+            name: "Títulos de colores",
+            code: "<div style=\"padding-left: 6px; padding-right: 6px; margin-top: 0px; margin-bottom: 0px; border-radius: 6px;\">\n  <!-- Amarillo -->\n  <div style=\"background: linear-gradient(to right, #fffde7, #fff176); color:#795548; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px 4px;\">Amarillo</div>\n\n  <!-- Naranjo -->\n  <div style=\"background: linear-gradient(to right, #ffe0b2, #ff9800); color:#4e342e; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px 4px;\">Naranjo</div>\n\n  <!-- Azul -->\n  <div style=\"background: linear-gradient(to right, #bbdefb, #2196f3); color:#0d47a1; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px 4px;\">Azul</div>\n\n  <!-- Celeste -->\n  <div style=\"background: linear-gradient(to right, #e1f5fe, #4fc3f7); color:#01579b; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px 4px;\">Celeste</div>\n\n  <!-- Verde oscuro -->\n  <div style=\"background: linear-gradient(to right, #c8e6c9, #388e3c); color:#1b5e20; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px 4px;\">Verde oscuro</div>\n\n  <!-- Verde claro -->\n  <div style=\"background: linear-gradient(to right, #dcedc8, #8bc34a); color:#33691e; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px 4px;\">Verde claro</div>\n\n  <!-- Morado -->\n  <div style=\"background: linear-gradient(to right, #e1bee7, #9c27b0); color:#4a148c; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px 4px;\">Morado</div>\n\n  <!-- Café -->\n  <div style=\"background: linear-gradient(to right, #d7ccc8, #795548); color:#3e2723; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px 4px;\">Café</div>\n\n  <!-- Gris -->\n  <div style=\"background: linear-gradient(to right, #f5f5f5, #9e9e9e); color:#212121; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px 4px;\">Gris</div>\n\n  <!-- Rojo -->\n  <div style=\"background: linear-gradient(to right, #ffcdd2, #f44336); color:#b71c1c; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px 4px;\">Rojo</div>\n</div>\n",
+            tags: [],
+            favorite: false,
+            uses: 0,
+            created: 1756056072113
+        }
+    ];
     let htmlFavorites = [];
 
     const selectedHtmlModal = getElem('selected-html-modal');
@@ -977,9 +1035,14 @@ document.addEventListener('DOMContentLoaded', function () {
         subNoteToolbar.appendChild(createSNButton('Insertar HTML', '&lt;/&gt;', null, null, () => {
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0) {
-                savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                const range = selection.getRangeAt(0);
+                savedEditorSelection = range.cloneRange();
+                const div = document.createElement('div');
+                div.appendChild(range.cloneContents());
+                savedSelectedHtml = div.innerHTML;
             } else {
                 savedEditorSelection = null;
+                savedSelectedHtml = '';
             }
             currentHtmlEditor = subNoteEditor;
             openHtmlCodeModal();
@@ -1140,6 +1203,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentInlineNoteIcon = 'ℹ️';
     let editingQuickNote = false;
     let savedEditorSelection = null;
+    let savedSelectedHtml = '';
     let currentCallout = null;
     let aiToolsGeneratedText = '';
     let lineEraseMode = false;
@@ -2482,9 +2546,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const htmlCodeBtn = createButton('Insertar HTML', '&lt;/&gt;', null, null, () => {
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0) {
-                savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                const range = selection.getRangeAt(0);
+                savedEditorSelection = range.cloneRange();
+                const div = document.createElement('div');
+                div.appendChild(range.cloneContents());
+                savedSelectedHtml = div.innerHTML;
             } else {
                 savedEditorSelection = null;
+                savedSelectedHtml = '';
             }
             currentHtmlEditor = notesEditor;
             openHtmlCodeModal();
@@ -3117,14 +3186,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function loadHtmlFavorites() {
         const data = await db.get('keyvalue', 'htmlFavorites');
-        htmlFavorites = (data ? data.value : []).map(f => ({
-            name: f.name,
-            code: f.code,
-            tags: f.tags || [],
-            favorite: !!f.favorite,
-            uses: f.uses || 0,
-            created: f.created || Date.now()
-        }));
+        if (data && Array.isArray(data.value) && data.value.length > 0) {
+            htmlFavorites = data.value.map(f => ({
+                name: f.name,
+                code: f.code,
+                tags: f.tags || [],
+                favorite: !!f.favorite,
+                uses: f.uses || 0,
+                created: f.created || Date.now()
+            }));
+        } else {
+            htmlFavorites = DEFAULT_HTML_FAVORITES.map(f => ({ ...f }));
+            await saveHtmlFavorites();
+        }
     }
 
     async function saveHtmlFavorites() {
@@ -3353,9 +3427,31 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    function insertSelectedTextIntoTemplate(template, selectedHtml) {
+        if (!selectedHtml) return template;
+        const container = document.createElement('div');
+        container.innerHTML = template;
+        const nodes = Array.from(container.querySelectorAll('*'));
+        const placeholders = nodes.filter(node => {
+            const inner = node.innerHTML.trim().toLowerCase();
+            const text = node.textContent.trim();
+            const hasBr = node.childElementCount === 1 && (inner === '<br>' || inner === '<br/>');
+            return (node.childElementCount === 0 && text === '') || hasBr;
+        });
+        if (placeholders.length > 0) {
+            placeholders.forEach(node => node.innerHTML = selectedHtml);
+        } else {
+            nodes.filter(n => n.childElementCount === 0).forEach(n => n.innerHTML = selectedHtml);
+        }
+        return container.innerHTML;
+    }
+
     insertHtmlBtn.addEventListener('click', () => {
-        const html = htmlCodeInput.value;
+        let html = htmlCodeInput.value;
         if (html) {
+            if (savedSelectedHtml) {
+                html = insertSelectedTextIntoTemplate(html, savedSelectedHtml);
+            }
             if (savedEditorSelection) {
                 const selection = window.getSelection();
                 selection.removeAllRanges();
@@ -3366,12 +3462,14 @@ document.addEventListener('DOMContentLoaded', function () {
         hideModal(htmlCodeModal);
         if (currentHtmlEditor) currentHtmlEditor.focus();
         savedEditorSelection = null;
+        savedSelectedHtml = '';
     });
 
     cancelHtmlBtn.addEventListener('click', () => {
         hideModal(htmlCodeModal);
         if (currentHtmlEditor) currentHtmlEditor.focus();
         savedEditorSelection = null;
+        savedSelectedHtml = '';
     });
 
     copySelectedHtmlBtn.addEventListener('click', () => {
