@@ -12,6 +12,7 @@ import { makeTableResizable } from './table-resize.js';
 import { setupAdvancedSearchReplace } from './search-replace.js';
 import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
+import { setupAdvancedEditing } from './editor-enhancements.js';
 
 const pdfjsLib = typeof window !== 'undefined' ? window['pdfjsLib'] : null;
 if (pdfjsLib) {
@@ -5630,6 +5631,7 @@ document.addEventListener('DOMContentLoaded', function () {
         applyTheme(document.documentElement.dataset.theme || 'default');
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();
+        setupAdvancedEditing(notesEditor);
         setupCloudIntegration();
     }
 

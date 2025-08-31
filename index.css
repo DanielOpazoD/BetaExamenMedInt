@@ -1025,3 +1025,14 @@ table.resizable-table .table-resize-handle {
   body {
     padding-top: 32px;
   }
+
+.extra-cursor {
+  border-left: 1px solid var(--text-primary);
+  margin-left: -1px;
+  pointer-events: none;
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% { border-color: transparent; }
+}
