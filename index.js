@@ -1680,6 +1680,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             // After inserting, re-add resizers and controls
             initTableResize(table);
+            enableTableEditing(table);
             removeTableControls();
         });
         document.body.appendChild(insertRowBtn);
@@ -1699,6 +1700,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 newCell.style.padding = '4px';
             });
             initTableResize(table);
+            enableTableEditing(table);
             removeTableControls();
         });
         document.body.appendChild(insertColBtn);
@@ -1712,6 +1714,8 @@ document.addEventListener('DOMContentLoaded', function () {
         deleteRowBtn.style.top = `${cellRect.top - 16 + window.scrollY}px`;
         deleteRowBtn.addEventListener('click', () => {
             table.deleteRow(rowIndex);
+            initTableResize(table);
+            enableTableEditing(table);
             removeTableControls();
         });
         document.body.appendChild(deleteRowBtn);
@@ -1730,6 +1734,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
             initTableResize(table);
+            enableTableEditing(table);
             removeTableControls();
         });
         document.body.appendChild(deleteColBtn);
@@ -2387,18 +2392,30 @@ document.addEventListener('DOMContentLoaded', function () {
                         block.style.borderBottomRightRadius = '';
                     } else {
                         block.style.backgroundColor = color;
-                        block.style.paddingLeft = '6px';
-                        block.style.paddingRight = '6px';
-                        // Remove default margins to fuse adjacent highlighted lines
-                        block.style.marginTop = '0px';
-                        block.style.marginBottom = '0px';
-                        // Set border radius based on position in selection
-                        const first = index === 0;
-                        const last = index === elements.length - 1;
-                        block.style.borderTopLeftRadius = first ? '6px' : '0';
-                        block.style.borderTopRightRadius = first ? '6px' : '0';
-                        block.style.borderBottomLeftRadius = last ? '6px' : '0';
-                        block.style.borderBottomRightRadius = last ? '6px' : '0';
+                        if (!block.closest('table')) {
+                            block.style.paddingLeft = '6px';
+                            block.style.paddingRight = '6px';
+                            // Remove default margins to fuse adjacent highlighted lines
+                            block.style.marginTop = '0px';
+                            block.style.marginBottom = '0px';
+                            // Set border radius based on position in selection
+                            const first = index === 0;
+                            const last = index === elements.length - 1;
+                            block.style.borderTopLeftRadius = first ? '6px' : '0';
+                            block.style.borderTopRightRadius = first ? '6px' : '0';
+                            block.style.borderBottomLeftRadius = last ? '6px' : '0';
+                            block.style.borderBottomRightRadius = last ? '6px' : '0';
+                        } else {
+                            // For table elements, avoid rounded corners and extra padding/margins
+                            block.style.paddingLeft = '';
+                            block.style.paddingRight = '';
+                            block.style.marginTop = '';
+                            block.style.marginBottom = '';
+                            block.style.borderTopLeftRadius = '0';
+                            block.style.borderTopRightRadius = '0';
+                            block.style.borderBottomLeftRadius = '0';
+                            block.style.borderBottomRightRadius = '0';
+                        }
                     }
                 }
             });
@@ -3663,7 +3680,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // initialize resizers on newly inserted tables (defer to allow DOM insertion)
         setTimeout(() => {
             const tables = notesEditor.querySelectorAll('table');
-            tables.forEach(t => initTableResize(t));
+            tables.forEach(t => { initTableResize(t); enableTableEditing(t); });
         }, 50);
     }
     function initTableResize(table) {
@@ -3728,7 +3745,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
-        notesEditor.querySelectorAll('table').forEach(initTableResize);
+        notesEditor.querySelectorAll('table').forEach(t => { initTableResize(t); enableTableEditing(t); });
 
         renderNotesList();
         notesEditor.focus();
@@ -4746,7 +4763,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const reader = new FileReader();
                     reader.onload = (e) => {
                         notesEditor.innerHTML = e.target.result;
-                        notesEditor.querySelectorAll('table').forEach(initTableResize);
+                        notesEditor.querySelectorAll('table').forEach(t => { initTableResize(t); enableTableEditing(t); });
                     };
                     reader.readAsText(file);
                 }
@@ -5220,7 +5237,7 @@ document.addEventListener('DOMContentLoaded', function () {
         populateIconPicker();
         loadState();
         setupEventListeners();
-        document.querySelectorAll('table').forEach(initTableResize);
+        document.querySelectorAll('table').forEach(t => { initTableResize(t); enableTableEditing(t); });
         applyTheme(document.documentElement.dataset.theme || 'default');
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();
