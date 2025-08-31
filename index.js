@@ -12,6 +12,7 @@ import { setupAdvancedSearchReplace } from './search-replace.js';
 import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
 import { setupAdvancedEditing } from './editor-enhancements.js';
+import { improveText, askNotesQuestion } from './ai-tools.js';
 
 // --- IndexedDB Helper ---
 // NOTE: The IndexedDB helper has been moved into db.js.  The following
@@ -109,6 +110,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const printAllBtn = getElem('print-all-btn');
     const exportBtn = getElem('export-btn');
     const importBtn = getElem('import-btn');
+    const askNotesBtn = getElem('ask-notes-btn');
     const importFileInput = getElem('import-file-input');
     const exportNoteBtn = getElem('export-note-btn');
     const importNoteBtn = getElem('import-note-btn');
@@ -1918,7 +1920,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return [startBlock]; // Fallback
     }
-    
+
+    async function improveSelectedText() {
+        const selection = window.getSelection();
+        if (!selection || selection.toString().trim() === '') {
+            alert('Selecciona el texto a mejorar.');
+            return;
+        }
+        const original = selection.toString();
+        try {
+            const improved = await improveText(original);
+            if (improved) {
+                document.execCommand('insertText', false, improved);
+            }
+        } catch (err) {
+            console.error('AI improve error', err);
+            alert('No se pudo mejorar el texto.');
+        }
+    }
+
     function setupEditorToolbar() {
         editorToolbar.innerHTML = ''; // Clear existing toolbar
 
@@ -2354,6 +2374,8 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createButton('Rehacer', '↻', 'redo'));
 
         editorToolbar.appendChild(createButton('Limpiar formato', '❌', null, null, clearFormatting));
+
+        editorToolbar.appendChild(createButton('Mejorar texto', '✨', null, null, improveSelectedText));
 
         editorToolbar.appendChild(createSeparator());
 
@@ -4612,6 +4634,26 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         printAllBtn.addEventListener('click', () => handlePrintAll());
+
+        if (askNotesBtn) {
+            askNotesBtn.addEventListener('click', async () => {
+                const question = prompt('¿Qué deseas preguntar sobre las notas?');
+                if (!question) return;
+                const topics = await db.getAll('topics');
+                const notesText = topics.flatMap(t => (t.notes || []).map(n => {
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = n.content || '';
+                    return tmp.textContent || '';
+                })).join('\n');
+                try {
+                    const answer = await askNotesQuestion(question, notesText);
+                    alert(answer);
+                } catch (err) {
+                    console.error('AI question error', err);
+                    alert('No se pudo obtener una respuesta.');
+                }
+            });
+        }
 
         // Import/Export
         exportBtn.addEventListener('click', () => {
