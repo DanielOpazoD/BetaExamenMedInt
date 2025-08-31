@@ -8,9 +8,7 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "dependencies": {
-    "@google/genai": "^1.8.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.14.0",
     "typescript": "~5.8.2",
