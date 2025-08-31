@@ -51,10 +51,6 @@
         <div class="p-6 sm:p-8">
             <h1 class="text-2xl sm:text-3xl font-bold text-primary mb-4 text-center">Temario para Examen Final de Medicina Interna</h1>
             <div class="flex flex-col md:flex-row flex-wrap items-center justify-between gap-4 my-4">
-                 <button id="ask-ai-btn" class="w-full md:w-auto order-1 px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-opacity-75 flex items-center justify-center space-x-2">
-                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a.75.75 0 01.75.75v.518a3.75 3.75 0 013.232 4.025l-1.82 1.82a.75.75 0 101.06 1.06l1.82-1.82A5.25 5.25 0 0010.75 2.52V2.75A.75.75 0 0110 2zM3.483 4.49A5.23 5.23 0 002.5 7.25v.518a3.75 3.75 0 014.025-3.232l-1.82-1.82a.75.75 0 10-1.06 1.06l1.82 1.82zM10 18a.75.75 0 01-.75-.75v-.518a3.75 3.75 0 01-3.232-4.025l1.82-1.82a.75.75 0 10-1.06-1.06l-1.82 1.82A5.25 5.25 0 009.25 17.48v.77a.75.75 0 01.75.75zM16.517 15.51a5.23 5.23 0 00.983-2.76v-.518a3.75 3.75 0 01-4.025 3.232l1.82 1.82a.75.75 0 101.06-1.06l-1.82-1.82zM10 12a2 2 0 100-4 2 2 0 000 4z"/></svg>
-                    <span>Preguntar a la IA</span>
-                </button>
                 <div id="status-filters" class="order-2 flex items-center space-x-1 bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
                     <span class="mr-2">Filtrar por estado de avance</span>
                     <button data-filter="all" class="filter-btn active px-3 py-1 rounded-md text-sm font-medium" aria-label="Todos">Todos</button>
@@ -416,39 +412,6 @@
         </div>
     </div>
     
-    <div id="ai-qa-modal" class="modal-overlay">
-        <div class="modal-content w-full max-w-2xl">
-            <h3 class="text-xl font-bold mb-4">Preguntar a la IA</h3>
-            <div id="ai-response-area" class="w-full h-64 p-3 bg-bg-tertiary rounded-lg overflow-y-auto mb-4 border border-border-color">
-                Escribe tu pregunta a continuación...
-            </div>
-            <div id="ai-qa-loader" class="hidden text-center my-2">
-                <p>Pensando...</p>
-            </div>
-            <textarea id="ai-question-input" class="w-full p-2 border border-border-color rounded-lg bg-secondary mb-4" placeholder="Ej: ¿Cuál es el tratamiento para la fibrilación auricular basado en mis notas?"></textarea>
-            <div class="flex justify-end gap-2">
-                <button id="cancel-ai-qa-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cancelar</button>
-                <button id="send-ai-qa-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Enviar</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="ai-tools-modal" class="modal-overlay">
-        <div class="modal-content w-full max-w-2xl">
-            <h3 class="text-xl font-bold mb-4">Asistente de IA</h3>
-            <div id="ai-tools-thinking" class="w-full p-2 text-sm text-gray-600"></div>
-            <div id="ai-tools-response" class="w-full h-40 p-3 bg-bg-tertiary rounded-lg overflow-y-auto mb-4 border border-border-color">Escribe tu instrucción a continuación...</div>
-            <div id="ai-tools-loader" class="hidden text-center my-2">
-                <p>Pensando...</p>
-            </div>
-            <textarea id="ai-tools-input" class="w-full p-2 border border-border-color rounded-lg bg-secondary mb-4" placeholder="Ej: Resume el texto seleccionado"></textarea>
-            <div class="flex justify-end gap-2">
-                <button id="cancel-ai-tools-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cancelar</button>
-                <button id="insert-ai-tools-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 hidden">Insertar</button>
-                <button id="send-ai-tools-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Generar</button>
-            </div>
-        </div>
-    </div>
 
     <div id="html-code-modal" class="modal-overlay">
         <div class="modal-content w-full max-w-3xl">
@@ -668,56 +631,9 @@
         Progreso guardado
     </div>
 
-    <!-- IA Side Panel -->
-    <div id="ai-panel" class="fixed top-0 right-0 w-full md:w-1/3 h-full bg-white dark:bg-slate-800 shadow-lg transform translate-x-full transition-transform z-50 flex flex-col">
-        <div class="flex items-center justify-between p-2 border-b border-border-color">
-            <h3 class="font-bold">Asistente IA</h3>
-            <button id="close-ai-panel" class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700" aria-label="Cerrar panel de IA">&times;</button>
-        </div>
-        <div id="ai-messages" class="flex-1 overflow-y-auto p-3 space-y-2" aria-live="polite"></div>
-        <div class="p-3 border-t border-border-color space-y-2">
-            <div class="flex gap-2">
-                <select id="ai-tool-select" class="flex-1 border rounded p-1">
-                    <option value="qa">Pregunta</option>
-                    <option value="summary">Resumen</option>
-                    <option value="flashcards">Tarjetas</option>
-                    <option value="translate">Traducción</option>
-                    <option value="questions">Preguntas</option>
-                </select>
-                <button id="send-ai-btn" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Enviar</button>
-            </div>
-            <div class="flex flex-col md:flex-row gap-2 text-sm">
-                <label class="flex items-center gap-1">Tono
-                    <select id="tone-select" class="border rounded p-1">
-                        <option value="neutral">Neutral</option>
-                        <option value="formal">Formal</option>
-                        <option value="informal">Informal</option>
-                    </select>
-                </label>
-                <label class="flex items-center gap-1 flex-grow">Extensión
-                    <input id="length-range" type="range" min="50" max="300" value="150" class="w-full">
-                </label>
-                <label class="flex items-center gap-1">Idioma
-                    <select id="lang-select" class="border rounded p-1">
-                        <option value="es">Español</option>
-                        <option value="en">Inglés</option>
-                    </select>
-                </label>
-            </div>
-            <input id="file-upload" type="file" accept="application/pdf,text/plain" class="w-full border rounded p-1" />
-            <button id="generate-canvas-btn" class="w-full px-4 py-2 bg-green-600 text-white rounded mt-2">Canvas IA</button>
-            <canvas id="ai-canvas" width="300" height="300" class="w-full border rounded mt-2"></canvas>
-            <div id="ai-canvas-reasoning" class="text-sm text-gray-600 mt-1"></div>
-            <textarea id="ai-input" rows="2" class="w-full border rounded p-1" placeholder="Escribe tu mensaje..."></textarea>
-            <div id="ai-status" class="text-sm text-gray-500 hidden">Pensando...</div>
-        </div>
-    </div>
-
     <button id="restore-note-btn" class="hidden fixed bottom-4 left-4 p-3 bg-blue-600 text-white rounded-full shadow-lg" aria-label="Restaurar nota">📝</button>
-    <button id="open-ai-panel" class="fixed bottom-4 right-4 p-3 bg-indigo-600 text-white rounded-full shadow-lg" aria-label="Abrir asistente de IA">🤖</button>
 
     <div id="print-area" class="hidden"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="index.js" type="module"></script>
 </body>
 </html>
