@@ -4,7 +4,6 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { GoogleGenAI } from "@google/genai";
 // Import the database helper from a separate module.  This replaces the
 // inline IndexedDB implementation and keeps the rest of the code unchanged.
 import db from './db.js';
@@ -14,17 +13,6 @@ import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
 import { setupAdvancedEditing } from './editor-enhancements.js';
 
-const pdfjsLib = typeof window !== 'undefined' ? window['pdfjsLib'] : null;
-if (pdfjsLib) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-}
-
-// API Key for Google Gemini.  For simplicity and to avoid relying on build
-// environment variables, insert your key directly here.  Replace the
-// placeholder string below with your actual Gemini API key.  Note: embedding
-// secrets in client-side code exposes them to anyone who can view your
-// website, so only use this approach in personal or non-sensitive projects.
-const API_KEY = 'AIzaSyA9-VXmB8QyNS_wt5WclUlMVfXgbPuaLj4';
 
 // --- IndexedDB Helper ---
 // NOTE: The IndexedDB helper has been moved into db.js.  The following
@@ -118,53 +106,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveAndCloseNoteBtn = getElem('save-and-close-note-btn');
     const cancelNoteBtn = getElem('cancel-note-btn');
     const unmarkNoteBtn = getElem('unmark-note-btn');
-    const progressBar = getElem('progress-bar');
-    const askAiBtn = getElem('ask-ai-btn');
-    const aiQaModal = getElem('ai-qa-modal');
-    const aiResponseArea = getElem('ai-response-area');
-    const aiQaLoader = getElem('ai-qa-loader');
-    const aiQuestionInput = getElem('ai-question-input');
-    const cancelAiQaBtn = getElem('cancel-ai-qa-btn');
-    const sendAiQaBtn = getElem('send-ai-qa-btn');
-    const aiToolsModal = getElem('ai-tools-modal');
-    const aiToolsThinking = getElem('ai-tools-thinking');
-    const aiToolsResponse = getElem('ai-tools-response');
-    const aiToolsLoader = getElem('ai-tools-loader');
-    const aiToolsInput = getElem('ai-tools-input');
-    const cancelAiToolsBtn = getElem('cancel-ai-tools-btn');
-    const sendAiToolsBtn = getElem('send-ai-tools-btn');
-    const insertAiToolsBtn = getElem('insert-ai-tools-btn');
-    const printAllBtn = getElem('print-all-btn');
-    const exportBtn = getElem('export-btn');
-    const importBtn = getElem('import-btn');
-    const importFileInput = getElem('import-file-input');
-    const exportNoteBtn = getElem('export-note-btn');
-    const importNoteBtn = getElem('import-note-btn');
-    const importNoteFileInput = getElem('import-note-file-input');
-    const settingsBtn = getElem('settings-btn');
-    const settingsDropdown = getElem('settings-dropdown');
-    const statusFiltersContainer = getElem('status-filters');
-    const saveConfirmation = getElem('save-confirmation');
-    const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
-    const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
-
-    const openAiPanelBtn = getElem('open-ai-panel');
-    const aiPanel = getElem('ai-panel');
-    const closeAiPanelBtn = getElem('close-ai-panel');
-    const aiMessages = getElem('ai-messages');
-    const aiInput = getElem('ai-input');
-    const sendAiPanelBtn = getElem('send-ai-btn');
-    const aiStatus = getElem('ai-status');
-    const aiToolSelect = getElem('ai-tool-select');
-    const toneSelect = getElem('tone-select');
-    const lengthRange = getElem('length-range');
-    const langSelect = getElem('lang-select');
-    const fileUploadInput = getElem('file-upload');
-    const generateCanvasBtn = getElem('generate-canvas-btn');
-    const aiCanvas = getElem('ai-canvas');
-    const aiCanvasReasoning = getElem('ai-canvas-reasoning');
-    let uploadedFileText = '';
-    
+    const progressBar = getElem('progress-bar');    
     // References modal elements
     const referencesModal = getElem('references-modal');
     const referencesEditor = getElem('references-editor');
@@ -465,6 +407,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let defaultSuggestedIcons;
     let customIconsList;
     let globalSpecialChars;
+    let symbolDropdown;
+    let specialCharDropdown;
 
     // Multi-note panel elements
     const notesPanelToggle = getElem('notes-panel-toggle');
@@ -778,18 +722,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
                     if (d !== content) d.classList.remove('visible');
                 });
-                const willShow = !content.classList.contains('visible');
                 content.classList.toggle('visible');
-                if (willShow) {
-                    content.style.left = '100%';
-                    content.style.right = 'auto';
-                    const contentRect = content.getBoundingClientRect();
-                    const containerRect = dropdown.parentElement.getBoundingClientRect();
-                    if (contentRect.right > containerRect.right) {
-                        content.style.left = 'auto';
-                        content.style.right = '100%';
-                    }
-                }
             });
             return dropdown;
         };
@@ -1206,7 +1139,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let savedEditorSelection = null;
     let savedSelectedHtml = '';
     let currentCallout = null;
-    let aiToolsGeneratedText = '';
     let lineEraseMode = false;
 
     // Image selection handling within the sub-note editor
@@ -1275,6 +1207,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (selectedIconCategory === 'Sugeridos') {
                     loadEmojisForCategory('Sugeridos');
                 }
+                symbolDropdown.refresh();
             });
             wrapper.appendChild(delBtn);
             currentIcons.appendChild(wrapper);
@@ -1305,6 +1238,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 e.stopPropagation();
                 globalSpecialChars.splice(index, 1);
                 renderCharManager();
+                specialCharDropdown.refresh();
             });
             wrapper.appendChild(delBtn);
             currentChars.appendChild(wrapper);
@@ -1325,9 +1259,7 @@ document.addEventListener('DOMContentLoaded', function () {
         closeIconManagerBtn.addEventListener('click', () => {
             hideModal(iconManagerModal);
             // Update the picker if the suggested tab is active
-            if (selectedIconCategory === 'Sugeridos') {
-                loadEmojisForCategory('Sugeridos');
-            }
+                        symbolDropdown.refresh();
         });
     }
     // Add new icon from manager
@@ -1344,20 +1276,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (selectedIconCategory === 'Sugeridos') {
                 loadEmojisForCategory('Sugeridos');
             }
+            symbolDropdown.refresh();
         });
     }
 
-    // Open character manager modal when user clicks the char manager gear.
-    // Currently there is no dedicated open button in the UI; you can create
-    // one if desired.  For demonstration purposes, we bind it to the icon
-    // manager open button when the user holds Shift.
-    if (openIconManagerBtn && charManagerModal) {
-        openIconManagerBtn.addEventListener('dblclick', (e) => {
-            e.preventDefault();
-            renderCharManager();
-            showModal(charManagerModal);
-        });
-    }
     if (closeCharManagerBtn) {
         closeCharManagerBtn.addEventListener('click', () => hideModal(charManagerModal));
     }
@@ -1368,6 +1290,7 @@ document.addEventListener('DOMContentLoaded', function () {
             globalSpecialChars.push(val);
             newCharInputManager.value = '';
             renderCharManager();
+            specialCharDropdown.refresh();
         });
     }
 
@@ -2236,7 +2159,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return group;
         };
 
-        const createSymbolDropdown = (symbols, title, icon) => {
+        const createSymbolDropdown = (symbols, title, icon, onEdit) => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
             const btn = document.createElement('button');
@@ -2246,11 +2169,15 @@ document.addEventListener('DOMContentLoaded', function () {
             dropdown.appendChild(btn);
             const content = document.createElement('div');
             content.className = 'symbol-dropdown-content';
-            // Render symbols list without deletion or add buttons.  The
-            // administración de caracteres se gestiona en el panel de
-            // configuración y no desde este menú desplegable.
+            content.style.paddingTop = '28px';
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Editar';
+            editBtn.className = 'absolute top-1 right-1 text-xs text-blue-600';
+            editBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); if (onEdit) onEdit(); });
+            content.appendChild(editBtn);
             const renderSymbols = () => {
                 content.innerHTML = '';
+                content.appendChild(editBtn);
                 symbols.forEach((sym) => {
                     const symBtn = createButton(sym, sym, 'insertText', sym);
                     symBtn.classList.add('symbol-btn');
@@ -2272,18 +2199,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 const willShow = !content.classList.contains('visible');
                 content.classList.toggle('visible');
                 if (willShow) {
-                    // Posicionar inicialmente a la derecha del botón
                     content.style.left = '100%';
                     content.style.right = 'auto';
                     const contentRect = content.getBoundingClientRect();
                     const containerRect = dropdown.parentElement.getBoundingClientRect();
-                    // Si se desborda, mostrar a la izquierda
                     if (contentRect.right > containerRect.right) {
                         content.style.left = 'auto';
                         content.style.right = '100%';
                     }
                 }
             });
+            dropdown.refresh = renderSymbols;
             return dropdown;
         };
 
@@ -2694,14 +2620,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(inlineIconSelect);
 
-        const aiBtn = createButton('Asistente de IA', '🤖', null, null, openAiToolsModal);
-        editorToolbar.appendChild(aiBtn);
-        const aiImproveBtn = createButton('Mejorar redacción', '✨', null, null, () => openAiToolsModalWithInstruction('Mejora la redacción del siguiente texto y corrige errores gramaticales'));
-        editorToolbar.appendChild(aiImproveBtn);
-        const aiSummarizeBtn = createButton('Resumir texto', '📝', null, null, () => openAiToolsModalWithInstruction('Resume el siguiente texto'));
-        editorToolbar.appendChild(aiSummarizeBtn);
-        const aiExpandBtn = createButton('Expandir contenido', '➕', null, null, () => openAiToolsModalWithInstruction('Amplía el contenido del siguiente texto utilizando tu conocimiento'));
-        editorToolbar.appendChild(aiExpandBtn);
         editorToolbar.appendChild(createSeparator());
 
         // Image controls
@@ -2753,11 +2671,17 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createSeparator());
 
         // Symbols
-        const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
-        editorToolbar.appendChild(createSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
+        symbolDropdown = createSymbolDropdown(EMOJI_CATEGORIES['Sugeridos'], 'Insertar Símbolo', '📌', () => {
+            renderIconManager();
+            showModal(iconManagerModal);
+        });
+        editorToolbar.appendChild(symbolDropdown);
 
-        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
-        editorToolbar.appendChild(createSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
+        specialCharDropdown = createSymbolDropdown(globalSpecialChars, 'Caracteres Especiales', 'Ω', () => {
+            renderCharManager();
+            showModal(charManagerModal);
+        });
+        editorToolbar.appendChild(specialCharDropdown);
     }
 
     function rgbToHex(rgb) {
@@ -2849,26 +2773,6 @@ document.addEventListener('DOMContentLoaded', function () {
         closeNoteStyleModal();
     }
 
-    function openAiToolsModal() {
-        const selection = window.getSelection();
-        if (selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
-            savedEditorSelection = selection.getRangeAt(0).cloneRange();
-        } else {
-            savedEditorSelection = null;
-        }
-        aiToolsInput.value = '';
-        aiToolsResponse.textContent = 'Escribe tu instrucción a continuación...';
-        aiToolsThinking.textContent = '';
-        aiToolsGeneratedText = '';
-        insertAiToolsBtn.classList.add('hidden');
-        showModal(aiToolsModal);
-    }
-
-    function openAiToolsModalWithInstruction(instr) {
-        openAiToolsModal();
-        aiToolsInput.value = instr;
-        aiToolsInput.focus();
-    }
 
     function resizeSelectedImage(multiplier) {
         if (selectedImageForResize) {
@@ -3501,133 +3405,6 @@ document.addEventListener('DOMContentLoaded', function () {
         htmlFavoriteName.value = '';
         htmlFavoriteTags.value = '';
     });
-
-    function gatherNotesContext() {
-        const allRows = document.querySelectorAll('tr[data-topic-id]');
-        let notesContext = '';
-        allRows.forEach(row => {
-            const notes = JSON.parse(row.dataset.notes || '[]');
-            if (notes.length > 0) {
-                const topicTitle = row.querySelector('.topic-text')?.textContent || `Tema ${row.dataset.topicId}`;
-                notes.forEach(note => {
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = note.content;
-                    notesContext += `Tema: ${topicTitle}\nNota: ${note.title}\nContenido:\n${tempDiv.textContent}\n\n---\n\n`;
-                });
-            }
-        });
-        return notesContext;
-    }
-
-    async function extractTextFromPDF(file) {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        let text = '';
-        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-            const page = await pdf.getPage(pageNum);
-            const content = await page.getTextContent();
-            const pageText = content.items.map(item => item.str).join(' ');
-            text += pageText + '\n';
-        }
-        return text;
-    }
-
-    async function readTextFile(file) {
-        return await file.text();
-    }
-
-    function drawCanvasFromDescription(desc) {
-        if (!aiCanvas) return;
-        let shapes;
-        try {
-            shapes = JSON.parse(desc);
-        } catch {
-            return;
-        }
-        const ctx = aiCanvas.getContext('2d');
-        ctx.clearRect(0, 0, aiCanvas.width, aiCanvas.height);
-        shapes.forEach(s => {
-            ctx.fillStyle = s.color || '#000';
-            if (s.type === 'circle') {
-                ctx.beginPath();
-                ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-                ctx.fill();
-            } else if (s.type === 'rect') {
-                ctx.fillRect(s.x, s.y, s.w, s.h);
-            }
-        });
-    }
-
-    function createMessageElement(role) {
-        const wrapper = document.createElement('div');
-        wrapper.className = role === 'user' ? 'text-right' : 'text-left';
-        const bubble = document.createElement('div');
-        bubble.className = role === 'user'
-            ? 'inline-block bg-indigo-600 text-white p-2 rounded-lg'
-            : 'inline-block bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 p-2 rounded-lg';
-        wrapper.appendChild(bubble);
-        aiMessages.appendChild(wrapper);
-        aiMessages.scrollTop = aiMessages.scrollHeight;
-        return bubble;
-    }
-
-    function formatAiResponse(text) {
-        if (!text) return '';
-        const escaped = text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-        const formatted = escaped
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>');
-        const lines = formatted.split(/\n/);
-        let html = '';
-        let inList = false;
-        for (const line of lines) {
-            const match = line.match(/^[-*]\s+(.*)/);
-            if (match) {
-                if (!inList) {
-                    html += '<ul>';
-                    inList = true;
-                }
-                html += `<li>${match[1]}</li>`;
-            } else {
-                if (inList) {
-                    html += '</ul>';
-                    inList = false;
-                }
-                html += line + '<br>';
-            }
-        }
-        if (inList) html += '</ul>';
-        return html;
-    }
-
-    function splitReasoning(text) {
-        const match = text.match(/Razonamiento:\s*([\s\S]*?)\nRespuesta:\s*([\s\S]*)/i);
-        if (match) {
-            return { reasoning: match[1].trim(), answer: match[2].trim() };
-        }
-        return { reasoning: '', answer: text.trim() };
-    }
-
-    function buildReasoningHTML(reasoning, answer) {
-        const answerHtml = formatAiResponse(answer);
-        if (reasoning) {
-            return `<details><summary>Pensamiento</summary>${formatAiResponse(reasoning)}</details>${answerHtml}`;
-        }
-        return answerHtml;
-    }
-
-    function appendMessage(role, text) {
-        const el = createMessageElement(role);
-        if (role === 'assistant') {
-            el.innerHTML = formatAiResponse(text);
-        } else {
-            el.textContent = text;
-        }
-    }
-
     function filterTable() {
         const isFiltering = activeStatusFilter !== 'all';
 
@@ -5386,224 +5163,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (resolveConfirmation) resolveConfirmation(true);
         });
         okAlertBtn.addEventListener('click', () => hideModal(alertModal));
-
-        // --- AI Modal Listeners ---
-        askAiBtn.addEventListener('click', () => {
-            aiQuestionInput.value = '';
-            aiResponseArea.textContent = 'Escribe tu pregunta a continuación...';
-            showModal(aiQaModal);
-        });
-        cancelAiQaBtn.addEventListener('click', () => hideModal(aiQaModal));
-        sendAiQaBtn.addEventListener('click', async () => {
-            const question = aiQuestionInput.value.trim();
-            if (!question) {
-                showAlert("Por favor, escribe una pregunta.");
-                return;
-            }
-            if (!API_KEY) {
-                showAlert("La API Key de Gemini no está configurada.");
-                return;
-            }
-
-            aiQaLoader.style.display = 'block';
-            aiResponseArea.textContent = '';
-            sendAiQaBtn.disabled = true;
-            
-            try {
-                // Gather all notes content
-                const allRows = document.querySelectorAll('tr[data-topic-id]');
-                let notesContext = '';
-                allRows.forEach(row => {
-                    const notes = JSON.parse(row.dataset.notes || '[]');
-                    if (notes.length > 0) {
-                        const topicTitle = row.querySelector('.topic-text')?.textContent || `Tema ${row.dataset.topicId}`;
-                        notes.forEach(note => {
-                            const tempDiv = document.createElement('div');
-                            tempDiv.innerHTML = note.content;
-                            notesContext += `Tema: ${topicTitle}\nNota: ${note.title}\nContenido:\n${tempDiv.textContent}\n\n---\n\n`;
-                        });
-                    }
-                });
-
-                if (notesContext.trim() === '') {
-                     throw new Error("No hay notas disponibles para analizar.");
-                }
-
-                const ai = new GoogleGenAI({ apiKey: API_KEY });
-                const extraContext = uploadedFileText ? `\n\nArchivo:\n${uploadedFileText}` : '';
-                const fullPrompt = `Basado en las siguientes notas de estudio${extraContext ? ' y archivo proporcionado' : ''}, responde la pregunta del usuario. Proporciona primero "Razonamiento:" y luego "Respuesta:". Contenido:\n\n${notesContext}${extraContext}\n\nPregunta: ${question}`;
-
-                const response = await ai.models.generateContent({
-                  model: 'gemini-2.5-flash',
-                  contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-                });
-
-                const { reasoning, answer } = splitReasoning(response.text);
-                aiResponseArea.innerHTML = buildReasoningHTML(reasoning, answer);
-
-            } catch (error) {
-                console.error("AI Error:", error);
-                aiResponseArea.textContent = "Error al contactar a la IA: " + error.message;
-            } finally {
-                aiQaLoader.style.display = 'none';
-                sendAiQaBtn.disabled = false;
-            }
-        });
-
-        cancelAiToolsBtn.addEventListener('click', () => hideModal(aiToolsModal));
-        sendAiToolsBtn.addEventListener('click', async () => {
-            const instruction = aiToolsInput.value.trim();
-            if (!instruction) {
-                showAlert("Por favor, escribe una instrucción.");
-                return;
-            }
-            if (!API_KEY) {
-                showAlert("La API Key de Gemini no está configurada.");
-                return;
-            }
-            aiToolsLoader.classList.remove('hidden');
-            aiToolsResponse.textContent = '';
-            aiToolsThinking.textContent = '';
-            sendAiToolsBtn.disabled = true;
-            try {
-                const selectionText = savedEditorSelection ? savedEditorSelection.toString() : '';
-                const context = [selectionText, uploadedFileText].filter(Boolean).join('\n\n');
-                const prompt = `Proporciona primero "Razonamiento:" con máximo tres frases y luego "Respuesta:". Instrucción: ${instruction}${context ? `\n\nTexto:\n${context}` : ''}`;
-                const ai = new GoogleGenAI({ apiKey: API_KEY });
-                const response = await ai.models.generateContent({
-                    model: 'gemini-1.5-flash',
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                });
-                const { reasoning, answer } = splitReasoning(response.text);
-                aiToolsGeneratedText = answer;
-                aiToolsThinking.innerHTML = formatAiResponse(reasoning);
-                aiToolsResponse.innerHTML = formatAiResponse(answer);
-                insertAiToolsBtn.classList.remove('hidden');
-            } catch (error) {
-                console.error('AI Error:', error);
-                aiToolsResponse.textContent = 'Error al contactar a la IA: ' + error.message;
-            } finally {
-                aiToolsLoader.classList.add('hidden');
-                sendAiToolsBtn.disabled = false;
-            }
-        });
-        insertAiToolsBtn.addEventListener('click', () => {
-            if (!aiToolsGeneratedText) return;
-            if (savedEditorSelection) {
-                const selection = window.getSelection();
-                selection.removeAllRanges();
-                selection.addRange(savedEditorSelection);
-            }
-            document.execCommand('insertHTML', false, formatAiResponse(aiToolsGeneratedText));
-            hideModal(aiToolsModal);
-            notesEditor.focus();
-        });
-
-        openAiPanelBtn.addEventListener('click', () => {
-            aiPanel.classList.remove('translate-x-full');
-            aiInput.focus();
-        });
-        closeAiPanelBtn.addEventListener('click', () => {
-            aiPanel.classList.add('translate-x-full');
-        });
-        fileUploadInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                try {
-                    if (file.type === 'application/pdf' && pdfjsLib) {
-                        uploadedFileText = await extractTextFromPDF(file);
-                    } else {
-                        uploadedFileText = await readTextFile(file);
-                    }
-                } catch (err) {
-                    console.error('Error al leer el archivo:', err);
-                }
-            }
-        });
-        sendAiPanelBtn.addEventListener('click', async () => {
-            const userText = aiInput.value.trim();
-            if (!userText && aiToolSelect.value === 'qa') {
-                showAlert("Por favor, escribe un mensaje.");
-                return;
-            }
-            if (!API_KEY) {
-                showAlert("La API Key de Gemini no está configurada.");
-                return;
-            }
-            const tone = toneSelect.value;
-            const length = lengthRange.value;
-            const lang = langSelect.value;
-            const notesContext = gatherNotesContext();
-            const fileContext = uploadedFileText ? `\n\nContenido del archivo:\n${uploadedFileText}` : '';
-            const combinedContext = notesContext + fileContext;
-            let prompt = '';
-            switch (aiToolSelect.value) {
-                case 'summary':
-                    prompt = `En ${lang} y con un tono ${tone}, resume el siguiente contenido en no más de ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
-                    break;
-                case 'flashcards':
-                    prompt = `En ${lang} y con un tono ${tone}, crea tarjetas de estudio (pregunta: respuesta) basadas en el siguiente contenido. Limita cada tarjeta a ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
-                    break;
-                case 'translate':
-                    prompt = `Traduce al ${lang} con un tono ${tone} el siguiente contenido. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
-                    break;
-                case 'questions':
-                    prompt = `En ${lang} y con un tono ${tone}, genera preguntas tipo examen con respuestas breves basadas en este contenido. Limita cada respuesta a ${length} palabras. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n${combinedContext}`;
-                    break;
-                default:
-                    prompt = `Responde en ${lang} con un tono ${tone} y no más de ${length} palabras a la siguiente consulta del usuario utilizando el contexto. Proporciona primero "Razonamiento:" y luego "Respuesta:".\n\nContexto:\n${combinedContext}\n\nPregunta: ${userText}`;
-            }
-            appendMessage('user', userText || aiToolSelect.options[aiToolSelect.selectedIndex].textContent);
-            aiInput.value = '';
-            aiStatus.classList.remove('hidden');
-            sendAiPanelBtn.disabled = true;
-            try {
-                const ai = new GoogleGenAI({ apiKey: API_KEY });
-                const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                });
-                const { reasoning, answer } = splitReasoning(response.text);
-                const assistantBubble = createMessageElement('assistant');
-                assistantBubble.innerHTML = buildReasoningHTML(reasoning, answer);
-                aiMessages.scrollTop = aiMessages.scrollHeight;
-            } catch (error) {
-                console.error("AI Error:", error);
-                const errBubble = createMessageElement('assistant');
-                errBubble.textContent = "Error al contactar a la IA: " + error.message;
-            } finally {
-                aiStatus.classList.add('hidden');
-                sendAiPanelBtn.disabled = false;
-            }
-        });
-
-        generateCanvasBtn.addEventListener('click', async () => {
-            if (!API_KEY) {
-                showAlert("La API Key de Gemini no está configurada.");
-                return;
-            }
-            aiCanvasReasoning.innerHTML = '';
-            aiStatus.classList.remove('hidden');
-            generateCanvasBtn.disabled = true;
-            try {
-                const ai = new GoogleGenAI({ apiKey: API_KEY });
-                const prompt = 'Genera una lista JSON de hasta cinco figuras simples (rect o circle) para dibujar en un canvas de 300x300. Proporciona primero "Razonamiento:" y luego "Respuesta:".';
-                const response = await ai.models.generateContent({
-                    model: 'gemini-1.5-flash',
-                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                });
-                const { reasoning, answer } = splitReasoning(response.text);
-                aiCanvasReasoning.innerHTML = formatAiResponse(reasoning);
-                drawCanvasFromDescription(answer);
-            } catch (err) {
-                console.error('AI Canvas Error:', err);
-                showAlert('Error al generar canvas.');
-            } finally {
-                aiStatus.classList.add('hidden');
-                generateCanvasBtn.disabled = false;
-            }
-        });
-
         // Close dropdowns when clicking outside
         window.addEventListener('click', (e) => {
             if (!settingsBtn.contains(e.target) && !settingsDropdown.contains(e.target)) {
