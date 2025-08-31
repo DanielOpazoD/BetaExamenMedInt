@@ -17,3 +17,4 @@ This contains everything you need to run your app locally.
 
 - Nueva herramienta en el editor para redimensionar lateralmente notas o bloques HTML insertados mediante el botón ↔️ de la barra de herramientas.
 - Experiencia de edición mejorada: multicursor, selección en bloques y reorganización de líneas con arrastrar y soltar.
+- Nuevas plantillas de notas de colores (azul, gris, naranja, morada) y una lista de tareas predefinida.

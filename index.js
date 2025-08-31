@@ -306,7 +306,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         {
             name: "Gris nota",
-            code: "<p><br></p><div style=\"background: rgb(245, 245, 245); padding: 10px; border-radius: 6px; box-shadow: rgba(0, 0, 0, 0.1) 0px 2px 4px; line-height: 1.2; width: 660px; margin-left: 39px;\" class=\"note-resizable\"><font face=\"sans-serif\"><font size=\"2\" style=\"\"><b>➖</b></font></font></div>",
+            code: "<div style=\"background: rgb(245, 245, 245); padding: 10px; border-radius: 6px; box-shadow: rgba(0, 0, 0, 0.1) 0px 2px 4px; line-height: 1.2; width: 660px; margin-left: 39px;\" class=\"note-resizable\"><div></div></div>",
             tags: [],
             favorite: false,
             uses: 3,
@@ -314,11 +314,35 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         {
             name: "Azul Nota",
-            code: "<div><div style=\"border-left-width: 4px; border-left-color: rgb(25, 118, 210); background: rgb(244, 250, 255); padding: 10px; margin: 8px 0px 8px 20px; border-radius: 6px; font-family: sans-serif; width: 775px;\" class=\"note-resizable\"><span id=\"docs-internal-guid-286844bf-7fff-cd10-d707-b68257dda577\" style=\"\"><span style=\"font-family: Arial, sans-serif; color: rgb(0, 0, 0); background-color: transparent; font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-variant-position: normal; font-variant-emoji: normal; vertical-align: baseline; white-space-collapse: preserve;\"><b style=\"\">P</b></span></span></div></div><div></div>",
+            code: "<div style=\"border-left-width: 4px; border-left-color: rgb(25, 118, 210); background: rgb(244, 250, 255); padding: 10px; margin: 8px 0px 8px 20px; border-radius: 6px; font-family: sans-serif; width: 775px;\" class=\"note-resizable\"><div></div></div>",
             tags: [],
             favorite: true,
             uses: 3,
             created: 1755964529820
+        },
+        {
+            name: "Naranja Nota",
+            code: "<div style=\"border-left-width:4px; border-left-color:#fb8c00; background:#fff3e0; padding:10px; margin:8px 0 8px 20px; border-radius:6px; font-family:sans-serif;\" class=\"note-resizable\"><div></div></div>",
+            tags: [],
+            favorite: false,
+            uses: 0,
+            created: 1756060000000
+        },
+        {
+            name: "Morada Nota",
+            code: "<div style=\"border-left-width:4px; border-left-color:#8e24aa; background:#f3e5f5; padding:10px; margin:8px 0 8px 20px; border-radius:6px; font-family:sans-serif;\" class=\"note-resizable\"><div></div></div>",
+            tags: [],
+            favorite: false,
+            uses: 0,
+            created: 1756060001000
+        },
+        {
+            name: "Lista de tareas",
+            code: "<ul style=\"list-style:none; padding-left:1rem; font-family:sans-serif;\"><li>☐ Pendiente 1</li><li>☐ Pendiente 2</li><li>☐ Pendiente 3</li></ul>",
+            tags: ['utilidad'],
+            favorite: false,
+            uses: 0,
+            created: 1756060002000
         },
         {
             name: "Múltiples notas amarillas",
@@ -2794,13 +2818,27 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             currentCallout.classList.remove('note-shadow');
         }
-        const range = document.createRange();
-        range.selectNodeContents(inner);
-        range.collapse(false);
+
+        const html = currentCallout.outerHTML;
+        const replaceRange = document.createRange();
+        replaceRange.selectNode(currentCallout);
         const selection = window.getSelection();
         selection.removeAllRanges();
-        selection.addRange(range);
-        inner.focus();
+        selection.addRange(replaceRange);
+        document.execCommand('insertHTML', false, html);
+
+        const newCallout = selection.anchorNode && selection.anchorNode.nodeType === 1
+            ? selection.anchorNode.closest('.note-callout')
+            : selection.anchorNode.parentElement && selection.anchorNode.parentElement.closest('.note-callout');
+        const target = newCallout ? newCallout.querySelector('.note-callout-content') : null;
+        if (target) {
+            const range = document.createRange();
+            range.selectNodeContents(target);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            target.focus();
+        }
         notesEditor.focus();
         closeNoteStyleModal();
     }
