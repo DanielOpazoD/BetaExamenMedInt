@@ -2036,9 +2036,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!blocks.some(b => b.contains(current))) blocks.push(current);
             }
             if (!blocks.length) {
-                const newBlock = document.createElement('p');
-                range.surroundContents(newBlock);
-                blocks.push(newBlock);
+                let block = node.closest('p, li, div, table');
+                if (block && root.contains(block)) {
+                    blocks.push(block);
+                } else {
+                    const newBlock = document.createElement('p');
+                    const frag = range.extractContents();
+                    newBlock.appendChild(frag);
+                    range.insertNode(newBlock);
+                    blocks.push(newBlock);
+                }
             }
 
             blocks.forEach(block => {
