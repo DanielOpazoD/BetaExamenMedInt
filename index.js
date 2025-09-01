@@ -3750,6 +3750,22 @@ document.addEventListener('DOMContentLoaded', function () {
         table.dataset.resizableInitialized = 'true';
     }
 
+    function observeTableInsertion(editor) {
+        const observer = new MutationObserver(mutations => {
+            mutations.forEach(m => {
+                m.addedNodes.forEach(node => {
+                    if (node.nodeType !== 1) return;
+                    if (node.matches('table')) {
+                        initTableResize(node);
+                    } else if (node.querySelectorAll) {
+                        node.querySelectorAll('table').forEach(initTableResize);
+                    }
+                });
+            });
+        });
+        observer.observe(editor, { childList: true, subtree: true });
+    }
+
     function renderNotesList() {
         notesList.innerHTML = '';
         if (currentNotesArray.length === 0) {
@@ -5318,6 +5334,8 @@ document.addEventListener('DOMContentLoaded', function () {
         loadState();
         setupEventListeners();
         document.querySelectorAll('table').forEach(initTableResize);
+        observeTableInsertion(notesEditor);
+        observeTableInsertion(subNoteEditor);
         applyTheme(document.documentElement.dataset.theme || 'default');
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();
