@@ -2033,7 +2033,21 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             let current;
             while ((current = walker.nextNode())) {
-                if (!blocks.some(b => b.contains(current))) blocks.push(current);
+                let replaced = false;
+                for (let i = 0; i < blocks.length; i++) {
+                    const b = blocks[i];
+                    if (b.contains(current)) {
+                        // Replace ancestor block with more specific descendant
+                        blocks[i] = current;
+                        replaced = true;
+                        break;
+                    } else if (current.contains(b)) {
+                        // Current node is an ancestor of an existing block; ignore it
+                        replaced = true;
+                        break;
+                    }
+                }
+                if (!replaced) blocks.push(current);
             }
             if (!blocks.length) {
                 const newBlock = document.createElement('p');
