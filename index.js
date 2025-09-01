@@ -2036,9 +2036,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!blocks.some(b => b.contains(current))) blocks.push(current);
             }
             if (!blocks.length) {
-                const newBlock = document.createElement('p');
-                range.surroundContents(newBlock);
-                blocks.push(newBlock);
+                if (range.collapsed) {
+                    let block = range.startContainer.closest('p, li, div, table, blockquote');
+                    if (!block || !root.contains(block)) {
+                        block = document.createElement('p');
+                        const br = document.createElement('br');
+                        block.appendChild(br);
+                        range.insertNode(block);
+                        sel.removeAllRanges();
+                        const newRange = document.createRange();
+                        newRange.selectNodeContents(block);
+                        newRange.collapse(true);
+                        sel.addRange(newRange);
+                    }
+                    blocks.push(block);
+                } else {
+                    const newBlock = document.createElement('p');
+                    newBlock.appendChild(range.extractContents());
+                    range.insertNode(newBlock);
+                    blocks.push(newBlock);
+                }
             }
 
             blocks.forEach(block => {
