@@ -1910,7 +1910,7 @@ document.addEventListener('DOMContentLoaded', function () {
              return [startBlock];
         }
 
-        const allBlocks = Array.from(notesEditor.querySelectorAll('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details'));
+        const allBlocks = Array.from(notesEditor.querySelectorAll('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details, table'));
         const startIndex = allBlocks.indexOf(startBlock);
         const endIndex = allBlocks.indexOf(endBlock);
 
@@ -2033,12 +2033,36 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             let current;
             while ((current = walker.nextNode())) {
-                if (!blocks.some(b => b.contains(current))) blocks.push(current);
+                let handled = false;
+                for (let i = 0; i < blocks.length; i++) {
+                    const b = blocks[i];
+                    if (b.contains(current)) {
+                        // Only replace ancestor when it's not fully within selection
+                        if (!range.containsNode(b, true)) {
+                            blocks[i] = current;
+                        }
+                        handled = true;
+                        break;
+                    } else if (current.contains(b)) {
+                        // Prefer current ancestor if the entire node is selected
+                        if (range.containsNode(current, true)) {
+                            blocks[i] = current;
+                        }
+                        handled = true;
+                        break;
+                    }
+                }
+                if (!handled) blocks.push(current);
             }
             if (!blocks.length) {
-                const newBlock = document.createElement('p');
-                range.surroundContents(newBlock);
-                blocks.push(newBlock);
+                const fallback = node.closest('p, li, div, table, blockquote');
+                if (fallback) {
+                    blocks.push(fallback);
+                } else {
+                    const newBlock = document.createElement('p');
+                    range.surroundContents(newBlock);
+                    blocks.push(newBlock);
+                }
             }
 
             blocks.forEach(block => {
