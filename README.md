@@ -17,3 +17,4 @@ This contains everything you need to run your app locally.
 
 - Nueva herramienta en el editor para redimensionar lateralmente notas o bloques HTML insertados mediante el botón ↔️ de la barra de herramientas.
 - Experiencia de edición mejorada: multicursor, selección en bloques y reorganización de líneas con arrastrar y soltar.
+- Botones para corregir la sangría de un bloque seleccionado.  Usa ↦ para aumentar un nivel de `indent-n` o ↤ para reducirlo.
