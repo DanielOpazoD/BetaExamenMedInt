@@ -2036,9 +2036,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!blocks.some(b => b.contains(current))) blocks.push(current);
             }
             if (!blocks.length) {
-                const newBlock = document.createElement('p');
-                range.surroundContents(newBlock);
-                blocks.push(newBlock);
+                let block = range.startContainer;
+                if (block.nodeType === Node.TEXT_NODE) block = block.parentElement;
+                while (block && block !== root && !block.matches('p, li, div, table')) {
+                    block = block.parentElement;
+                }
+                if (block && block !== root) {
+                    blocks.push(block);
+                } else {
+                    const newBlock = document.createElement('p');
+                    range.surroundContents(newBlock);
+                    blocks.push(newBlock);
+                }
             }
 
             blocks.forEach(block => {
@@ -2072,6 +2081,24 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             });
+        };
+
+        const manualIndentBlock = (root) => {
+            const sel = window.getSelection();
+            if (!sel.rangeCount) return;
+            const range = sel.getRangeAt(0);
+            let block = range.startContainer;
+            if (block.nodeType === Node.TEXT_NODE) block = block.parentElement;
+            while (block && block !== root && !block.matches('p, li, div, table')) {
+                block = block.parentElement;
+            }
+            if (block && root.contains(block)) {
+                const currentClass = Array.from(block.classList).find(c => c.startsWith('indent-'));
+                let level = currentClass ? parseInt(currentClass.split('-')[1], 10) : 0;
+                if (currentClass) block.classList.remove(currentClass);
+                level = Math.max(0, Math.min(5, level + 1));
+                if (level > 0) block.classList.add(`indent-${level}`);
+            }
         };
 
         const clearFormatting = () => {
@@ -2500,6 +2527,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
         editorToolbar.appendChild(createButton('Disminuir sangría', outdentSVG, null, null, () => adjustIndent(-1, notesEditor)));
         editorToolbar.appendChild(createButton('Aumentar sangría', indentSVG, null, null, () => adjustIndent(1, notesEditor)));
+        editorToolbar.appendChild(createButton('Corregir sangría bloque', '↦', null, null, () => manualIndentBlock(notesEditor)));
 
         const insertBlankLineAbove = () => {
             let blocks = getSelectedBlockElements();
