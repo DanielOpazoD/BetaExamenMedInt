@@ -1939,6 +1939,42 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function splitWrapperHere(editorEl) {
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return;
+        const range = sel.getRangeAt(0);
+
+        let anc = range.commonAncestorContainer;
+        while (anc && anc.nodeType === Node.TEXT_NODE) anc = anc.parentNode;
+        while (anc && !anc.classList?.toString().includes("indent-")) {
+            if (anc === editorEl) return;
+            anc = anc.parentNode;
+        }
+        if (!anc || anc === editorEl) return;
+
+        const wrapper = anc;
+
+        let refNode = range.endContainer;
+        while (refNode && refNode.parentNode !== wrapper) {
+            refNode = refNode.parentNode;
+        }
+        if (!refNode) return;
+
+        const clone = wrapper.cloneNode(false);
+        wrapper.parentNode.insertBefore(clone, wrapper.nextSibling);
+
+        let mover = refNode.nextSibling;
+        while (mover) {
+            const next = mover.nextSibling;
+            clone.appendChild(mover);
+            mover = next;
+        }
+
+        if (!clone.hasChildNodes()) {
+            clone.remove();
+        }
+    }
+
     function setupEditorToolbar() {
         editorToolbar.innerHTML = ''; // Clear existing toolbar
 
@@ -2506,6 +2542,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
         editorToolbar.appendChild(createButton('Disminuir sangría', outdentSVG, null, null, () => adjustIndent(-1, notesEditor)));
         editorToolbar.appendChild(createButton('Aumentar sangría', indentSVG, null, null, () => adjustIndent(1, notesEditor)));
+        editorToolbar.appendChild(createButton('Dividir contenedor de sangría', '✂️', null, null, () => splitWrapperHere(notesEditor)));
 
         const insertBlankLineAbove = () => {
             let blocks = getSelectedBlockElements();
