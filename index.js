@@ -985,6 +985,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
         subNoteToolbar.appendChild(createSNButton('Disminuir sangría', outdentSVG, null, null, () => adjustIndent(-1, subNoteEditor)));
         subNoteToolbar.appendChild(createSNButton('Aumentar sangría', indentSVG, null, null, () => adjustIndent(1, subNoteEditor)));
+        const scissorsSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-scissors w-5 h-5"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>`;
+        subNoteToolbar.appendChild(createSNButton('Dividir contenedor de sangría', scissorsSVG, null, null, () => splitWrapperHere(subNoteEditor)));
         // Collapsible list item
         const collapsibleListSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-tree w-5 h-5"><path d="M21 7H9"/><path d="M21 12H9"/><path d="M21 17H9"/><path d="M3 17v-6a4 4 0 0 1 4-4h4"/></svg>`;
         const collapsibleListHTML = `<details class="collapsible-list"><summary>Elemento</summary><div>Texto...<br></div></details><p><br></p>`;
@@ -2025,8 +2027,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const blocks = [];
             const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
                 acceptNode(n) {
+                    if (n === root) return NodeFilter.FILTER_SKIP;
                     if (!range.intersectsNode(n)) return NodeFilter.FILTER_SKIP;
-                    if (!n.matches('p, li, div, table')) return NodeFilter.FILTER_SKIP;
+                    if (!n.matches('p, li, div, table, blockquote')) return NodeFilter.FILTER_SKIP;
                     if (n.closest('table') && n.tagName !== 'TABLE') return NodeFilter.FILTER_SKIP;
                     return NodeFilter.FILTER_ACCEPT;
                 }
@@ -2036,9 +2039,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!blocks.some(b => b.contains(current))) blocks.push(current);
             }
             if (!blocks.length) {
-                const newBlock = document.createElement('p');
-                range.surroundContents(newBlock);
-                blocks.push(newBlock);
+                let block = node.closest('p, li, div, table, blockquote');
+                if (block && block !== root) {
+                    blocks.push(block);
+                } else {
+                    const newBlock = document.createElement('p');
+                    range.insertNode(newBlock);
+                    blocks.push(newBlock);
+                }
             }
 
             blocks.forEach(block => {
@@ -2072,6 +2080,41 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             });
+        };
+
+        const splitWrapperHere = (editorEl) => {
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            const range = sel.getRangeAt(0);
+
+            let anc = range.commonAncestorContainer;
+            while (anc && anc.nodeType === Node.TEXT_NODE) anc = anc.parentNode;
+            while (anc && !anc.classList?.toString().includes('indent-')) {
+                if (anc === editorEl) return;
+                anc = anc.parentNode;
+            }
+            if (!anc || anc === editorEl) return;
+
+            const wrapper = anc;
+            let refNode = range.endContainer;
+            while (refNode && refNode.parentNode !== wrapper) {
+                refNode = refNode.parentNode;
+            }
+            if (!refNode) return;
+
+            const clone = wrapper.cloneNode(false);
+            wrapper.parentNode.insertBefore(clone, wrapper.nextSibling);
+
+            let mover = refNode.nextSibling;
+            while (mover) {
+                const next = mover.nextSibling;
+                clone.appendChild(mover);
+                mover = next;
+            }
+
+            if (!clone.hasChildNodes()) {
+                clone.remove();
+            }
         };
 
         const clearFormatting = () => {
@@ -2500,6 +2543,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
         editorToolbar.appendChild(createButton('Disminuir sangría', outdentSVG, null, null, () => adjustIndent(-1, notesEditor)));
         editorToolbar.appendChild(createButton('Aumentar sangría', indentSVG, null, null, () => adjustIndent(1, notesEditor)));
+        const scissorsSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-scissors w-5 h-5"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>`;
+        editorToolbar.appendChild(createButton('Dividir contenedor de sangría', scissorsSVG, null, null, () => splitWrapperHere(notesEditor)));
 
         const insertBlankLineAbove = () => {
             let blocks = getSelectedBlockElements();
