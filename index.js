@@ -2033,21 +2033,26 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             let current;
             while ((current = walker.nextNode())) {
-                let replaced = false;
+                let handled = false;
                 for (let i = 0; i < blocks.length; i++) {
                     const b = blocks[i];
                     if (b.contains(current)) {
-                        // Replace ancestor block with more specific descendant
-                        blocks[i] = current;
-                        replaced = true;
+                        // Only replace ancestor when it's not fully within selection
+                        if (!range.containsNode(b, true)) {
+                            blocks[i] = current;
+                        }
+                        handled = true;
                         break;
                     } else if (current.contains(b)) {
-                        // Current node is an ancestor of an existing block; ignore it
-                        replaced = true;
+                        // Prefer current ancestor if the entire node is selected
+                        if (range.containsNode(current, true)) {
+                            blocks[i] = current;
+                        }
+                        handled = true;
                         break;
                     }
                 }
-                if (!replaced) blocks.push(current);
+                if (!handled) blocks.push(current);
             }
             if (!blocks.length) {
                 const newBlock = document.createElement('p');
