@@ -2025,8 +2025,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const blocks = [];
             const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
                 acceptNode(n) {
+                    if (n === root) return NodeFilter.FILTER_SKIP;
                     if (!range.intersectsNode(n)) return NodeFilter.FILTER_SKIP;
-                    if (!n.matches('p, li, div, table')) return NodeFilter.FILTER_SKIP;
+                    if (!n.matches('p, li, div, table, blockquote')) return NodeFilter.FILTER_SKIP;
                     if (n.closest('table') && n.tagName !== 'TABLE') return NodeFilter.FILTER_SKIP;
                     return NodeFilter.FILTER_ACCEPT;
                 }
@@ -2036,9 +2037,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!blocks.some(b => b.contains(current))) blocks.push(current);
             }
             if (!blocks.length) {
-                const newBlock = document.createElement('p');
-                range.surroundContents(newBlock);
-                blocks.push(newBlock);
+                let block = node.closest('p, li, div, table, blockquote');
+                if (block && block !== root) {
+                    blocks.push(block);
+                } else {
+                    const newBlock = document.createElement('p');
+                    range.insertNode(newBlock);
+                    blocks.push(newBlock);
+                }
             }
 
             blocks.forEach(block => {
