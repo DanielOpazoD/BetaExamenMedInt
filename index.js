@@ -2025,6 +2025,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const blocks = [];
             const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
                 acceptNode(n) {
+                    if (n === root) return NodeFilter.FILTER_SKIP;
                     if (!range.intersectsNode(n)) return NodeFilter.FILTER_SKIP;
                     if (!n.matches('p, li, div, table')) return NodeFilter.FILTER_SKIP;
                     if (n.closest('table') && n.tagName !== 'TABLE') return NodeFilter.FILTER_SKIP;
@@ -2036,9 +2037,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!blocks.some(b => b.contains(current))) blocks.push(current);
             }
             if (!blocks.length) {
-                const newBlock = document.createElement('p');
-                range.surroundContents(newBlock);
-                blocks.push(newBlock);
+                let block = range.startContainer;
+                if (block.nodeType === Node.TEXT_NODE) block = block.parentElement;
+                block = block.closest('p, li, div, table');
+                if (!block) {
+                    document.execCommand('formatBlock', false, 'p');
+                    block = range.startContainer.closest('p');
+                }
+                if (block && block !== root) blocks.push(block);
             }
 
             blocks.forEach(block => {
@@ -2062,6 +2068,16 @@ document.addEventListener('DOMContentLoaded', function () {
                             if (cls.startsWith('indent-')) target.classList.remove(cls);
                         });
                         if (target.tagName === 'BLOCKQUOTE') {
+                            const parent = target.parentNode;
+                            while (target.firstChild) parent.insertBefore(target.firstChild, target);
+                            target.remove();
+                            target = parent;
+                        } else if (
+                            target.tagName === 'DIV' &&
+                            !target.getAttribute('style') &&
+                            target.classList.length === 0 &&
+                            target.childNodes.length === 1
+                        ) {
                             const parent = target.parentNode;
                             while (target.firstChild) parent.insertBefore(target.firstChild, target);
                             target.remove();
