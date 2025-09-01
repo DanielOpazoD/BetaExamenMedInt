@@ -1910,7 +1910,7 @@ document.addEventListener('DOMContentLoaded', function () {
              return [startBlock];
         }
 
-        const allBlocks = Array.from(notesEditor.querySelectorAll('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details'));
+        const allBlocks = Array.from(notesEditor.querySelectorAll('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details, table'));
         const startIndex = allBlocks.indexOf(startBlock);
         const endIndex = allBlocks.indexOf(endBlock);
 
@@ -2055,9 +2055,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!handled) blocks.push(current);
             }
             if (!blocks.length) {
-                const newBlock = document.createElement('p');
-                range.surroundContents(newBlock);
-                blocks.push(newBlock);
+                const fallback = node.closest('p, li, div, table, blockquote');
+                if (fallback) {
+                    blocks.push(fallback);
+                } else {
+                    const newBlock = document.createElement('p');
+                    range.surroundContents(newBlock);
+                    blocks.push(newBlock);
+                }
             }
 
             blocks.forEach(block => {
