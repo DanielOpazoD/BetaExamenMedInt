@@ -121,6 +121,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveConfirmation = getElem('save-confirmation');
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
+
+    let advancedEditing;
+    let dragModeEnabled = false;
     
     // References modal elements
     const referencesModal = getElem('references-modal');
@@ -1942,6 +1945,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function setupEditorToolbar() {
         editorToolbar.innerHTML = ''; // Clear existing toolbar
+
+        // Hand icon toggle for drag mode
+        const dragToggleBtn = createButton('Mover bloques', '✋', null, null, () => {
+            dragModeEnabled = !dragModeEnabled;
+            dragToggleBtn.classList.toggle('active', dragModeEnabled);
+            if (advancedEditing && advancedEditing.setDragEnabled) {
+                advancedEditing.setDragEnabled(dragModeEnabled);
+            }
+        });
+        editorToolbar.appendChild(dragToggleBtn);
 
         // Utility to collapse the current selection so formatting doesn't persist beyond the selected range
         const collapseSelection = (editor) => {
@@ -3916,11 +3929,11 @@ document.addEventListener('DOMContentLoaded', function () {
         showModal(notesModal);
     }
 
-    function closeTab(id) {
+    function closeTab(id, save = true) {
         const index = openNoteTabs.findIndex(t => t.id === id);
         if (index === -1) return;
         if (openNoteTabs[index].id === activeTabId) {
-            saveActiveTab();
+            if (save) saveActiveTab();
             openNoteTabs.splice(index, 1);
             if (openNoteTabs.length > 0) {
                 activeTabId = openNoteTabs[0].id;
@@ -4758,11 +4771,21 @@ document.addEventListener('DOMContentLoaded', function () {
                  // Do nothing, to prevent closing on overlay click.
             }
         });
-        cancelNoteBtn.addEventListener('click', closeNotesModal);
+        cancelNoteBtn.addEventListener('click', () => {
+            if (activeTabId !== null) {
+                closeTab(activeTabId, false);
+            } else {
+                closeNotesModal();
+            }
+        });
         saveNoteBtn.addEventListener('click', saveCurrentNote);
         saveAndCloseNoteBtn.addEventListener('click', () => {
-            saveCurrentNote();
-            closeNotesModal();
+            if (activeTabId !== null) {
+                closeTab(activeTabId, true);
+            } else {
+                saveCurrentNote();
+                closeNotesModal();
+            }
         });
         
         unmarkNoteBtn.addEventListener('click', async () => {
@@ -5321,7 +5344,7 @@ document.addEventListener('DOMContentLoaded', function () {
         applyTheme(document.documentElement.dataset.theme || 'default');
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();
-        setupAdvancedEditing(notesEditor);
+        advancedEditing = setupAdvancedEditing(notesEditor);
         setupCloudIntegration();
     }
 
