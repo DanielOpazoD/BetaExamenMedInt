@@ -83,7 +83,13 @@ export function setupAdvancedEditing(editor) {
   }
 
   let dragLine = null;
+
+  // Allow dragging lines when Alt is held or drag mode is enabled to avoid interfering with text selection.
   editor.addEventListener('dragstart', e => {
+    if (!e.altKey && !window.dragModeEnabled) {
+      e.preventDefault();
+      return;
+    }
     const line = e.target.closest('p');
     if (!line) return;
     dragLine = line;
@@ -102,10 +108,20 @@ export function setupAdvancedEditing(editor) {
     dragLine = null;
   });
 
-  editor.querySelectorAll('p').forEach(p => p.setAttribute('draggable', 'true'));
+  // Toggle draggable attribute based on Alt key or drag mode usage
+  editor.addEventListener('mousedown', e => {
+    const p = e.target.closest('p');
+    if (!p) return;
+    p.setAttribute('draggable', (e.altKey || window.dragModeEnabled) ? 'true' : 'false');
+  });
+  document.addEventListener('mouseup', () => {
+    editor.querySelectorAll('p').forEach(p => p.setAttribute('draggable', 'false'));
+  });
+
+  editor.querySelectorAll('p').forEach(p => p.setAttribute('draggable', 'false'));
   const observer = new MutationObserver(() => {
     editor.querySelectorAll('p').forEach(p => {
-      if (!p.getAttribute('draggable')) p.setAttribute('draggable', 'true');
+      p.setAttribute('draggable', 'false');
     });
   });
   observer.observe(editor, { childList: true, subtree: true });

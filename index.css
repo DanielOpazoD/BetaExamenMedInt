@@ -158,7 +158,12 @@
         #notes-editor { border: 1px solid var(--border-color); padding: 12px; flex-grow: 1; overflow-y: auto; border-bottom-left-radius: 0.5rem; border-bottom-right-radius: 0.5rem; line-height: 1.6; background-color: var(--bg-secondary); }
         #notes-editor:focus { outline: none; }
         #notes-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; cursor: pointer; }
-        #notes-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
+        #notes-editor img.selected-for-resize {
+            outline: 2px solid var(--btn-primary-bg);
+            resize: both;
+            overflow: auto;
+            display: inline-block;
+        }
 
         /* Display multiple images in a row */
         #notes-editor .image-row {
@@ -184,7 +189,12 @@
         }
         #subnote-editor:focus { outline: none; }
         #subnote-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; cursor: pointer; }
-        #subnote-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
+        #subnote-editor img.selected-for-resize {
+            outline: 2px solid var(--btn-primary-bg);
+            resize: both;
+            overflow: auto;
+            display: inline-block;
+        }
 
         /* Smaller buttons for the sub-note action bar */
         #subnote-modal-actions button {
@@ -400,9 +410,11 @@ table.resizable-table .table-resize-handle {
 /* Floating image styles */
 .float-image {
     display: block;
-    max-width: 250px;
+    max-width: 100%;
     margin: 0 1rem 1rem 0;
     cursor: default;
+    resize: both;
+    overflow: auto;
 }
 .float-image.float-left {
     float: left;

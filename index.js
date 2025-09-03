@@ -121,6 +121,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveConfirmation = getElem('save-confirmation');
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
+
+    // Global drag mode flag
+    window.dragModeEnabled = false;
     
     // References modal elements
     const referencesModal = getElem('references-modal');
@@ -797,6 +800,14 @@ document.addEventListener('DOMContentLoaded', function () {
             return dropdown;
         };
 
+        // Drag mode toggle
+        const dragSNBtn = createSNButton('Modo arrastre', '🖐️', null, null, () => {
+            window.dragModeEnabled = !window.dragModeEnabled;
+            dragSNBtn.classList.toggle('active', window.dragModeEnabled);
+        });
+        subNoteToolbar.appendChild(dragSNBtn);
+        subNoteToolbar.appendChild(createSNSeparator());
+
         // Begin constructing toolbar
         // Basic formatting
         subNoteToolbar.appendChild(createSNButton('Negrita', '<b>B</b>', 'bold'));
@@ -1391,6 +1402,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Use relative positioning so that text flows around normally
         fig.style.position = fig.style.position || 'relative';
         fig.addEventListener('mousedown', (e) => {
+            if (!e.altKey && !window.dragModeEnabled) return; // Only drag with Alt or drag mode to avoid interfering with resizing
             isDragging = true;
             const rect = fig.getBoundingClientRect();
             offsetX = e.clientX - rect.left;
@@ -1474,6 +1486,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (existingFig) {
             existingFig.classList.remove('float-left', 'float-right');
             existingFig.classList.add(`float-${align}`);
+            enableDragForFloatingImage(existingFig);
             return;
         }
         // Crear figure y mover la imagen dentro
@@ -1482,6 +1495,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fig.contentEditable = 'false';
         img.parentNode.insertBefore(fig, img);
         fig.appendChild(img);
+        enableDragForFloatingImage(fig);
         // Insertar espacio NBSP para que el cursor siga después del figure
         const spacer = document.createTextNode('\u00A0');
         fig.parentNode.insertBefore(spacer, fig.nextSibling);
@@ -2350,6 +2364,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 notesEditor.focus();
             }
         });
+        const dragBtn = createButton('Modo arrastre', '🖐️', null, null, () => {
+            window.dragModeEnabled = !window.dragModeEnabled;
+            dragBtn.classList.toggle('active', window.dragModeEnabled);
+        });
+        editorToolbar.appendChild(dragBtn);
+        editorToolbar.appendChild(createSeparator());
+
         editorToolbar.appendChild(selectSize);
 
         // Line height selector
@@ -4758,11 +4779,15 @@ document.addEventListener('DOMContentLoaded', function () {
                  // Do nothing, to prevent closing on overlay click.
             }
         });
-        cancelNoteBtn.addEventListener('click', closeNotesModal);
+        cancelNoteBtn.addEventListener('click', () => {
+            closeNotesModal();
+            window.close();
+        });
         saveNoteBtn.addEventListener('click', saveCurrentNote);
         saveAndCloseNoteBtn.addEventListener('click', () => {
             saveCurrentNote();
             closeNotesModal();
+            window.close();
         });
         
         unmarkNoteBtn.addEventListener('click', async () => {
@@ -5321,7 +5346,9 @@ document.addEventListener('DOMContentLoaded', function () {
         applyTheme(document.documentElement.dataset.theme || 'default');
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();
-        setupAdvancedEditing(notesEditor);
+        [notesEditor, subNoteEditor].forEach(editor => {
+            if (editor) setupAdvancedEditing(editor);
+        });
         setupCloudIntegration();
     }
 
