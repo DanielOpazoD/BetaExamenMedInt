@@ -83,18 +83,23 @@ export function setupAdvancedEditing(editor) {
   }
 
   let dragLine = null;
+  let dragEnabled = false;
+
   editor.addEventListener('dragstart', e => {
+    if (!dragEnabled) return;
     const line = e.target.closest('p');
     if (!line) return;
     dragLine = line;
     e.dataTransfer.setData('text/plain', '');
   });
   editor.addEventListener('dragover', e => {
+    if (!dragEnabled) return;
     const line = e.target.closest('p');
     if (!line || !dragLine || line === dragLine) return;
     e.preventDefault();
   });
   editor.addEventListener('drop', e => {
+    if (!dragEnabled) return;
     const line = e.target.closest('p');
     if (!line || !dragLine || line === dragLine) return;
     e.preventDefault();
@@ -102,11 +107,23 @@ export function setupAdvancedEditing(editor) {
     dragLine = null;
   });
 
-  editor.querySelectorAll('p').forEach(p => p.setAttribute('draggable', 'true'));
+  function setDragEnabled(enabled) {
+    dragEnabled = enabled;
+    if (dragEnabled) {
+      editor.querySelectorAll('p').forEach(p => p.setAttribute('draggable', 'true'));
+    } else {
+      editor.querySelectorAll('p').forEach(p => p.removeAttribute('draggable'));
+    }
+  }
+
   const observer = new MutationObserver(() => {
+    if (!dragEnabled) return;
     editor.querySelectorAll('p').forEach(p => {
       if (!p.getAttribute('draggable')) p.setAttribute('draggable', 'true');
     });
   });
   observer.observe(editor, { childList: true, subtree: true });
+
+  setDragEnabled(false);
+  return { setDragEnabled };
 }
