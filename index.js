@@ -1391,6 +1391,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Use relative positioning so that text flows around normally
         fig.style.position = fig.style.position || 'relative';
         fig.addEventListener('mousedown', (e) => {
+            if (!e.altKey) return; // Only drag with Alt to avoid interfering with resizing
             isDragging = true;
             const rect = fig.getBoundingClientRect();
             offsetX = e.clientX - rect.left;
@@ -1474,6 +1475,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (existingFig) {
             existingFig.classList.remove('float-left', 'float-right');
             existingFig.classList.add(`float-${align}`);
+            enableDragForFloatingImage(existingFig);
             return;
         }
         // Crear figure y mover la imagen dentro
@@ -1482,6 +1484,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fig.contentEditable = 'false';
         img.parentNode.insertBefore(fig, img);
         fig.appendChild(img);
+        enableDragForFloatingImage(fig);
         // Insertar espacio NBSP para que el cursor siga después del figure
         const spacer = document.createTextNode('\u00A0');
         fig.parentNode.insertBefore(spacer, fig.nextSibling);
