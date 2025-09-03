@@ -939,6 +939,22 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
+        function stripExtraWhitespace(root) {
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            while ((node = walker.nextNode())) {
+                node.textContent = node.textContent.replace(/\u00A0/g, ' ');
+                if (!node.textContent.trim()) {
+                    node.remove();
+                }
+            }
+            root.querySelectorAll('p, div, span').forEach(el => {
+                if (el.textContent.replace(/\u00A0/g, '').trim() === '') {
+                    el.remove();
+                }
+            });
+        }
+
         function cleanAttributesSN() {
             const blocks = getSelectedBlocksSN();
             blocks.forEach(block => {
@@ -948,6 +964,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         ['style', 'class', 'width', 'height', 'cellpadding', 'cellspacing', 'border', 'align', 'valign']
                             .forEach(attr => el.removeAttribute(attr));
                     });
+                    stripExtraWhitespace(block);
                 }
             });
         }
@@ -2165,6 +2182,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     ['style', 'class', 'width', 'height', 'cellpadding', 'cellspacing', 'border', 'align', 'valign']
                         .forEach(attr => el.removeAttribute(attr));
                 });
+                stripExtraWhitespace(block);
             });
         };
 
