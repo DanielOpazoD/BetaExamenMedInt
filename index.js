@@ -808,6 +808,7 @@ document.addEventListener('DOMContentLoaded', function () {
         subNoteToolbar.appendChild(createSNButton('Superíndice', 'X²', 'superscript'));
         // Clear formatting
         subNoteToolbar.appendChild(createSNButton('Limpiar formato', '❌', null, null, clearFormattingSN));
+        subNoteToolbar.appendChild(createSNButton('Limpiar atributos', '🧹', null, null, cleanAttributesSN));
         // Font size selector
         const selectSNSize = document.createElement('select');
         selectSNSize.className = 'toolbar-select';
@@ -936,6 +937,36 @@ document.addEventListener('DOMContentLoaded', function () {
                         while (block.firstChild) block.parentNode.insertBefore(block.firstChild, block);
                         block.remove();
                     }
+                }
+            });
+        }
+
+        function stripExtraWhitespace(root) {
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            while ((node = walker.nextNode())) {
+                node.textContent = node.textContent.replace(/\u00A0/g, ' ');
+                if (!node.textContent.trim()) {
+                    node.remove();
+                }
+            }
+            root.querySelectorAll('p, div, span').forEach(el => {
+                if (el.textContent.replace(/\u00A0/g, '').trim() === '') {
+                    el.remove();
+                }
+            });
+        }
+
+        function cleanAttributesSN() {
+            const blocks = getSelectedBlocksSN();
+            blocks.forEach(block => {
+                if (block && subNoteEditor.contains(block)) {
+                    const targets = [block, ...block.querySelectorAll('*')];
+                    targets.forEach(el => {
+                        ['style', 'class', 'width', 'height', 'cellpadding', 'cellspacing', 'border', 'align', 'valign']
+                            .forEach(attr => el.removeAttribute(attr));
+                    });
+                    stripExtraWhitespace(block);
                 }
             });
         }
@@ -2213,6 +2244,19 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         };
 
+        const cleanAttributes = () => {
+            const blocks = getSelectedBlockElements();
+            blocks.forEach(block => {
+                if (!notesEditor.contains(block)) return;
+                const targets = [block, ...block.querySelectorAll('*')];
+                targets.forEach(el => {
+                    ['style', 'class', 'width', 'height', 'cellpadding', 'cellspacing', 'border', 'align', 'valign']
+                        .forEach(attr => el.removeAttribute(attr));
+                });
+                stripExtraWhitespace(block);
+            });
+        };
+
         const createSeparator = () => {
             const sep = document.createElement('div');
             sep.className = 'toolbar-separator';
@@ -2498,6 +2542,7 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createButton('Rehacer', '↻', 'redo'));
 
         editorToolbar.appendChild(createButton('Limpiar formato', '❌', null, null, clearFormatting));
+        editorToolbar.appendChild(createButton('Limpiar atributos', '🧹', null, null, cleanAttributes));
 
         editorToolbar.appendChild(createButton('Mejorar texto', '✨', null, null, improveSelectedText));
 

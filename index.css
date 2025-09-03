@@ -807,9 +807,6 @@ table.resizable-table .table-resize-handle {
                 cursor: default !important;
             }
             .topic-print-wrapper {
-                page-break-before: always;
-            }
-            .topic-print-wrapper:first-child {
                 page-break-before: auto;
             }
             #print-index {
@@ -841,6 +838,41 @@ table.resizable-table .table-resize-handle {
             #print-index {
                 page-break-after: always;
             }
+            @page { margin: 12mm; }
+
+            /* Ocultar artefactos del editor */
+            .table-resize-handle { display: none !important; }
+
+            /* Hacer que las tablas y contenedores se puedan fragmentar */
+            .resizable-table,
+            table {
+                width: auto !important;
+                table-layout: auto !important;
+                break-inside: auto !important;
+                page-break-inside: auto !important;
+            }
+
+            /* Permitir que filas se partan si es necesario para evitar espacios en blanco */
+            thead { display: table-header-group !important; }
+            tfoot { display: table-footer-group !important; }
+            tr    { break-inside: auto !important; page-break-inside: auto !important; }
+
+            /* Neutralizar posibles estilos del editor que bloquean la fragmentación */
+            [style*="overflow:hidden"] { overflow: visible !important; }
+            [style*="position:fixed"], [style*="position:absolute"], .sticky { position: static !important; }
+            [style*="transform"] { transform: none !important; }
+
+            /* Reducir márgenes verticales grandes en texto */
+            p { margin-block: 6px !important; }
+            table { margin-block: 6px !important; }
+            h1, h2, h3, h4, h5, h6, caption {
+                margin-block: 6px !important;
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+            }
+
+            /* Indentaciones del editor que puedan generar huecos raros */
+            .indent-1, .indent-2, .indent-3 { margin-left: 0 !important; }
         }
 
 /* Note callout styles */
