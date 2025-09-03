@@ -193,6 +193,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let openNoteTabs = [];
     let activeTabId = null;
     let tabPosition = 'top';
+    let blockDragEnabled = false;
+    let draggedBlock = null;
 
     if (minimizeNoteBtn && restoreNoteBtn) {
         minimizeNoteBtn.addEventListener('click', () => {
@@ -2012,6 +2014,75 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             }
         };
+
+        const blockSelector = 'p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details, table';
+
+        const onDragStart = (e) => {
+            const block = e.target.closest(blockSelector);
+            if (block && notesEditor.contains(block)) {
+                draggedBlock = block;
+            } else {
+                draggedBlock = null;
+            }
+        };
+
+        const onDragOver = (e) => {
+            if (!draggedBlock) return;
+            const block = e.target.closest(blockSelector);
+            if (block && notesEditor.contains(block) && block !== draggedBlock) {
+                e.preventDefault();
+            }
+        };
+
+        const onDrop = (e) => {
+            if (!draggedBlock) return;
+            const block = e.target.closest(blockSelector);
+            if (block && notesEditor.contains(block) && block !== draggedBlock) {
+                e.preventDefault();
+                const rect = block.getBoundingClientRect();
+                const after = (e.clientY - rect.top) > rect.height / 2;
+                if (after) {
+                    block.parentNode.insertBefore(draggedBlock, block.nextSibling);
+                } else {
+                    block.parentNode.insertBefore(draggedBlock, block);
+                }
+            }
+            draggedBlock = null;
+        };
+
+        const enableBlockDragging = () => {
+            notesEditor.addEventListener('dragstart', onDragStart);
+            notesEditor.addEventListener('dragover', onDragOver);
+            notesEditor.addEventListener('drop', onDrop);
+            notesEditor.querySelectorAll(blockSelector).forEach(block => {
+                block.setAttribute('draggable', 'true');
+                block.style.cursor = 'move';
+            });
+        };
+
+        const disableBlockDragging = () => {
+            notesEditor.removeEventListener('dragstart', onDragStart);
+            notesEditor.removeEventListener('dragover', onDragOver);
+            notesEditor.removeEventListener('drop', onDrop);
+            notesEditor.querySelectorAll(blockSelector).forEach(block => {
+                block.removeAttribute('draggable');
+                block.style.cursor = '';
+            });
+            draggedBlock = null;
+        };
+
+        const toggleBlockDrag = () => {
+            blockDragEnabled = !blockDragEnabled;
+            dragBtn.classList.toggle('active', blockDragEnabled);
+            if (blockDragEnabled) {
+                enableBlockDragging();
+            } else {
+                disableBlockDragging();
+            }
+        };
+
+        const dragBtn = createButton('Mover bloques', '✋', null, null, toggleBlockDrag);
+        editorToolbar.appendChild(dragBtn);
 
         const adjustIndent = (delta, root) => {
             const sel = window.getSelection();
@@ -4758,11 +4829,21 @@ document.addEventListener('DOMContentLoaded', function () {
                  // Do nothing, to prevent closing on overlay click.
             }
         });
-        cancelNoteBtn.addEventListener('click', closeNotesModal);
+        cancelNoteBtn.addEventListener('click', () => {
+            if (activeTabId) {
+                closeTab(activeTabId);
+            } else {
+                closeNotesModal();
+            }
+        });
         saveNoteBtn.addEventListener('click', saveCurrentNote);
         saveAndCloseNoteBtn.addEventListener('click', () => {
             saveCurrentNote();
-            closeNotesModal();
+            if (activeTabId) {
+                closeTab(activeTabId);
+            } else {
+                closeNotesModal();
+            }
         });
         
         unmarkNoteBtn.addEventListener('click', async () => {
