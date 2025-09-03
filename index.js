@@ -177,6 +177,13 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentHtmlEditor = null;
     let editingFavoriteIndex = null;
 
+    // Table modal elements
+    const tableModal = getElem('table-modal');
+    const tableRowsInput = getElem('table-rows');
+    const tableColsInput = getElem('table-cols');
+    const insertTableBtn = getElem('insert-table-btn');
+    const cancelTableBtn = getElem('cancel-table-btn');
+
     const noteTabsBar = getElem('note-tabs-bar');
     const noteTabs = getElem('note-tabs');
     const tabsPrev = getElem('tabs-prev');
@@ -1576,6 +1583,39 @@ document.addEventListener('DOMContentLoaded', function () {
         tableGridEl.querySelectorAll('.cell').forEach(cell => cell.classList.remove('highlight'));
     }
 
+    function insertTable(rows, cols) {
+        const table = document.createElement('table');
+        table.className = 'resizable-table';
+        table.style.borderCollapse = 'collapse';
+        for (let r = 0; r < rows; r++) {
+            const tr = document.createElement('tr');
+            for (let c = 0; c < cols; c++) {
+                const td = document.createElement('td');
+                td.style.border = '1px solid var(--border-color)';
+                td.style.padding = '4px';
+                td.innerHTML = '&nbsp;';
+                tr.appendChild(td);
+            }
+            table.appendChild(tr);
+        }
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(table);
+            const br = document.createElement('p');
+            br.innerHTML = '<br>';
+            table.parentNode.insertBefore(br, table.nextSibling);
+            range.setStart(br, 0);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } else {
+            notesEditor.appendChild(table);
+        }
+        makeTableResizable(table);
+    }
+
     /**
      * Insert a table with the specified number of rows and columns.  After
      * insertion, initialize column resizers and row/column editing controls.
@@ -2547,6 +2587,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const hrBtn = createButton('Insertar línea separadora', '—', 'insertHorizontalRule');
         editorToolbar.appendChild(hrBtn);
+        const tableBtn = createButton('Insertar tabla', '📊', null, null, () => showModal(tableModal));
+        editorToolbar.appendChild(tableBtn);
         editorToolbar.appendChild(createSeparator());
 
         const outdentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-decrease w-5 h-5"><polyline points="7 8 3 12 7 16"/><line x1="21" x2="3" y1="12" y2="12"/><line x1="21" x2="3" y1="6" y2="6"/><line x1="21" x2="3" y1="18" y2="18"/></svg>`;
@@ -3496,6 +3538,25 @@ document.addEventListener('DOMContentLoaded', function () {
         hideModal(selectedHtmlModal);
         if (currentHtmlEditor) currentHtmlEditor.focus();
     });
+
+    if (insertTableBtn) {
+        insertTableBtn.addEventListener('click', () => {
+            const rows = parseInt(tableRowsInput.value, 10);
+            const cols = parseInt(tableColsInput.value, 10);
+            if (rows > 0 && cols > 0) {
+                insertTable(rows, cols);
+            }
+            hideModal(tableModal);
+            notesEditor.focus();
+        });
+    }
+
+    if (cancelTableBtn) {
+        cancelTableBtn.addEventListener('click', () => {
+            hideModal(tableModal);
+            notesEditor.focus();
+        });
+    }
 
     saveHtmlFavoriteBtn.addEventListener('click', async () => {
         const name = htmlFavoriteName.value.trim();

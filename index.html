@@ -339,6 +339,24 @@
         </div>
     </div>
 
+    <div id="table-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-sm">
+            <h3 class="text-lg font-bold mb-4">Insertar tabla</h3>
+            <div class="mb-2">
+                <label class="block mb-1" for="table-rows">Filas</label>
+                <input type="number" id="table-rows" min="1" value="2" class="w-full p-2 border border-border-color rounded-lg bg-secondary">
+            </div>
+            <div class="mb-4">
+                <label class="block mb-1" for="table-cols">Columnas</label>
+                <input type="number" id="table-cols" min="1" value="2" class="w-full p-2 border border-border-color rounded-lg bg-secondary">
+            </div>
+            <div class="flex justify-end gap-2">
+                <button id="cancel-table-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cancelar</button>
+                <button id="insert-table-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Insertar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="notes-modal" class="modal-overlay">
         <div class="modal-content notes-modal-content relative overflow-hidden">
             <div class="resizer resizer-r"></div>
