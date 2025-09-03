@@ -6,8 +6,8 @@
 // Call initResizableTables() after inserting tables into the DOM.
 (function(){
   function initResizableTable(table){
-    if (table.dataset.resizableInitialized === 'true') return;
-    table.dataset.resizableInitialized = 'true';
+    if (table.dataset.resizableV2Initialized === 'true') return;
+    table.dataset.resizableV2Initialized = 'true';
 
     const handle = document.createElement('div');
     handle.className = 'resize-handle';
@@ -225,7 +225,7 @@
     table.removeEventListener('mousemove', detectEdge);
     table.removeEventListener('mousedown', startCellResize);
     table.removeEventListener('dblclick', autoFit);
-    table.dataset.resizableInitialized = 'false';
+    table.dataset.resizableV2Initialized = 'false';
   }
 
   window.initResizableTables = initResizableTables;
