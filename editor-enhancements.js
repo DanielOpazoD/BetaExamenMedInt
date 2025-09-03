@@ -84,9 +84,9 @@ export function setupAdvancedEditing(editor) {
 
   let dragLine = null;
 
-  // Allow dragging lines only when holding Alt to avoid interfering with text selection.
+  // Allow dragging lines when Alt is held or drag mode is enabled to avoid interfering with text selection.
   editor.addEventListener('dragstart', e => {
-    if (!e.altKey) {
+    if (!e.altKey && !window.dragModeEnabled) {
       e.preventDefault();
       return;
     }
@@ -108,11 +108,11 @@ export function setupAdvancedEditing(editor) {
     dragLine = null;
   });
 
-  // Toggle draggable attribute based on Alt key usage
+  // Toggle draggable attribute based on Alt key or drag mode usage
   editor.addEventListener('mousedown', e => {
     const p = e.target.closest('p');
     if (!p) return;
-    p.setAttribute('draggable', e.altKey ? 'true' : 'false');
+    p.setAttribute('draggable', (e.altKey || window.dragModeEnabled) ? 'true' : 'false');
   });
   document.addEventListener('mouseup', () => {
     editor.querySelectorAll('p').forEach(p => p.setAttribute('draggable', 'false'));
