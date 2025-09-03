@@ -1064,6 +1064,7 @@ document.addEventListener('DOMContentLoaded', function () {
         subNoteToolbar.appendChild(createSNButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
             const printArea = getElem('print-area');
             printArea.innerHTML = `<div>${subNoteEditor.innerHTML}</div>`;
+            cleanupResizableTables(printArea);
             window.print();
         }));
     }
@@ -2779,6 +2780,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const printBtn = createButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
              const printArea = getElem('print-area');
              printArea.innerHTML = `<div>${notesEditor.innerHTML}</div>`;
+             cleanupResizableTables(printArea);
              window.print();
         });
         editorToolbar.appendChild(printBtn);
@@ -3750,6 +3752,19 @@ document.addEventListener('DOMContentLoaded', function () {
         table.dataset.resizableInitialized = 'true';
     }
 
+    function cleanupResizableTables(root) {
+        root.querySelectorAll('.table-resize-handle').forEach(h => h.remove());
+        root.querySelectorAll('table.resizable-table').forEach(table => {
+            table.style.width = '';
+            table.style.height = '';
+            table.style.cursor = '';
+            table.querySelectorAll('td, th').forEach(cell => {
+                cell.style.width = '';
+                cell.style.height = '';
+            });
+        });
+    }
+
     function renderNotesList() {
         notesList.innerHTML = '';
         if (currentNotesArray.length === 0) {
@@ -4383,6 +4398,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        cleanupResizableTables(printArea);
         window.print();
     }
 
@@ -4489,6 +4505,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        cleanupResizableTables(printArea);
         window.print();
     }
 
