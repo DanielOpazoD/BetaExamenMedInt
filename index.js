@@ -121,7 +121,48 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveConfirmation = getElem('save-confirmation');
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
-    
+
+    // --- Undo/Redo History ---
+    const historyStack = [];
+    let historyIndex = -1;
+    const recordHistory = () => {
+        const html = notesEditor.innerHTML;
+        if (historyStack[historyIndex] !== html) {
+            historyStack.splice(historyIndex + 1);
+            historyStack.push(html);
+            if (historyStack.length > 100) {
+                historyStack.shift();
+            }
+            historyIndex = historyStack.length - 1;
+        }
+    };
+    const undoAction = () => {
+        if (historyIndex > 0) {
+            historyIndex--;
+            notesEditor.innerHTML = historyStack[historyIndex];
+        }
+    };
+    const redoAction = () => {
+        if (historyIndex < historyStack.length - 1) {
+            historyIndex++;
+            notesEditor.innerHTML = historyStack[historyIndex];
+        }
+    };
+    notesEditor.addEventListener('input', recordHistory);
+    notesEditor.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) {
+                redoAction();
+            } else {
+                undoAction();
+            }
+        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+            e.preventDefault();
+            redoAction();
+        }
+    });
+
     // References modal elements
     const referencesModal = getElem('references-modal');
     const referencesEditor = getElem('references-editor');
@@ -808,6 +849,33 @@ document.addEventListener('DOMContentLoaded', function () {
         subNoteToolbar.appendChild(createSNButton('Superíndice', 'X²', 'superscript'));
         // Clear formatting
         subNoteToolbar.appendChild(createSNButton('Limpiar formato', '❌', null, null, clearFormattingSN));
+        // Font family selector
+        const selectSNFont = document.createElement('select');
+        selectSNFont.className = 'toolbar-select';
+        selectSNFont.title = 'Fuente';
+        const fontSNPlaceholder = document.createElement('option');
+        fontSNPlaceholder.value = "";
+        fontSNPlaceholder.textContent = 'Fuente';
+        fontSNPlaceholder.disabled = true;
+        fontSNPlaceholder.selected = true;
+        selectSNFont.appendChild(fontSNPlaceholder);
+        const fontsSN = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
+        fontsSN.forEach(f => {
+            const opt = document.createElement('option');
+            opt.value = f;
+            opt.textContent = f;
+            opt.style.fontFamily = f;
+            selectSNFont.appendChild(opt);
+        });
+        selectSNFont.addEventListener('change', () => {
+            if (selectSNFont.value) {
+                document.execCommand('fontName', false, selectSNFont.value);
+                selectSNFont.selectedIndex = 0;
+                subNoteEditor.focus();
+            }
+        });
+        subNoteToolbar.appendChild(selectSNFont);
+
         // Font size selector
         const selectSNSize = document.createElement('select');
         selectSNSize.className = 'toolbar-select';
@@ -968,6 +1036,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             });
+            recordHistory();
         };
         const typeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-type w-4 h-4"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>`;
         const highlighterIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-highlighter w-4 h-4"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>`;
@@ -979,8 +1048,36 @@ document.addEventListener('DOMContentLoaded', function () {
         subNoteToolbar.appendChild(subLineHighlightPalette);
         // Highlight size dropdown
         subNoteToolbar.appendChild(createSNHighlightSizeDropdown());
-        // Horizontal rule
-        subNoteToolbar.appendChild(createSNButton('Insertar línea separadora', '—', 'insertHorizontalRule'));
+        // Horizontal rule options
+        const lineDropdownSN = document.createElement('div');
+        lineDropdownSN.className = 'symbol-dropdown';
+        const lineBtnSN = createSNButton('Insertar línea separadora', '—', null, null, null);
+        lineDropdownSN.appendChild(lineBtnSN);
+        const lineContentSN = document.createElement('div');
+        lineContentSN.className = 'symbol-dropdown-content flex-dropdown';
+        lineContentSN.style.minWidth = '80px';
+        ['solid','dotted','dashed'].forEach(style => {
+            const b = document.createElement('button');
+            b.className = 'toolbar-btn';
+            b.innerHTML = `<div style="border-top:1px ${style} var(--text-primary); width:40px;"></div>`;
+            b.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.execCommand('insertHTML', false, `<hr class="hr-${style}">`);
+                lineContentSN.classList.remove('visible');
+                subNoteEditor.focus();
+            });
+            lineContentSN.appendChild(b);
+        });
+        lineDropdownSN.appendChild(lineContentSN);
+        lineBtnSN.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                if (d !== lineContentSN) d.classList.remove('visible');
+            });
+            lineContentSN.classList.toggle('visible');
+        });
+        subNoteToolbar.appendChild(lineDropdownSN);
         subNoteToolbar.appendChild(createSNSeparator());
         // Indent/outdent
         // Indent/outdent
@@ -2048,6 +2145,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
             draggedBlock = null;
+            recordHistory();
         };
 
         const enableBlockDragging = () => {
@@ -2058,6 +2156,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 block.setAttribute('draggable', 'true');
                 block.style.cursor = 'move';
             });
+            recordHistory();
         };
 
         const disableBlockDragging = () => {
@@ -2153,6 +2252,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             });
+            recordHistory();
         };
 
         /**
@@ -2177,6 +2277,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (currentClass) block.classList.remove(currentClass);
                 level = Math.max(0, Math.min(5, level + 1));
                 if (level > 0) block.classList.add(`indent-${level}`);
+                recordHistory();
             }
         };
 
@@ -2195,6 +2296,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (currentClass) block.classList.remove(currentClass);
                 level = Math.max(0, Math.min(5, level - 1));
                 if (level > 0) block.classList.add(`indent-${level}`);
+                recordHistory();
             }
         };
 
@@ -2395,6 +2497,58 @@ document.addEventListener('DOMContentLoaded', function () {
             return dropdown;
         };
 
+        // Font family selector
+        const selectFont = document.createElement('select');
+        selectFont.className = 'toolbar-select';
+        selectFont.title = 'Fuente';
+        const fontPlaceholder = document.createElement('option');
+        fontPlaceholder.value = "";
+        fontPlaceholder.textContent = 'Fuente';
+        fontPlaceholder.disabled = true;
+        fontPlaceholder.selected = true;
+        selectFont.appendChild(fontPlaceholder);
+        const fonts = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
+        fonts.forEach(f => {
+            const opt = document.createElement('option');
+            opt.value = f;
+            opt.textContent = f;
+            opt.style.fontFamily = f;
+            selectFont.appendChild(opt);
+        });
+        selectFont.addEventListener('change', () => {
+            if (selectFont.value) {
+                document.execCommand('fontName', false, selectFont.value);
+                selectFont.selectedIndex = 0;
+                notesEditor.focus();
+            }
+        });
+        editorToolbar.appendChild(selectFont);
+
+        // Zoom selector
+        const selectZoom = document.createElement('select');
+        selectZoom.className = 'toolbar-select';
+        selectZoom.title = 'Zoom';
+        const zoomPlaceholder = document.createElement('option');
+        zoomPlaceholder.value = "";
+        zoomPlaceholder.textContent = 'Zoom';
+        zoomPlaceholder.disabled = true;
+        zoomPlaceholder.selected = true;
+        selectZoom.appendChild(zoomPlaceholder);
+        [50,60,75,80,90,100,110,120,130,150].forEach(level => {
+            const opt = document.createElement('option');
+            opt.value = (level/100).toString();
+            opt.textContent = `${level}%`;
+            selectZoom.appendChild(opt);
+        });
+        selectZoom.addEventListener('change', () => {
+            if (selectZoom.value) {
+                notesEditor.style.zoom = selectZoom.value;
+                selectZoom.selectedIndex = 0;
+                notesEditor.focus();
+            }
+        });
+        editorToolbar.appendChild(selectZoom);
+
         // Font size selector
         const selectSize = document.createElement('select');
         selectSize.className = 'toolbar-select';
@@ -2494,8 +2648,8 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createButton('Subrayado', '<u>U</u>', 'underline'));
         editorToolbar.appendChild(createButton('Tachado', '<s>S</s>', 'strikeThrough'));
         editorToolbar.appendChild(createButton('Superíndice', 'X²', 'superscript'));
-        editorToolbar.appendChild(createButton('Deshacer', '↺', 'undo'));
-        editorToolbar.appendChild(createButton('Rehacer', '↻', 'redo'));
+        editorToolbar.appendChild(createButton('Deshacer', '↺', null, null, undoAction));
+        editorToolbar.appendChild(createButton('Rehacer', '↻', null, null, redoAction));
 
         editorToolbar.appendChild(createButton('Limpiar formato', '❌', null, null, clearFormatting));
 
@@ -2616,8 +2770,36 @@ document.addEventListener('DOMContentLoaded', function () {
         
         editorToolbar.appendChild(createHighlightSizeDropdown());
 
-        const hrBtn = createButton('Insertar línea separadora', '—', 'insertHorizontalRule');
-        editorToolbar.appendChild(hrBtn);
+        const lineDropdown = document.createElement('div');
+        lineDropdown.className = 'symbol-dropdown';
+        const lineBtn = createButton('Insertar línea separadora', '—', null, null, null);
+        lineDropdown.appendChild(lineBtn);
+        const lineContent = document.createElement('div');
+        lineContent.className = 'symbol-dropdown-content flex-dropdown';
+        lineContent.style.minWidth = '80px';
+        const lineStyles = ['solid', 'dotted', 'dashed'];
+        lineStyles.forEach(style => {
+            const btn = document.createElement('button');
+            btn.className = 'toolbar-btn';
+            btn.innerHTML = `<div style="border-top:1px ${style} var(--text-primary); width:40px;"></div>`;
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.execCommand('insertHTML', false, `<hr class="hr-${style}">`);
+                lineContent.classList.remove('visible');
+                notesEditor.focus();
+            });
+            lineContent.appendChild(btn);
+        });
+        lineDropdown.appendChild(lineContent);
+        lineBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                if (d !== lineContent) d.classList.remove('visible');
+            });
+            lineContent.classList.toggle('visible');
+        });
+        editorToolbar.appendChild(lineDropdown);
         editorToolbar.appendChild(createSeparator());
 
         const outdentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-decrease w-5 h-5"><polyline points="7 8 3 12 7 16"/><line x1="21" x2="3" y1="12" y2="12"/><line x1="21" x2="3" y1="6" y2="6"/><line x1="21" x2="3" y1="18" y2="18"/></svg>`;
@@ -2640,6 +2822,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 blank.innerHTML = '<br>';
                 first.parentNode.insertBefore(blank, first);
             }
+            recordHistory();
         };
 
         editorToolbar.appendChild(createButton('Insertar línea en blanco arriba', '⬆️⏎', null, null, insertBlankLineAbove));
@@ -3229,6 +3412,7 @@ document.addEventListener('DOMContentLoaded', function () {
             updateAllTotals();
             updateSectionHeaderCounts();
             filterTable();
+            recordHistory();
         }
     }
 
