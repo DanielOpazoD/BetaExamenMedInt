@@ -855,6 +855,32 @@ table.resizable-table .table-resize-handle {
             #print-index {
                 page-break-after: always;
             }
+
+            /* Asegura que las tablas se puedan partir entre páginas */
+            .resizable-table {
+                display: table !important;            /* nunca inline-block */
+                width: auto !important;
+                max-width: 100% !important;
+                overflow: visible !important;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
+            }
+
+            /* Permite que la tabla se parta pero evita partir una fila por la mitad */
+            .resizable-table tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+
+            /* Cualquier wrapper “resizable” */
+            .indent-2, .note-resizable {
+                overflow: visible !important;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
+            }
+
+            /* Oculta manejadores de resize en la impresión */
+            .table-resize-handle { display: none !important; }
         }
 
 /* Note callout styles */
