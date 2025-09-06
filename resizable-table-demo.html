@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Demo Tablas Redimensionables</title>
+<link rel="stylesheet" href="resizable-table.css">
+</head>
+<body>
+<h2>Enfrentamiento de HTA Resistente (ESC 2024)</h2>
+<table class="resizable-table tabla-estandar indent-1">
+  <tr>
+    <td>Medidas</td>
+    <td>Detalles</td>
+  </tr>
+  <tr>
+    <td>
+      <ul>
+        <li>Confirmar adherencia</li>
+        <li>Ajustar terapia</li>
+        <li>Evaluar causas secundarias</li>
+      </ul>
+    </td>
+    <td>Recordar seguimiento cercano.</td>
+  </tr>
+</table>
+
+<h2>Otras definiciones (ESC 2024)</h2>
+<table class="resizable-table tabla-estandar indent-2">
+  <tr>
+    <td>Término</td>
+    <td>Definición</td>
+  </tr>
+  <tr>
+    <td>HTA resistente</td>
+    <td>PA persistente &gt; 140/90 con &ge;3 fármacos.</td>
+  </tr>
+  <tr>
+    <td>HTA refractaria</td>
+    <td>PA no controlada con &ge;5 fármacos.</td>
+  </tr>
+</table>
+
+<h2>Grupos / Causas / Frecuencia</h2>
+<table class="resizable-table tabla-estandar">
+  <tr>
+    <td>Grupo</td>
+    <td>Causa</td>
+    <td>Frecuencia</td>
+  </tr>
+  <tr>
+    <td rowspan="2">Primario</td>
+    <td class="highlight">Hiperaldosteronismo</td>
+    <td>10%</td>
+  </tr>
+  <tr>
+    <td>Falla renal crónica</td>
+    <td>5%</td>
+  </tr>
+  <tr>
+    <td>Secundario</td>
+    <td class="highlight">Estenosis de arteria renal</td>
+    <td>2%</td>
+  </tr>
+</table>
+
+<script src="resizable-table.js"></script>
+<script>
+initResizableTables();
+</script>
+</body>
+</html>
