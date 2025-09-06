@@ -1251,6 +1251,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeStatusFilter = 'all';
     let activeNoteIcon = null;
     let selectedImageForResize = null;
+    let selectedTableForMove = null;
     let saveTimeout;
     let activeReferencesCell = null;
     let activeIconPickerButton = null;
@@ -3070,6 +3071,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const resizeMinusBtn = createButton('Disminuir tamaño de imagen (-10%)', '➖', null, null, () => resizeSelectedImage(0.9));
         editorToolbar.appendChild(resizeMinusBtn);
 
+        const moveLeftBtn = createButton('Mover imagen/tabla a la izquierda', '⬅️', null, null, () => moveSelectedElement(-10));
+        editorToolbar.appendChild(moveLeftBtn);
+
+        const moveRightBtn = createButton('Mover imagen/tabla a la derecha', '➡️', null, null, () => moveSelectedElement(10));
+        editorToolbar.appendChild(moveRightBtn);
+
         // Eliminamos el botón de inserción de tablas y el separador asociado
 
         // Print/Save
@@ -3191,6 +3198,20 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             showAlert("Por favor, selecciona una imagen primero para cambiar su tamaño.");
         }
+    }
+
+    function moveSelectedElement(deltaX) {
+        let elem = selectedImageForResize || selectedTableForMove;
+        if (elem && elem.tagName === 'IMG') {
+            const fig = elem.closest('figure.float-image');
+            if (fig) elem = fig;
+        }
+        if (!elem) {
+            showAlert("Selecciona una imagen o tabla para moverla.");
+            return;
+        }
+        const current = parseFloat(elem.style.marginLeft) || 0;
+        elem.style.marginLeft = `${current + deltaX}px`;
     }
 
     function updateAllTotals() {
@@ -5188,6 +5209,17 @@ document.addEventListener('DOMContentLoaded', function () {
              } else {
                  document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
                  selectedImageForResize = null;
+             }
+
+             // Handle table selection
+             const tbl = e.target.closest('table');
+             if (tbl && notesEditor.contains(tbl)) {
+                 notesEditor.querySelectorAll('table').forEach(t => t.classList.remove('selected-for-move'));
+                 tbl.classList.add('selected-for-move');
+                 selectedTableForMove = tbl;
+             } else {
+                 notesEditor.querySelectorAll('table').forEach(t => t.classList.remove('selected-for-move'));
+                 selectedTableForMove = null;
              }
 
              // Handle gallery link clicks
