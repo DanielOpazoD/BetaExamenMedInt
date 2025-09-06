@@ -83,6 +83,18 @@ export function setupAdvancedEditing(editor) {
   }
 
   let dragLine = null;
+  editor.addEventListener('mousedown', e => {
+    if (e.altKey) return;
+    const line = e.target.closest('p');
+    if (e.ctrlKey && line) {
+      line.setAttribute('draggable', 'true');
+    } else {
+      editor.querySelectorAll('p[draggable="true"]').forEach(p => p.setAttribute('draggable', 'false'));
+    }
+  });
+  editor.addEventListener('mouseup', () => {
+    editor.querySelectorAll('p[draggable="true"]').forEach(p => p.setAttribute('draggable', 'false'));
+  });
   editor.addEventListener('dragstart', e => {
     const line = e.target.closest('p');
     if (!line) return;
@@ -102,10 +114,10 @@ export function setupAdvancedEditing(editor) {
     dragLine = null;
   });
 
-  editor.querySelectorAll('p').forEach(p => p.setAttribute('draggable', 'true'));
+  editor.querySelectorAll('p').forEach(p => p.setAttribute('draggable', 'false'));
   const observer = new MutationObserver(() => {
     editor.querySelectorAll('p').forEach(p => {
-      if (!p.getAttribute('draggable')) p.setAttribute('draggable', 'true');
+      if (!p.getAttribute('draggable')) p.setAttribute('draggable', 'false');
     });
   });
   observer.observe(editor, { childList: true, subtree: true });
