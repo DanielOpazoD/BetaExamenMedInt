@@ -107,7 +107,7 @@
         
         .notes-modal-content { max-width: 900px; height: 95vh; max-height: 95vh; padding: 0; }
 
-        .notes-modal-content.fullscreen { max-width: 100vw; width: 100vw; height: 95vh; background: #fff; }
+        .notes-modal-content.fullscreen { max-width: 100vw; width: 100vw; height: 95vh; background: #F8FBFD; }
         .notes-modal-content.fullscreen #notes-side-panel,
         .notes-modal-content.fullscreen .resizer-e-panel { display: none; }
         .notes-modal-content.fullscreen #notes-main-content { flex: 0 0 auto; }
@@ -160,14 +160,19 @@
             border-top-left-radius: 0.5rem;
             border-top-right-radius: 0.5rem;
             display: flex;
-            flex-wrap: wrap; 
+            flex-wrap: wrap;
             align-items: center;
             gap: 1px;
+        }
+        .editor-toolbar .toolbar-select {
+            max-width: 90px;
+            font-size: 0.75rem;
         }
         #notes-editor { border: 1px solid var(--border-color); padding: 12px; flex-grow: 1; overflow-y: auto; border-bottom-left-radius: 0.5rem; border-bottom-right-radius: 0.5rem; line-height: 1.6; background-color: var(--bg-secondary); }
         #notes-editor:focus { outline: none; }
         #notes-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; cursor: pointer; }
         #notes-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
+        #notes-editor table.selected-for-move { outline: 2px solid var(--btn-primary-bg); }
 
         /* Display multiple images in a row */
         #notes-editor .image-row {
