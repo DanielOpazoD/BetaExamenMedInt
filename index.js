@@ -8,6 +8,7 @@
 // inline IndexedDB implementation and keeps the rest of the code unchanged.
 import db from './db.js';
 import { makeTableResizable } from './table-resize.js';
+import { enableTableColumnSelection } from './table-column-select.js';
 import { setupAdvancedSearchReplace } from './search-replace.js';
 import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
@@ -4069,6 +4070,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (table.dataset.resizableInitialized === 'true') return;
         table.classList.add('resizable-table');
         makeTableResizable(table);
+        enableTableColumnSelection(table);
         table.dataset.resizableInitialized = 'true';
     }
 
