@@ -112,7 +112,7 @@
         .notes-modal-content.fullscreen .resizer-e-panel { display: none; }
         .notes-modal-content.fullscreen #notes-main-content { flex: 0 0 auto; }
         .notes-modal-content.fullscreen #notes-editor {
-            background: #F8FBFD;
+            background: #fff;
             border: 1px solid var(--border-color);
         }
 
