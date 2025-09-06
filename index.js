@@ -468,6 +468,23 @@ document.addEventListener('DOMContentLoaded', function () {
     let defaultSuggestedIcons;
     let customIconsList;
     let globalSpecialChars;
+    let toolbarIcons;
+    const iconDropdownRenderers = [];
+    const charDropdownRenderers = [];
+
+    toolbarIcons = [
+        "💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️",
+        "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖",
+        "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊",
+        "🩸", "🧪", "🔬", "🩻", "🦠", "✔️", "✖️", "❔", "⭐", "📚", "📑",
+        "📊", "🔎", "📏", "o", "▪︎", "●", "○", "◆", "□", "🟠", "🟥",
+        "🟧", "🟨", "🟩", "🟦"
+    ];
+
+    globalSpecialChars = [
+        '∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖',
+        '➤','⇒','⮕','▸','▹','✦','✱','✪','✽','~'
+    ];
 
     // Multi-note panel elements
     const notesPanelToggle = getElem('notes-panel-toggle');
@@ -754,7 +771,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return group;
         };
 
-        const createSNSymbolDropdown = (symbols, title, icon) => {
+        const createSNSymbolDropdown = (symbols, title, icon, editHandler, isChar = false) => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
             const btn = document.createElement('button');
@@ -774,8 +791,21 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     content.appendChild(sBtn);
                 });
+                const editBtn = document.createElement('button');
+                editBtn.textContent = 'Editar';
+                editBtn.className = 'symbol-btn';
+                editBtn.addEventListener('click', () => {
+                    content.classList.remove('visible');
+                    if (editHandler) editHandler();
+                });
+                content.appendChild(editBtn);
             };
             renderSNSyms();
+            if (isChar) {
+                charDropdownRenderers.push(renderSNSyms);
+            } else {
+                iconDropdownRenderers.push(renderSNSyms);
+            }
             dropdown.appendChild(content);
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -1128,10 +1158,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
         subNoteToolbar.appendChild(createSNSeparator());
         // Symbols and special characters
-        const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
-        subNoteToolbar.appendChild(createSNSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
-        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
-        subNoteToolbar.appendChild(createSNSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
+        subNoteToolbar.appendChild(createSNSymbolDropdown(
+            toolbarIcons,
+            'Insertar Símbolo',
+            '📌',
+            () => {
+                renderIconManager();
+                showModal(iconManagerModal);
+            }
+        ));
+        subNoteToolbar.appendChild(createSNSymbolDropdown(
+            globalSpecialChars,
+            'Caracteres Especiales',
+            'Ω',
+            () => {
+                renderCharManager();
+                showModal(charManagerModal);
+            },
+            true
+        ));
         // Image from URL
         subNoteToolbar.appendChild(createSNButton('Insertar Imagen desde URL', '🖼️', null, null, () => {
             const url = prompt('Ingresa la URL de la imagen:');
@@ -1312,9 +1357,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderIconManager() {
         if (!currentIcons) return;
         currentIcons.innerHTML = '';
-        // Merge default and custom icons; duplicates are not filtered.
-        const icons = EMOJI_CATEGORIES['Sugeridos'];
-        icons.forEach((icon, index) => {
+        toolbarIcons.forEach((icon, index) => {
             const wrapper = document.createElement('div');
             wrapper.className = 'relative inline-flex items-center justify-center m-1';
             const span = document.createElement('span');
@@ -1327,16 +1370,9 @@ document.addEventListener('DOMContentLoaded', function () {
             delBtn.className = 'absolute -top-1 -right-1 text-red-500 text-xs';
             delBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                // Remove this icon from the list
-                EMOJI_CATEGORIES['Sugeridos'].splice(index, 1);
+                toolbarIcons.splice(index, 1);
                 renderIconManager();
-                // If the removed icon came from customIconsList, also remove it there
-                const customIndex = customIconsList.indexOf(icon);
-                if (customIndex > -1) customIconsList.splice(customIndex, 1);
-                // Refresh the emoji grid if we are currently on the suggested tab
-                if (selectedIconCategory === 'Sugeridos') {
-                    loadEmojisForCategory('Sugeridos');
-                }
+                iconDropdownRenderers.forEach(fn => fn());
             });
             wrapper.appendChild(delBtn);
             currentIcons.appendChild(wrapper);
@@ -1367,6 +1403,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 e.stopPropagation();
                 globalSpecialChars.splice(index, 1);
                 renderCharManager();
+                charDropdownRenderers.forEach(fn => fn());
             });
             wrapper.appendChild(delBtn);
             currentChars.appendChild(wrapper);
@@ -1376,8 +1413,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // Open icon manager modal
     if (openIconManagerBtn) {
         openIconManagerBtn.addEventListener('click', () => {
-            // Ensure the combined list includes custom icons appended to the default
-            EMOJI_CATEGORIES['Sugeridos'] = defaultSuggestedIcons.concat(customIconsList);
             renderIconManager();
             showModal(iconManagerModal);
         });
@@ -1386,10 +1421,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (closeIconManagerBtn) {
         closeIconManagerBtn.addEventListener('click', () => {
             hideModal(iconManagerModal);
-            // Update the picker if the suggested tab is active
-            if (selectedIconCategory === 'Sugeridos') {
-                loadEmojisForCategory('Sugeridos');
-            }
+            iconDropdownRenderers.forEach(fn => fn());
         });
     }
     // Add new icon from manager
@@ -1397,15 +1429,10 @@ document.addEventListener('DOMContentLoaded', function () {
         addNewIconBtn.addEventListener('click', () => {
             const val = newIconInputManager.value.trim();
             if (!val) return;
-            // Push into custom list and update suggested list
-            customIconsList.push(val);
-            EMOJI_CATEGORIES['Sugeridos'] = defaultSuggestedIcons.concat(customIconsList);
+            toolbarIcons.push(val);
             newIconInputManager.value = '';
             renderIconManager();
-            // Refresh the emoji grid if needed
-            if (selectedIconCategory === 'Sugeridos') {
-                loadEmojisForCategory('Sugeridos');
-            }
+            iconDropdownRenderers.forEach(fn => fn());
         });
     }
 
@@ -1421,7 +1448,10 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
     if (closeCharManagerBtn) {
-        closeCharManagerBtn.addEventListener('click', () => hideModal(charManagerModal));
+        closeCharManagerBtn.addEventListener('click', () => {
+            hideModal(charManagerModal);
+            charDropdownRenderers.forEach(fn => fn());
+        });
     }
     if (addNewCharBtn) {
         addNewCharBtn.addEventListener('click', () => {
@@ -1430,6 +1460,7 @@ document.addEventListener('DOMContentLoaded', function () {
             globalSpecialChars.push(val);
             newCharInputManager.value = '';
             renderCharManager();
+            charDropdownRenderers.forEach(fn => fn());
         });
     }
 
@@ -1888,7 +1919,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // were declared earlier with let.
     defaultSuggestedIcons = Array.isArray(EMOJI_CATEGORIES['Sugeridos']) ? [...EMOJI_CATEGORIES['Sugeridos']] : [];
     customIconsList = [];
-    globalSpecialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
     
     // --- Core Logic Functions ---
 
@@ -2490,7 +2520,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return group;
         };
 
-        const createSymbolDropdown = (symbols, title, icon) => {
+        const createSymbolDropdown = (symbols, title, icon, editHandler, isChar = false) => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
             const btn = document.createElement('button');
@@ -2513,8 +2543,21 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     content.appendChild(symBtn);
                 });
+                const editBtn = document.createElement('button');
+                editBtn.textContent = 'Editar';
+                editBtn.className = 'symbol-btn';
+                editBtn.addEventListener('click', () => {
+                    content.classList.remove('visible');
+                    if (editHandler) editHandler();
+                });
+                content.appendChild(editBtn);
             };
             renderSymbols();
+            if (isChar) {
+                charDropdownRenderers.push(renderSymbols);
+            } else {
+                iconDropdownRenderers.push(renderSymbols);
+            }
             dropdown.appendChild(content);
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -3090,11 +3133,26 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createSeparator());
 
         // Symbols
-        const symbols = ["💡", "⚠️", "📌", "📍", "✴️", "🟢", "🟡", "🔴", "✅", "☑️", "❌", "➡️", "⬅️", "➔", "👉", "↳", "▪️", "▫️", "🔵", "🔹", "🔸", "➕", "➖", "📂", "📄", "📝", "📋", "📎", "🔑", "📈", "📉", "🩺", "💉", "💊", "🩸", "🧪", "🔬", "🩻", "🦠"];
-        editorToolbar.appendChild(createSymbolDropdown(symbols, 'Insertar Símbolo', '📌'));
+        editorToolbar.appendChild(createSymbolDropdown(
+            toolbarIcons,
+            'Insertar Símbolo',
+            '📌',
+            () => {
+                renderIconManager();
+                showModal(iconManagerModal);
+            }
+        ));
 
-        const specialChars = ['∞','±','≈','•','‣','↑','↓','→','←','↔','⇧','⇩','⇨','⇦','↗','↘','↙','↖'];
-        editorToolbar.appendChild(createSymbolDropdown(specialChars, 'Caracteres Especiales', 'Ω'));
+        editorToolbar.appendChild(createSymbolDropdown(
+            globalSpecialChars,
+            'Caracteres Especiales',
+            'Ω',
+            () => {
+                renderCharManager();
+                showModal(charManagerModal);
+            },
+            true
+        ));
     }
 
     function rgbToHex(rgb) {
