@@ -114,10 +114,6 @@
         .notes-modal-content.fullscreen #notes-editor {
             background: #fff;
             border: 1px solid var(--border-color);
-            background-image:
-                linear-gradient(to right, var(--border-color) 1px, transparent 1px),
-                linear-gradient(to bottom, var(--border-color) 1px, transparent 1px);
-            background-size: 20px 20px;
         }
 
         #subnote-modal .notes-modal-content {
