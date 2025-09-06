@@ -411,6 +411,20 @@ table.resizable-table .table-resize-handle {
     box-sizing: border-box;
 }
 
+table.resizable-table .col-select-btn {
+    position: absolute;
+    top: -18px;
+    width: 16px;
+    height: 16px;
+    line-height: 14px;
+    font-size: 12px;
+    background: #f0f0f0;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    display: none;
+    text-align: center;
+}
+
 /* Floating image styles */
 .float-image {
     display: block;

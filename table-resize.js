@@ -6,6 +6,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   let startSize = 0;
   let startWidth = 0;
   let startHeight = 0;
+  let hoverColIndex = -1;
 
   table.style.position = 'relative';
   const handle = document.createElement('div');
@@ -16,9 +17,18 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
     table.style.cursor = 'se-resize';
   });
 
-  table.addEventListener('mousemove', onHover);
+  const colBtn = document.createElement('button');
+  colBtn.className = 'col-select-btn';
+  colBtn.textContent = '\u25BC';
+  table.appendChild(colBtn);
+
+  table.addEventListener('mousemove', onMove);
+  table.addEventListener('mouseleave', hideColBtn);
   table.addEventListener('mousedown', startResize);
   handle.addEventListener('mousedown', startTableResize);
+  colBtn.addEventListener('click', () => {
+    if (hoverColIndex > -1) selectColumn(hoverColIndex);
+  });
   document.addEventListener('mousemove', onDrag);
   document.addEventListener('mouseup', stopResize);
   document.addEventListener('keydown', cancelOnEsc);
@@ -39,6 +49,25 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
     } else {
       table.style.cursor = '';
       hoverEdge = null;
+    }
+  }
+
+  function onMove(e) {
+    onHover(e);
+    if (activeResize) return;
+    const rect = table.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (y <= 6) {
+      const col = findColIndex(x);
+      if (col > -1) {
+        hoverColIndex = col;
+        showColBtn(col);
+      } else {
+        hideColBtn();
+      }
+    } else {
+      hideColBtn();
     }
   }
 
@@ -115,6 +144,18 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
     return -1;
   }
 
+  function findColIndex(x) {
+    let left = 0;
+    const row = table.rows[0];
+    if (!row) return -1;
+    for (let i = 0; i < row.cells.length; i++) {
+      const width = row.cells[i].offsetWidth;
+      if (x >= left && x <= left + width) return i;
+      left += width;
+    }
+    return -1;
+  }
+
   function findRowEdge(y) {
     let top = 0;
     for (let i = 0; i < table.rows.length; i++) {
@@ -127,6 +168,16 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   function getColWidth(index) {
     const cell = table.rows[0]?.cells[index];
     return cell ? cell.offsetWidth : 0;
+  }
+
+  function getColLeft(index) {
+    let left = 0;
+    const row = table.rows[0];
+    if (!row) return 0;
+    for (let i = 0; i < index; i++) {
+      left += row.cells[i].offsetWidth;
+    }
+    return left;
   }
 
   function setColWidth(index, width) {
@@ -144,5 +195,30 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   function setRowHeight(index, height) {
     const row = table.rows[index];
     if (row) row.style.height = height + 'px';
+  }
+
+  function showColBtn(index) {
+    const left = getColLeft(index);
+    const width = getColWidth(index);
+    colBtn.style.left = left + width / 2 - 8 + 'px';
+    colBtn.style.display = 'block';
+  }
+
+  function hideColBtn() {
+    colBtn.style.display = 'none';
+    hoverColIndex = -1;
+  }
+
+  function selectColumn(index) {
+    const first = table.rows[0]?.cells[index];
+    const lastRow = table.rows[table.rows.length - 1];
+    const last = lastRow ? lastRow.cells[index] : null;
+    if (!first || !last) return;
+    const range = document.createRange();
+    range.setStartBefore(first);
+    range.setEndAfter(last);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
   }
 }
