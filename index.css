@@ -62,6 +62,19 @@
             --section-header-text: #f3f4f6;
         }
 
+        html[data-theme="pastel"] {
+            --header-bg: #fbcfe8;
+            --section-header-bg: linear-gradient(to right, #fce7f3, #fbcfe8);
+            --section-header-text: #831843;
+            --btn-primary-bg: #f472b6;
+        }
+        html[data-theme="pastel"].dark {
+            --header-bg: #9d174d;
+            --section-header-bg: linear-gradient(to right, #831843, #9d174d);
+            --section-header-text: #fce7f3;
+            --btn-primary-bg: #be185d;
+        }
+
 
         body { font-family: 'San Francisco', 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); }
 
