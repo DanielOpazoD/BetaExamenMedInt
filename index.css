@@ -107,6 +107,11 @@
         
         .notes-modal-content { max-width: 900px; height: 95vh; max-height: 95vh; padding: 0; }
 
+        .notes-modal-content.fullscreen { max-width: 100vw; width: 100vw; height: 95vh; }
+        .notes-modal-content.fullscreen #notes-side-panel,
+        .notes-modal-content.fullscreen .resizer-e-panel { display: none; }
+        .notes-modal-content.fullscreen #notes-main-content { flex: 1; }
+
         #subnote-modal .notes-modal-content {
             padding: 1rem;
         }
