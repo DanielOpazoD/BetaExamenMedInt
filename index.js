@@ -524,8 +524,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const subNoteTitle = getElem('subnote-title');
     const subNoteEditor = getElem('subnote-editor');
     const toggleHtmlPasteBtn = getElem('toggle-html-paste-btn');
+    const blockDragBtn = getElem('toggle-block-drag-btn');
+    const toggleFullwidthBtn = getElem('toggle-fullwidth-btn');
+    const notesModalContent = notesModal.querySelector('.notes-modal-content');
 
     let htmlPasteEnabled = false;
+    let fullWidthEnabled = false;
 
     function sanitizeHtml(html) {
         const div = document.createElement('div');
@@ -538,6 +542,14 @@ document.addEventListener('DOMContentLoaded', function () {
         toggleHtmlPasteBtn.addEventListener('click', () => {
             htmlPasteEnabled = !htmlPasteEnabled;
             toggleHtmlPasteBtn.classList.toggle('active', htmlPasteEnabled);
+        });
+    }
+
+    if (toggleFullwidthBtn && notesModalContent) {
+        toggleFullwidthBtn.addEventListener('click', () => {
+            fullWidthEnabled = !fullWidthEnabled;
+            toggleFullwidthBtn.classList.toggle('active', fullWidthEnabled);
+            notesModalContent.classList.toggle('full-width', fullWidthEnabled);
         });
     }
 
@@ -2172,7 +2184,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const toggleBlockDrag = () => {
             blockDragEnabled = !blockDragEnabled;
-            dragBtn.classList.toggle('active', blockDragEnabled);
+            if (blockDragBtn) blockDragBtn.classList.toggle('active', blockDragEnabled);
             if (blockDragEnabled) {
                 enableBlockDragging();
             } else {
@@ -2180,8 +2192,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
 
-        const dragBtn = createButton('Mover bloques', '✋', null, null, toggleBlockDrag);
-        editorToolbar.appendChild(dragBtn);
+        if (blockDragBtn) {
+            blockDragBtn.addEventListener('click', toggleBlockDrag);
+        }
 
         const adjustIndent = (delta, root) => {
             const sel = window.getSelection();
@@ -4057,9 +4070,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const currentTab = openNoteTabs.find(t => t.id === activeTabId);
         if (currentTab) currentTab.activeIndex = index;
-        
+
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
+        blockDragEnabled = false;
+        disableBlockDragging();
+        if (blockDragBtn) blockDragBtn.classList.remove('active');
         notesEditor.querySelectorAll('table').forEach(initTableResize);
 
         renderNotesList();

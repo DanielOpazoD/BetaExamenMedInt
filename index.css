@@ -106,6 +106,7 @@
         .modal-overlay.visible .modal-content { transform: translateY(0); }
         
         .notes-modal-content { max-width: 900px; height: 95vh; max-height: 95vh; padding: 0; }
+        .notes-modal-content.full-width { max-width: none; width: 95vw; }
 
         #subnote-modal .notes-modal-content {
             padding: 1rem;
@@ -291,6 +292,11 @@
         .toolbar-btn:hover { background-color: var(--bg-tertiary); }
         .toolbar-btn.active { background-color: var(--bg-tertiary); }
         .toolbar-btn.active:hover { background-color: var(--bg-tertiary); }
+        #toggle-block-drag-btn.active,
+        #toggle-fullwidth-btn.active {
+            background-color: var(--btn-primary-bg);
+            color: var(--btn-primary-text);
+        }
         .toolbar-select {
             font-size: 12px;
             background-color: var(--bg-secondary);
