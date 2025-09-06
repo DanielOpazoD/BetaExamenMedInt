@@ -102,6 +102,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const notesModalTitle = getElem('notes-modal-title');
     const notesEditor = getElem('notes-editor');
     const editorToolbar = notesModal.querySelector('.editor-toolbar');
+    const notesModalContent = notesModal.querySelector('.notes-modal-content');
     const saveNoteBtn = getElem('save-note-btn');
     const saveAndCloseNoteBtn = getElem('save-and-close-note-btn');
     const cancelNoteBtn = getElem('cancel-note-btn');
@@ -235,6 +236,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeTabId = null;
     let tabPosition = 'top';
     let blockDragEnabled = false;
+    let fullscreenEnabled = false;
+    let savedEditorWidth = 0;
     let draggedBlock = null;
 
     if (minimizeNoteBtn && restoreNoteBtn) {
@@ -524,6 +527,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const subNoteTitle = getElem('subnote-title');
     const subNoteEditor = getElem('subnote-editor');
     const toggleHtmlPasteBtn = getElem('toggle-html-paste-btn');
+    const dragBtn = getElem('toggle-block-drag-btn');
+    const fullscreenBtn = getElem('toggle-fullscreen-btn');
 
     let htmlPasteEnabled = false;
 
@@ -2172,7 +2177,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const toggleBlockDrag = () => {
             blockDragEnabled = !blockDragEnabled;
-            dragBtn.classList.toggle('active', blockDragEnabled);
+            dragBtn?.classList.toggle('active', blockDragEnabled);
             if (blockDragEnabled) {
                 enableBlockDragging();
             } else {
@@ -2180,8 +2185,46 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
 
-        const dragBtn = createButton('Mover bloques', '✋', null, null, toggleBlockDrag);
-        editorToolbar.appendChild(dragBtn);
+        const toggleFullscreen = () => {
+            if (!fullscreenEnabled) {
+                if (notesMainContent) {
+                    savedEditorWidth = notesMainContent.offsetWidth;
+                    notesMainContent.style.maxWidth = savedEditorWidth + 'px';
+                    notesMainContent.style.margin = '0 auto';
+                }
+            } else {
+                if (notesMainContent) {
+                    notesMainContent.style.maxWidth = '';
+                    notesMainContent.style.margin = '';
+                }
+            }
+            fullscreenEnabled = !fullscreenEnabled;
+            notesModalContent?.classList.toggle('fullscreen', fullscreenEnabled);
+            fullscreenBtn?.classList.toggle('active', fullscreenEnabled);
+        };
+
+        if (dragBtn) {
+            dragBtn.addEventListener('click', toggleBlockDrag);
+        }
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', toggleFullscreen);
+        }
+
+        const resetEditorModes = () => {
+            blockDragEnabled = false;
+            if (dragBtn) dragBtn.classList.remove('active');
+            disableBlockDragging();
+            fullscreenEnabled = false;
+            if (fullscreenBtn) fullscreenBtn.classList.remove('active');
+            if (notesModalContent) notesModalContent.classList.remove('fullscreen');
+            if (notesMainContent) {
+                notesMainContent.style.maxWidth = '';
+                notesMainContent.style.margin = '';
+            }
+            savedEditorWidth = 0;
+        };
+
+        resetEditorModes();
 
         const adjustIndent = (delta, root) => {
             const sel = window.getSelection();
@@ -3422,6 +3465,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function hideModal(modal) {
         modal.classList.remove('visible');
+        if (modal === notesModal) {
+            resetEditorModes();
+        }
     }
 
     function showAlert(message, title = "Aviso") {
