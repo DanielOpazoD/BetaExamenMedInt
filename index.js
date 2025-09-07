@@ -767,6 +767,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (d !== submenu) d.classList.remove('visible');
                 });
                 submenu.classList.toggle('visible');
+                if (submenu.classList.contains('visible')) {
+                    submenu.style.left = '0';
+                    submenu.style.right = 'auto';
+                    const menuRect = submenu.getBoundingClientRect();
+                    const containerRect = group.parentElement.getBoundingClientRect();
+                    if (menuRect.right > containerRect.right) {
+                        submenu.style.left = 'auto';
+                        submenu.style.right = '0';
+                    }
+                }
             });
             return group;
         };
@@ -2515,6 +2525,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (d !== submenu) d.classList.remove('visible');
                 });
                 submenu.classList.toggle('visible');
+                if (submenu.classList.contains('visible')) {
+                    submenu.style.left = '0';
+                    submenu.style.right = 'auto';
+                    const menuRect = submenu.getBoundingClientRect();
+                    const containerRect = group.parentElement.getBoundingClientRect();
+                    if (menuRect.right > containerRect.right) {
+                        submenu.style.left = 'auto';
+                        submenu.style.right = '0';
+                    }
+                }
             });
             
             return group;
@@ -4052,16 +4072,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function saveCurrentNote() {
+    function saveCurrentNote(index = activeNoteIndex) {
         if (!currentNoteRow || !currentNotesArray || currentNotesArray.length === 0) return;
-        
+        if (index < 0 || index >= currentNotesArray.length) return;
+
         const currentContent = notesEditor.innerHTML;
         const currentTitle = notesModalTitle.textContent.trim();
-        
+
         // Keep existing postits and quick note data
-        const existingPostits = currentNotesArray[activeNoteIndex].postits || {};
-        const existingQuickNote = currentNotesArray[activeNoteIndex].quickNote || '';
-        currentNotesArray[activeNoteIndex] = {
+        const existingPostits = currentNotesArray[index].postits || {};
+        const existingQuickNote = currentNotesArray[index].quickNote || '';
+        currentNotesArray[index] = {
             title: currentTitle,
             content: currentContent,
             lastEdited: new Date().toISOString(),
@@ -4169,6 +4190,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function loadNoteIntoEditor(index) {
+        if (index !== activeNoteIndex && currentNotesArray.length > 0) {
+            saveCurrentNote(activeNoteIndex);
+        }
         if (index < 0 || index >= currentNotesArray.length) {
             if (currentNotesArray.length === 0) {
                addNewNote(false);
@@ -4176,7 +4200,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             index = 0; // fallback to the first note
         }
-        
+
         activeNoteIndex = index;
         const note = currentNotesArray[index];
 
