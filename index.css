@@ -500,13 +500,14 @@ table.resizable-table .table-resize-handle {
         #notes-side-panel {
             width: 220px;
             flex-shrink: 0;
-            margin-left: 0;
             border-right: 1px solid var(--border-color);
-            transition: margin-left 0.3s ease-in-out;
+            transition: width 0.3s ease-in-out;
             position: relative;
+            overflow: hidden;
         }
         #notes-side-panel:not(.open) {
-            margin-left: calc(-100% - 1px);
+            width: 0;
+            border-right: none;
         }
         #notes-side-panel:not(.open) .resizer-e-panel {
             display: none;
