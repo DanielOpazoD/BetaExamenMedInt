@@ -101,6 +101,10 @@
         
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease; }
         .modal-overlay.visible { opacity: 1; visibility: visible; }
+
+        /* Ensure the HTML insertion dialog appears above other overlays,
+           particularly when editing sub-notes where multiple modals stack. */
+        #html-code-modal { z-index: 1100; }
         
         .modal-content { background: var(--modal-bg); color: var(--modal-text); padding: 1.5rem; border-radius: 0.5rem; width: 95%; box-shadow: 0 5px 15px rgba(0,0,0,0.3); transform: translateY(-20px); transition: transform 0.3s ease; display: flex; flex-direction: column; }
         .modal-overlay.visible .modal-content { transform: translateY(0); }
