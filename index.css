@@ -107,7 +107,7 @@
 
         #html-code-modal { z-index: 1100; }
         
-        .notes-modal-content { max-width: 900px; height: 95vh; max-height: 95vh; padding: 0; }
+        .notes-modal-content { max-width: 900px; height: 95vh; max-height: 95vh; padding: 0; overflow: visible; }
 
         .notes-modal-content.fullscreen { max-width: 100vw; width: 100vw; height: 95vh; background: #F8FBFD; }
         .notes-modal-content.fullscreen #notes-side-panel,
