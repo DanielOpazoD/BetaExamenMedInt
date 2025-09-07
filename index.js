@@ -767,6 +767,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (d !== submenu) d.classList.remove('visible');
                 });
                 submenu.classList.toggle('visible');
+                if (submenu.classList.contains('visible')) {
+                    submenu.style.left = '0';
+                    submenu.style.right = 'auto';
+                    const rect = submenu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        submenu.style.left = 'auto';
+                        submenu.style.right = '0';
+                    }
+                }
             });
             return group;
         };
@@ -2199,9 +2208,9 @@ document.addEventListener('DOMContentLoaded', function () {
             notesEditor.removeEventListener('dragstart', onDragStart);
             notesEditor.removeEventListener('dragover', onDragOver);
             notesEditor.removeEventListener('drop', onDrop);
-            notesEditor.querySelectorAll(blockSelector).forEach(block => {
-                block.removeAttribute('draggable');
-                block.style.cursor = '';
+            notesEditor.querySelectorAll('[draggable="true"]').forEach(el => {
+                el.removeAttribute('draggable');
+                el.style.cursor = '';
             });
             draggedBlock = null;
         };
@@ -2515,8 +2524,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (d !== submenu) d.classList.remove('visible');
                 });
                 submenu.classList.toggle('visible');
+                if (submenu.classList.contains('visible')) {
+                    submenu.style.left = '0';
+                    submenu.style.right = 'auto';
+                    const rect = submenu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        submenu.style.left = 'auto';
+                        submenu.style.right = '0';
+                    }
+                }
             });
-            
+
             return group;
         };
 
