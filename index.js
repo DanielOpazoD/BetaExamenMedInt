@@ -767,6 +767,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (d !== submenu) d.classList.remove('visible');
                 });
                 submenu.classList.toggle('visible');
+                if (submenu.classList.contains('visible')) {
+                    // Reset positioning then measure to avoid clipping at viewport edges
+                    submenu.style.left = '0';
+                    submenu.style.right = 'auto';
+                    const rect = submenu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        submenu.style.left = 'auto';
+                        submenu.style.right = '0';
+                    }
+                }
             });
             return group;
         };
@@ -2515,6 +2525,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (d !== submenu) d.classList.remove('visible');
                 });
                 submenu.classList.toggle('visible');
+                if (submenu.classList.contains('visible')) {
+                    submenu.style.left = '0';
+                    submenu.style.right = 'auto';
+                    const rect = submenu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        submenu.style.left = 'auto';
+                        submenu.style.right = '0';
+                    }
+                }
             });
             
             return group;
@@ -4055,6 +4074,10 @@ document.addEventListener('DOMContentLoaded', function () {
     function saveCurrentNote() {
         if (!currentNoteRow || !currentNotesArray || currentNotesArray.length === 0) return;
         
+        notesEditor.querySelectorAll('[draggable]').forEach(el => {
+            el.removeAttribute('draggable');
+            if (el.style.cursor === 'move') el.style.cursor = '';
+        });
         const currentContent = notesEditor.innerHTML;
         const currentTitle = notesModalTitle.textContent.trim();
         
@@ -4185,6 +4208,10 @@ document.addEventListener('DOMContentLoaded', function () {
         
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
+        notesEditor.querySelectorAll('[draggable]').forEach(el => {
+            el.removeAttribute('draggable');
+            if (el.style.cursor === 'move') el.style.cursor = '';
+        });
         notesEditor.querySelectorAll('table').forEach(initTableResize);
 
         renderNotesList();
