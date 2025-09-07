@@ -237,7 +237,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let tabPosition = 'top';
     let blockDragEnabled = false;
     let fullscreenEnabled = false;
-    let savedEditorWidth = 0;
     let draggedBlock = null;
 
     if (minimizeNoteBtn && restoreNoteBtn) {
@@ -767,6 +766,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (d !== submenu) d.classList.remove('visible');
                 });
                 submenu.classList.toggle('visible');
+                if (submenu.classList.contains('visible')) {
+                    submenu.style.left = '0';
+                    submenu.style.right = 'auto';
+                    const rect = submenu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        submenu.style.left = 'auto';
+                        submenu.style.right = '0';
+                    }
+                }
             });
             return group;
         };
@@ -2199,9 +2207,9 @@ document.addEventListener('DOMContentLoaded', function () {
             notesEditor.removeEventListener('dragstart', onDragStart);
             notesEditor.removeEventListener('dragover', onDragOver);
             notesEditor.removeEventListener('drop', onDrop);
-            notesEditor.querySelectorAll(blockSelector).forEach(block => {
-                block.removeAttribute('draggable');
-                block.style.cursor = '';
+            notesEditor.querySelectorAll('[draggable="true"]').forEach(el => {
+                el.removeAttribute('draggable');
+                el.style.cursor = '';
             });
             draggedBlock = null;
         };
@@ -2217,19 +2225,11 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         const toggleFullscreen = () => {
-            if (!fullscreenEnabled) {
-                if (notesMainContent) {
-                    savedEditorWidth = notesMainContent.offsetWidth;
-                    notesMainContent.style.maxWidth = savedEditorWidth + 'px';
-                    notesMainContent.style.margin = '0 auto';
-                }
-            } else {
-                if (notesMainContent) {
-                    notesMainContent.style.maxWidth = '';
-                    notesMainContent.style.margin = '';
-                }
-            }
             fullscreenEnabled = !fullscreenEnabled;
+            if (!fullscreenEnabled && notesMainContent) {
+                notesMainContent.style.maxWidth = '';
+                notesMainContent.style.margin = '';
+            }
             notesModalContent?.classList.toggle('fullscreen', fullscreenEnabled);
             fullscreenBtn?.classList.toggle('active', fullscreenEnabled);
         };
@@ -2252,7 +2252,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 notesMainContent.style.maxWidth = '';
                 notesMainContent.style.margin = '';
             }
-            savedEditorWidth = 0;
         };
 
         resetEditorModes();
@@ -2515,8 +2514,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (d !== submenu) d.classList.remove('visible');
                 });
                 submenu.classList.toggle('visible');
+                if (submenu.classList.contains('visible')) {
+                    submenu.style.left = '0';
+                    submenu.style.right = 'auto';
+                    const rect = submenu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        submenu.style.left = 'auto';
+                        submenu.style.right = '0';
+                    }
+                }
             });
-            
+
             return group;
         };
 
