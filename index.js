@@ -766,7 +766,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
                     if (d !== submenu) d.classList.remove('visible');
                 });
+                const willShow = !submenu.classList.contains('visible');
                 submenu.classList.toggle('visible');
+                if (willShow) {
+                    // Position submenu within viewport
+                    submenu.style.left = '0';
+                    submenu.style.right = 'auto';
+                    const rect = submenu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        submenu.style.left = 'auto';
+                        submenu.style.right = '0';
+                    }
+                }
             });
             return group;
         };
@@ -2514,7 +2525,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
                     if (d !== submenu) d.classList.remove('visible');
                 });
+                const willShow = !submenu.classList.contains('visible');
                 submenu.classList.toggle('visible');
+                if (willShow) {
+                    // Position submenu within viewport
+                    submenu.style.left = '0';
+                    submenu.style.right = 'auto';
+                    const rect = submenu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        submenu.style.left = 'auto';
+                        submenu.style.right = '0';
+                    }
+                }
             });
             
             return group;

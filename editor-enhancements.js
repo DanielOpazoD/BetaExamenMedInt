@@ -82,31 +82,10 @@ export function setupAdvancedEditing(editor) {
     return null;
   }
 
-  let dragLine = null;
-  editor.addEventListener('dragstart', e => {
-    const line = e.target.closest('p');
-    if (!line) return;
-    dragLine = line;
-    e.dataTransfer.setData('text/plain', '');
-  });
-  editor.addEventListener('dragover', e => {
-    const line = e.target.closest('p');
-    if (!line || !dragLine || line === dragLine) return;
-    e.preventDefault();
-  });
-  editor.addEventListener('drop', e => {
-    const line = e.target.closest('p');
-    if (!line || !dragLine || line === dragLine) return;
-    e.preventDefault();
-    editor.insertBefore(dragLine, line);
-    dragLine = null;
-  });
-
-  editor.querySelectorAll('p').forEach(p => p.setAttribute('draggable', 'true'));
-  const observer = new MutationObserver(() => {
-    editor.querySelectorAll('p').forEach(p => {
-      if (!p.getAttribute('draggable')) p.setAttribute('draggable', 'true');
-    });
-  });
-  observer.observe(editor, { childList: true, subtree: true });
+  // Previously, the editor enabled dragging of paragraphs by default to allow
+  // reordering lines. This interfered with the "hand" tool in the main
+  // application because elements kept the `draggable` attribute even when block
+  // dragging was disabled. By removing the automatic draggable behavior and the
+  // related observers, the editor respects the default state where text can be
+  // selected normally unless block dragging is explicitly enabled elsewhere.
 }
