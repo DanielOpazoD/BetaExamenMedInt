@@ -237,7 +237,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let tabPosition = 'top';
     let blockDragEnabled = false;
     let fullscreenEnabled = false;
-    let savedEditorWidth = 0;
     let draggedBlock = null;
 
     if (minimizeNoteBtn && restoreNoteBtn) {
@@ -2226,19 +2225,11 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         const toggleFullscreen = () => {
-            if (!fullscreenEnabled) {
-                if (notesMainContent) {
-                    savedEditorWidth = notesMainContent.offsetWidth;
-                    notesMainContent.style.maxWidth = savedEditorWidth + 'px';
-                    notesMainContent.style.margin = '0 auto';
-                }
-            } else {
-                if (notesMainContent) {
-                    notesMainContent.style.maxWidth = '';
-                    notesMainContent.style.margin = '';
-                }
-            }
             fullscreenEnabled = !fullscreenEnabled;
+            if (!fullscreenEnabled && notesMainContent) {
+                notesMainContent.style.maxWidth = '';
+                notesMainContent.style.margin = '';
+            }
             notesModalContent?.classList.toggle('fullscreen', fullscreenEnabled);
             fullscreenBtn?.classList.toggle('active', fullscreenEnabled);
         };
@@ -2261,7 +2252,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 notesMainContent.style.maxWidth = '';
                 notesMainContent.style.margin = '';
             }
-            savedEditorWidth = 0;
         };
 
         resetEditorModes();
