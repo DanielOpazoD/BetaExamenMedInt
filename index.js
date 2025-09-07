@@ -766,7 +766,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
                     if (d !== submenu) d.classList.remove('visible');
                 });
+                const willShow = !submenu.classList.contains('visible');
                 submenu.classList.toggle('visible');
+                if (willShow) {
+                    submenu.style.left = '0';
+                    submenu.style.right = 'auto';
+                    const rect = submenu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        submenu.style.left = 'auto';
+                        submenu.style.right = '0';
+                    }
+                }
             });
             return group;
         };
@@ -2514,7 +2524,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
                     if (d !== submenu) d.classList.remove('visible');
                 });
+                const willShow = !submenu.classList.contains('visible');
                 submenu.classList.toggle('visible');
+                if (willShow) {
+                    submenu.style.left = '0';
+                    submenu.style.right = 'auto';
+                    const rect = submenu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        submenu.style.left = 'auto';
+                        submenu.style.right = '0';
+                    }
+                }
             });
             
             return group;
@@ -4077,7 +4097,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const currentTab = openNoteTabs.find(t => t.id === activeTabId);
-        if (currentTab) currentTab.notesArray = currentNotesArray;
+        if (currentTab) currentTab.notesArray = JSON.parse(JSON.stringify(currentNotesArray));
         
         const hasContent = currentNotesArray.some(n => (n.content && n.content.trim() !== '' && n.content.trim() !== '<p><br></p>'));
         if (activeNoteIcon) {
@@ -4281,7 +4301,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function loadTab(tab) {
         currentNoteRow = tab.row;
         activeNoteIcon = tab.icon;
-        currentNotesArray = tab.notesArray;
+        currentNotesArray = JSON.parse(JSON.stringify(tab.notesArray || []));
         activeNoteIndex = tab.activeIndex || 0;
         loadNoteIntoEditor(activeNoteIndex);
     }
@@ -4948,10 +4968,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 let tab = openNoteTabs.find(t => t.id === noteId);
                 const title = currentNoteRow.cells[1]?.textContent.trim() || 'Nota';
                 if (!tab) {
-                    tab = { id: noteId, row: currentNoteRow, icon: activeNoteIcon, notesArray: parsed, activeIndex: 0, title };
+                    tab = { id: noteId, row: currentNoteRow, icon: activeNoteIcon, notesArray: JSON.parse(JSON.stringify(parsed)), activeIndex: 0, title };
                     openNoteTabs.push(tab);
                 } else {
-                    tab.notesArray = parsed;
+                    tab.notesArray = JSON.parse(JSON.stringify(parsed));
                     tab.row = currentNoteRow;
                     tab.icon = activeNoteIcon;
                 }
