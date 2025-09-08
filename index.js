@@ -13,6 +13,7 @@ import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
 import { setupAdvancedEditing } from './editor-enhancements.js';
 import { improveText, askNotesQuestion } from './ai-tools.js';
+import { makeImageResizable } from './image-resize.js';
 
 // --- IndexedDB Helper ---
 // NOTE: The IndexedDB helper has been moved into db.js.  The following
@@ -1515,6 +1516,8 @@ document.addEventListener('DOMContentLoaded', function () {
         img.src = url;
         img.alt = '';
         fig.appendChild(img);
+        enableDragForFloatingImage(fig);
+        makeImageResizable(fig);
         // Insert the figure at the current caret position
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0) {
@@ -1636,6 +1639,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (existingFig) {
             existingFig.classList.remove('float-left', 'float-right');
             existingFig.classList.add(`float-${align}`);
+            enableDragForFloatingImage(existingFig);
+            makeImageResizable(existingFig);
             return;
         }
         // Crear figure y mover la imagen dentro
@@ -1644,6 +1649,8 @@ document.addEventListener('DOMContentLoaded', function () {
         fig.contentEditable = 'false';
         img.parentNode.insertBefore(fig, img);
         fig.appendChild(img);
+        enableDragForFloatingImage(fig);
+        makeImageResizable(fig);
         // Insertar espacio NBSP para que el cursor siga después del figure
         const spacer = document.createTextNode('\u00A0');
         fig.parentNode.insertBefore(spacer, fig.nextSibling);
@@ -5837,6 +5844,10 @@ document.addEventListener('DOMContentLoaded', function () {
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();
         setupAdvancedEditing(notesEditor);
+        notesEditor.querySelectorAll('figure.float-image').forEach(fig => {
+            enableDragForFloatingImage(fig);
+            makeImageResizable(fig);
+        });
         setupCloudIntegration();
     }
 

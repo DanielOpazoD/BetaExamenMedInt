@@ -414,9 +414,9 @@ table.resizable-table .table-resize-handle {
 /* Floating image styles */
 .float-image {
     display: block;
-    max-width: 250px;
     margin: 0 1rem 1rem 0;
     cursor: default;
+    position: relative;
 }
 .float-image.float-left {
     float: left;
@@ -429,6 +429,60 @@ table.resizable-table .table-resize-handle {
     height: auto;
     display: block;
     border-radius: 0.25rem;
+}
+
+.float-image .img-resize-handle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #3b82f6;
+    border: 1px solid #fff;
+    box-sizing: border-box;
+    z-index: 10;
+}
+.float-image .img-resize-handle.n {
+    top: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: ns-resize;
+}
+.float-image .img-resize-handle.s {
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: ns-resize;
+}
+.float-image .img-resize-handle.e {
+    right: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: ew-resize;
+}
+.float-image .img-resize-handle.w {
+    left: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: ew-resize;
+}
+.float-image .img-resize-handle.nw {
+    top: -4px;
+    left: -4px;
+    cursor: nwse-resize;
+}
+.float-image .img-resize-handle.ne {
+    top: -4px;
+    right: -4px;
+    cursor: nesw-resize;
+}
+.float-image .img-resize-handle.sw {
+    bottom: -4px;
+    left: -4px;
+    cursor: nesw-resize;
+}
+.float-image .img-resize-handle.se {
+    bottom: -4px;
+    right: -4px;
+    cursor: nwse-resize;
 }
 
 /* Table size selection grid */
