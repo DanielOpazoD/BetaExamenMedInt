@@ -164,6 +164,22 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    notesEditor.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') {
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            let node = sel.anchorNode;
+            if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+            while (node && node !== notesEditor) {
+                if (node.hasAttribute && node.hasAttribute('style')) {
+                    node.removeAttribute('style');
+                    break;
+                }
+                node = node.parentElement;
+            }
+        }
+    });
+
     // References modal elements
     const referencesModal = getElem('references-modal');
     const referencesEditor = getElem('references-editor');
@@ -2743,6 +2759,79 @@ document.addEventListener('DOMContentLoaded', function () {
             notesEditor.focus();
         };
 
+        const applyPresetStyle = (cssText) => {
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            const range = sel.getRangeAt(0);
+            if (range.collapsed) return;
+            const span = document.createElement('span');
+            span.style.cssText = cssText;
+            span.appendChild(range.extractContents());
+            range.insertNode(span);
+            const newRange = document.createRange();
+            newRange.setStartAfter(span);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+        };
+
+        const createPresetStyleDropdown = () => {
+            const dropdown = document.createElement('div');
+            dropdown.className = 'symbol-dropdown';
+            const btn = createButton('Estilos de texto', '🖌️', null, null, null);
+            dropdown.appendChild(btn);
+            const content = document.createElement('div');
+            content.className = 'symbol-dropdown-content flex-dropdown';
+            const styles = [
+                { label: 'Texto estilo celeste', style: 'font-family:Arial; font-weight:600; background:#e0f7fa; color:#01579b; padding:2px 4px; border-radius:4px;' },
+                { label: 'Texto estilo lila', style: 'font-family:Arial; font-weight:600; background:#f3e5f5; color:#6a1b9a; padding:2px 4px; border-radius:4px;' },
+                { label: 'Texto estilo menta', style: 'font-family:Arial; font-weight:600; background:#e8f5e9; color:#1b5e20; padding:2px 4px; border-radius:4px;' },
+                { label: 'Texto estilo durazno', style: 'font-family:Arial; font-weight:600; background:#fff3e0; color:#e65100; padding:2px 4px; border-radius:4px;' },
+                { label: 'Texto estilo amarillo', style: 'font-family:Arial; font-weight:600; background:#fffde7; color:#f57f17; padding:2px 4px; border-radius:4px;' },
+                { label: 'Texto estilo rosado', style: 'font-family:Arial; font-weight:600; background:#fce4ec; color:#ad1457; padding:2px 4px; border-radius:4px;' },
+                { label: 'Texto estilo azul', style: 'font-family:Arial; font-weight:600; background:#e3f2fd; color:#1a237e; padding:2px 4px; border-radius:4px;' },
+                { label: 'Texto estilo turquesa', style: 'font-family:Arial; font-weight:600; background:#e0f2f1; color:#004d40; padding:2px 4px; border-radius:4px;' },
+                { label: 'Texto estilo arena', style: 'font-family:Arial; font-weight:600; background:#fbe9e7; color:#4e342e; padding:2px 4px; border-radius:4px;' },
+                { label: 'Texto estilo café', style: 'font-family:Arial; font-weight:600; background:#efebe9; color:#5d4037; padding:2px 4px; border-radius:4px;' },
+                { label: 'Texto estilo rojo', style: 'font-family:Arial; font-weight:600; background:#f44336; color:#ffffff; padding:2px 4px; border-radius:4px;' },
+                { label: 'Texto estilo verde oscuro', style: 'font-family:Arial; font-weight:600; background:#1b5e20; color:#ffffff; padding:2px 4px; border-radius:4px;' }
+            ];
+            styles.forEach(s => {
+                const opt = document.createElement('button');
+                opt.className = 'toolbar-btn';
+                opt.innerHTML = `<span style="${s.style}">${s.label}</span>`;
+                opt.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    applyPresetStyle(s.style);
+                    content.classList.remove('visible');
+                    notesEditor.focus();
+                });
+                content.appendChild(opt);
+            });
+            dropdown.appendChild(content);
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                    if (d !== content) d.classList.remove('visible');
+                });
+                content.classList.toggle('visible');
+                if (content.classList.contains('visible')) {
+                    const editorRect = notesModalContent.getBoundingClientRect();
+                    const dropdownRect = dropdown.getBoundingClientRect();
+                    const contentRect = content.getBoundingClientRect();
+                    const editorCenter = editorRect.left + editorRect.width / 2;
+                    let left = editorCenter - dropdownRect.left - contentRect.width / 2;
+                    const minLeft = editorRect.left - dropdownRect.left;
+                    const maxLeft = editorRect.right - dropdownRect.left - contentRect.width;
+                    if (left < minLeft) left = minLeft;
+                    if (left > maxLeft) left = maxLeft;
+                    content.style.left = `${left}px`;
+                }
+            });
+            return dropdown;
+        };
+
         editorToolbar.appendChild(createButton('Reducir interlineado', '-', null, null, () => adjustLineHeight(-0.2)));
         editorToolbar.appendChild(createButton('Aumentar interlineado', '+', null, null, () => adjustLineHeight(0.2)));
 
@@ -2822,6 +2911,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
         editorToolbar.appendChild(lineHighlightPalette);
+        editorToolbar.appendChild(createPresetStyleDropdown());
 
         const applyBlockVerticalPadding = (level) => {
             const paddingValues = [0, 2, 4, 6, 8, 10];
