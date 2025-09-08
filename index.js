@@ -2820,8 +2820,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     const editorRect = notesModalContent.getBoundingClientRect();
                     const dropdownRect = dropdown.getBoundingClientRect();
                     const contentRect = content.getBoundingClientRect();
-                    let left = editorRect.right - dropdownRect.left - contentRect.width;
-                    if (left < 0) left = 0;
+                    const editorCenter = editorRect.left + editorRect.width / 2;
+                    let left = editorCenter - dropdownRect.left - contentRect.width / 2;
+                    const minLeft = editorRect.left - dropdownRect.left;
+                    const maxLeft = editorRect.right - dropdownRect.left - contentRect.width;
+                    if (left < minLeft) left = minLeft;
+                    if (left > maxLeft) left = maxLeft;
                     content.style.left = `${left}px`;
                 }
             });
