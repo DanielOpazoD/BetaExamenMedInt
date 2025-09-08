@@ -2819,9 +2819,88 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const highlightPalette = createColorPalette('Color de Resaltado', applyHiliteColor, highlightColors, extraHighlightColors, highlighterIcon);
         editorToolbar.appendChild(highlightPalette);
-        
+
         const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
         editorToolbar.appendChild(lineHighlightPalette);
+
+        const presetStyles = [
+            { name: 'Texto estilo celeste', style: 'font-family:Arial; font-weight:600; background:#e0f7fa; color:#01579b; padding:2px 4px; border-radius:4px;' },
+            { name: 'Texto estilo lila', style: 'font-family:Arial; font-weight:600; background:#f3e5f5; color:#6a1b9a; padding:2px 4px; border-radius:4px;' },
+            { name: 'Texto estilo menta', style: 'font-family:Arial; font-weight:600; background:#e8f5e9; color:#1b5e20; padding:2px 4px; border-radius:4px;' },
+            { name: 'Texto estilo durazno', style: 'font-family:Arial; font-weight:600; background:#fff3e0; color:#e65100; padding:2px 4px; border-radius:4px;' },
+            { name: 'Texto estilo amarillo', style: 'font-family:Arial; font-weight:600; background:#fffde7; color:#f57f17; padding:2px 4px; border-radius:4px;' },
+            { name: 'Texto estilo rosado', style: 'font-family:Arial; font-weight:600; background:#fce4ec; color:#ad1457; padding:2px 4px; border-radius:4px;' },
+            { name: 'Texto estilo azul', style: 'font-family:Arial; font-weight:600; background:#e3f2fd; color:#1a237e; padding:2px 4px; border-radius:4px;' },
+            { name: 'Texto estilo turquesa', style: 'font-family:Arial; font-weight:600; background:#e0f2f1; color:#004d40; padding:2px 4px; border-radius:4px;' },
+            { name: 'Texto estilo arena', style: 'font-family:Arial; font-weight:600; background:#fbe9e7; color:#4e342e; padding:2px 4px; border-radius:4px;' },
+            { name: 'Texto estilo café', style: 'font-family:Arial; font-weight:600; background:#efebe9; color:#5d4037; padding:2px 4px; border-radius:4px;' },
+            { name: 'Texto estilo rojo', style: 'font-family:Arial; font-weight:600; background:#f44336; color:#ffffff; padding:2px 4px; border-radius:4px;' },
+            { name: 'Texto estilo verde oscuro', style: 'font-family:Arial; font-weight:600; background:#1b5e20; color:#ffffff; padding:2px 4px; border-radius:4px;' }
+        ];
+
+        const applyPresetStyle = (style) => {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+                const range = sel.getRangeAt(0);
+                const span = document.createElement('span');
+                span.setAttribute('style', style);
+                span.appendChild(range.extractContents());
+                range.insertNode(span);
+                sel.removeAllRanges();
+                const collapsed = document.createRange();
+                collapsed.setStartAfter(span);
+                collapsed.collapse(true);
+                sel.addRange(collapsed);
+            }
+        };
+
+        const createPresetStyleDropdown = () => {
+            const dropdown = document.createElement('div');
+            dropdown.className = 'symbol-dropdown';
+            const btn = createButton('Estilos destacados', '🎨', null, null, null);
+            dropdown.appendChild(btn);
+            const content = document.createElement('div');
+            content.className = 'symbol-dropdown-content flex-dropdown';
+            presetStyles.forEach(({ name, style }) => {
+                const optBtn = document.createElement('button');
+                optBtn.className = 'toolbar-btn';
+                optBtn.innerHTML = `<span style="${style}">${name}</span>`;
+                optBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (savedEditorSelection) {
+                        const selection = window.getSelection();
+                        selection.removeAllRanges();
+                        selection.addRange(savedEditorSelection);
+                    }
+                    applyPresetStyle(style);
+                    content.classList.remove('visible');
+                    savedEditorSelection = null;
+                    notesEditor.focus();
+                });
+                content.appendChild(optBtn);
+            });
+            dropdown.appendChild(content);
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                    if (d !== content) d.classList.remove('visible');
+                });
+                const willShow = !content.classList.contains('visible');
+                content.classList.toggle('visible');
+                if (willShow) {
+                    const selection = window.getSelection();
+                    if (selection.rangeCount) {
+                        savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                    }
+                } else {
+                    savedEditorSelection = null;
+                }
+            });
+            return dropdown;
+        };
+
+        editorToolbar.appendChild(createPresetStyleDropdown());
 
         const applyBlockVerticalPadding = (level) => {
             const paddingValues = [0, 2, 4, 6, 8, 10];
