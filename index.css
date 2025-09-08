@@ -835,6 +835,27 @@ table.resizable-table .table-resize-handle {
             .section-cover-page + .topic-print-wrapper {
                 page-break-before: auto;
             }
+            /* Allow resizable tables and wrappers to break across pages while preserving row integrity */
+            .resizable-table {
+                display: table !important;
+                width: auto !important;
+                max-width: 100% !important;
+                overflow: visible !important;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
+            }
+            .resizable-table tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            .indent-2, .note-resizable {
+                overflow: visible !important;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
+            }
+            .table-resize-handle {
+                display: none !important;
+            }
             /* Ensure side-by-side images print in the same row */
             #notes-editor .image-row,
             #print-area .image-row {
