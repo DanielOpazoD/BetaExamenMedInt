@@ -2097,6 +2097,16 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 0);
     }
 
+    function escapeXml(unsafe) {
+        return unsafe.replace(/[<>&'\"]/g, c => ({
+            '<': '&lt;',
+            '>': '&gt;',
+            '&': '&amp;',
+            "'": '&apos;',
+            '"': '&quot;'
+        })[c]);
+    }
+
     function exportContent(format) {
         const html = `<html><head><meta charset="utf-8"/></head><body>${notesEditor.innerHTML}</body></html>`;
         switch (format) {
@@ -2111,11 +2121,42 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 break;
             case 'docx':
-                if (window.htmlDocx) {
-                    const blob = window.htmlDocx.asBlob(html);
-                    saveBlob(blob, 'contenido.docx');
+                if (window.JSZip) {
+                    const zip = new JSZip();
+                    const contentTypes =
+                        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+                        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+                        '<Default Extension="xml" ContentType="application/xml"/>' +
+                        '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+                        '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+                        '</Types>';
+                    const rels =
+                        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+                        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+                        '</Relationships>';
+                    const docXml =
+                        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' +
+                        notesEditor.innerText.split('\n').map(p => `<w:p><w:r><w:t>${escapeXml(p)}</w:t></w:r></w:p>`).join('') +
+                        '<w:sectPr/></w:body></w:document>';
+                    const docRels =
+                        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>';
+                    const styles =
+                        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                        '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>';
+
+                    zip.file('[Content_Types].xml', contentTypes);
+                    zip.folder('_rels').file('.rels', rels);
+                    const word = zip.folder('word');
+                    word.file('document.xml', docXml);
+                    word.folder('_rels').file('document.xml.rels', docRels);
+                    word.file('styles.xml', styles);
+                    zip.generateAsync({ type: 'blob' }).then(blob => saveBlob(blob, 'contenido.docx'));
                 } else {
-                    alert('Biblioteca DOCX no disponible');
+                    alert('Biblioteca JSZip no disponible');
                 }
                 break;
             case 'odt':
