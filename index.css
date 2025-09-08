@@ -835,6 +835,10 @@ table.resizable-table .table-resize-handle {
             .section-cover-page + .topic-print-wrapper {
                 page-break-before: auto;
             }
+            #print-index + .section-cover-page,
+            #print-index + .topic-print-wrapper {
+                page-break-before: auto;
+            }
             /* Ensure side-by-side images print in the same row */
             #notes-editor .image-row,
             #print-area .image-row {
