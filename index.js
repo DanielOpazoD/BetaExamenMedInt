@@ -2752,7 +2752,11 @@ document.addEventListener('DOMContentLoaded', function () {
             span.style.cssText = cssText;
             span.appendChild(range.extractContents());
             range.insertNode(span);
-            collapseSelection(notesEditor);
+            const newRange = document.createRange();
+            newRange.setStartAfter(span);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
         };
 
         const createPresetStyleDropdown = () => {
@@ -2812,7 +2816,6 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createButton('Subrayado', '<u>U</u>', 'underline'));
         editorToolbar.appendChild(createButton('Tachado', '<s>S</s>', 'strikeThrough'));
         editorToolbar.appendChild(createButton('Superíndice', 'X²', 'superscript'));
-        editorToolbar.appendChild(createPresetStyleDropdown());
         editorToolbar.appendChild(createButton('Deshacer', '↺', null, null, undoAction));
         editorToolbar.appendChild(createButton('Rehacer', '↻', null, null, redoAction));
 
@@ -2880,6 +2883,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
         editorToolbar.appendChild(lineHighlightPalette);
+        editorToolbar.appendChild(createPresetStyleDropdown());
 
         const applyBlockVerticalPadding = (level) => {
             const paddingValues = [0, 2, 4, 6, 8, 10];
