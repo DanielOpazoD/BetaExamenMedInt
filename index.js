@@ -164,6 +164,22 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    notesEditor.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') {
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            let node = sel.anchorNode;
+            if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+            while (node && node !== notesEditor) {
+                if (node.hasAttribute && node.hasAttribute('style')) {
+                    node.removeAttribute('style');
+                    break;
+                }
+                node = node.parentElement;
+            }
+        }
+    });
+
     // References modal elements
     const referencesModal = getElem('references-modal');
     const referencesEditor = getElem('references-editor');
@@ -2800,6 +2816,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (d !== content) d.classList.remove('visible');
                 });
                 content.classList.toggle('visible');
+                if (content.classList.contains('visible')) {
+                    const editorRect = notesModalContent.getBoundingClientRect();
+                    const dropdownRect = dropdown.getBoundingClientRect();
+                    const contentRect = content.getBoundingClientRect();
+                    let left = editorRect.right - dropdownRect.left - contentRect.width;
+                    if (left < 0) left = 0;
+                    content.style.left = `${left}px`;
+                }
             });
             return dropdown;
         };
