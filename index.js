@@ -2138,16 +2138,26 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 if (command) {
-                    document.execCommand(command, false, value);
-                    // Collapse the selection after applying the command
-                    collapseSelection(notesEditor);
+                    if (notesEditorInstance) {
+                        notesEditorInstance.execute(command, value);
+                    } else {
+                        document.execCommand(command, false, value);
+                        // Collapse the selection after applying the command
+                        collapseSelection(notesEditor);
+                    }
                 }
                 if (action) {
                     action();
-                    // Collapse again after custom actions
-                    collapseSelection(notesEditor);
+                    if (!notesEditorInstance) {
+                        // Collapse again after custom actions
+                        collapseSelection(notesEditor);
+                    }
                 }
-                notesEditor.focus();
+                if (notesEditorInstance) {
+                    notesEditorInstance.editing.view.focus();
+                } else {
+                    notesEditor.focus();
+                }
             });
             return btn;
         };
@@ -5853,6 +5863,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function init() {
         initializeCells();
+        setupEditorToolbar();
+        populateIconPicker();
         loadState();
         setupEventListeners();
         document.querySelectorAll('table').forEach(initTableResize);
