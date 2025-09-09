@@ -1040,9 +1040,14 @@ hr.hr-dashed { border-top: 1px dashed var(--text-primary); }
   /* Restore button visibility */
   #restore-note-btn.hidden { display: none; }
 
-  body {
+body {
     padding-top: 32px;
-  }
+}
+
+.ck-content img {
+  max-width: 100%;
+  height: auto;
+}
 
 .extra-cursor {
   border-left: 1px solid var(--text-primary);

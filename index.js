@@ -11,7 +11,6 @@ import { makeTableResizable } from './table-resize.js';
 import { setupAdvancedSearchReplace } from './search-replace.js';
 import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
-import { setupAdvancedEditing } from './editor-enhancements.js';
 import { improveText, askNotesQuestion } from './ai-tools.js';
 
 // --- IndexedDB Helper ---
@@ -102,6 +101,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const notesModalTitle = getElem('notes-modal-title');
     const notesEditor = getElem('notes-editor');
     const editorToolbar = notesModal.querySelector('.editor-toolbar');
+    let notesEditorInstance;
+    function MyUploadAdapterPlugin( editor ) {
+        editor.plugins.get( 'FileRepository' ).createUploadAdapter = loader => new CKEDITOR.Base64UploadAdapter( loader );
+    }
     const notesModalContent = notesModal.querySelector('.notes-modal-content');
     const saveNoteBtn = getElem('save-note-btn');
     const saveAndCloseNoteBtn = getElem('save-and-close-note-btn');
@@ -127,7 +130,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const historyStack = [];
     let historyIndex = -1;
     const recordHistory = () => {
-        const html = notesEditor.innerHTML;
+        const html = notesEditorInstance ? notesEditorInstance.getData() : notesEditor.innerHTML;
         if (historyStack[historyIndex] !== html) {
             historyStack.splice(historyIndex + 1);
             historyStack.push(html);
@@ -140,13 +143,23 @@ document.addEventListener('DOMContentLoaded', function () {
     const undoAction = () => {
         if (historyIndex > 0) {
             historyIndex--;
-            notesEditor.innerHTML = historyStack[historyIndex];
+            const data = historyStack[historyIndex];
+            if (notesEditorInstance) {
+                notesEditorInstance.setData(data);
+            } else {
+                notesEditor.innerHTML = data;
+            }
         }
     };
     const redoAction = () => {
         if (historyIndex < historyStack.length - 1) {
             historyIndex++;
-            notesEditor.innerHTML = historyStack[historyIndex];
+            const data = historyStack[historyIndex];
+            if (notesEditorInstance) {
+                notesEditorInstance.setData(data);
+            } else {
+                notesEditor.innerHTML = data;
+            }
         }
     };
     notesEditor.addEventListener('input', recordHistory);
@@ -4166,7 +4179,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!currentNoteRow || !currentNotesArray || currentNotesArray.length === 0) return;
         if (index < 0 || index >= currentNotesArray.length) return;
 
-        const currentContent = notesEditor.innerHTML;
+        const currentContent = notesEditorInstance ? notesEditorInstance.getData() : notesEditor.innerHTML;
         const currentTitle = notesModalTitle.textContent.trim();
 
         // Keep existing postits and quick note data
@@ -4298,11 +4311,15 @@ document.addEventListener('DOMContentLoaded', function () {
         if (currentTab) currentTab.activeIndex = index;
         
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
-        notesEditor.innerHTML = note.content || '<p><br></p>';
-        notesEditor.querySelectorAll('table').forEach(initTableResize);
+        if (notesEditorInstance) {
+            notesEditorInstance.setData(note.content || '<p><br></p>');
+            notesEditorInstance.editing.view.focus();
+        } else {
+            notesEditor.innerHTML = note.content || '<p><br></p>';
+            notesEditor.focus();
+        }
 
         renderNotesList();
-        notesEditor.focus();
         updateNoteInfo();
     }
     
@@ -5272,7 +5289,11 @@ document.addEventListener('DOMContentLoaded', function () {
         unmarkNoteBtn.addEventListener('click', async () => {
             const confirmed = await showConfirmation("¿Estás seguro de que quieres borrar todo el contenido de esta nota?");
             if (confirmed) {
-                notesEditor.innerHTML = '<p><br></p>';
+                if (notesEditorInstance) {
+                    notesEditorInstance.setData('<p><br></p>');
+                } else {
+                    notesEditor.innerHTML = '<p><br></p>';
+                }
             }
         });
 
@@ -5314,19 +5335,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Note content import/export
         exportNoteBtn.addEventListener('click', () => {
-            // Clone the editor content so we can strip sub-note links before exporting
-            const clone = notesEditor.cloneNode(true);
-            // Remove any sub-note or legacy post-it links entirely from the exported HTML
-            clone.querySelectorAll('a.subnote-link, a.postit-link').forEach(link => {
+            const noteContent = notesEditorInstance ? notesEditorInstance.getData() : notesEditor.innerHTML;
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = noteContent;
+            tempDiv.querySelectorAll('a.subnote-link, a.postit-link').forEach(link => {
                 const parent = link.parentNode;
                 while (link.firstChild) {
                     parent.insertBefore(link.firstChild, link);
                 }
                 parent.removeChild(link);
             });
-            const noteContent = clone.innerHTML;
+            const cleaned = tempDiv.innerHTML;
             const noteTitle = (notesModalTitle.textContent || 'nota').trim().replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${notesModalTitle.textContent}</title><style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap'); body { font-family: 'Inter', sans-serif; line-height: 1.6; padding: 1rem; } ul, ol { list-style: none; padding-left: 1.25rem; }</style></head><body>${noteContent}</body></html>`;
+            const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${notesModalTitle.textContent}</title><style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap'); body { font-family: 'Inter', sans-serif; line-height: 1.6; padding: 1rem; } ul, ol { list-style: none; padding-left: 1.25rem; }</style></head><body>${cleaned}</body></html>`;
             const blob = new Blob([html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -5346,8 +5367,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (confirmed) {
                     const reader = new FileReader();
                     reader.onload = (e) => {
-                        notesEditor.innerHTML = e.target.result;
-                        notesEditor.querySelectorAll('table').forEach(initTableResize);
+                        if (notesEditorInstance) {
+                            notesEditorInstance.setData(e.target.result);
+                        } else {
+                            notesEditor.innerHTML = e.target.result;
+                            notesEditor.querySelectorAll('table').forEach(initTableResize);
+                        }
                     };
                     reader.readAsText(file);
                 }
@@ -5828,16 +5853,44 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function init() {
         initializeCells();
-        setupEditorToolbar();
-        populateIconPicker();
         loadState();
         setupEventListeners();
         document.querySelectorAll('table').forEach(initTableResize);
         applyTheme(document.documentElement.dataset.theme || 'default');
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();
-        setupAdvancedEditing(notesEditor);
         setupCloudIntegration();
+
+        CKEDITOR.DecoupledEditor.create(document.getElementById('notes-editor'), {
+            extraPlugins: [MyUploadAdapterPlugin],
+            toolbar: {
+                items: ['undo', 'redo', 'insertImage', 'link', 'alignment']
+            },
+            image: {
+                styles: ['inline', 'wrapText', 'breakText'],
+                toolbar: [
+                    'toggleImageCaption',
+                    'imageTextAlternative',
+                    '|',
+                    'imageStyle:inline',
+                    'imageStyle:wrapText',
+                    'imageStyle:breakText',
+                    '|',
+                    'resizeImage'
+                ],
+                resizeUnit: '%',
+                resizeOptions: [
+                    { name: 'resizeImage:original', label: 'Original', value: null },
+                    { name: 'resizeImage:25', label: '25%', value: '25' },
+                    { name: 'resizeImage:50', label: '50%', value: '50' },
+                    { name: 'resizeImage:75', label: '75%', value: '75' },
+                    { name: 'resizeImage:100', label: '100%', value: '100' }
+                ]
+            }
+        }).then(editor => {
+            notesEditorInstance = editor;
+            editorToolbar.appendChild(editor.ui.view.toolbar.element);
+        }).catch(error => console.error('CKEditor init error', error));
     }
 
     init();
