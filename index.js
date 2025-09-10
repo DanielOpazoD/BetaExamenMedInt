@@ -3297,8 +3297,8 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(sideBySideBtn);
 
         const inlineLayoutBtn = createButton('Imagen en línea', '↔️', null, null, () => applyImageLayout('inline'));
-        const wrapLayoutBtn = createButton('Rodear texto', '📰', null, null, () => applyImageLayout('wrap'));
-        const breakLayoutBtn = createButton('Imagen en bloque', '⛶', null, null, () => applyImageLayout('break'));
+        const wrapLayoutBtn = createButton('Rodear texto', '📰', null, null, () => applyImageLayout('wrapText'));
+        const breakLayoutBtn = createButton('Imagen en bloque', '⛶', null, null, () => applyImageLayout('breakText'));
         editorToolbar.appendChild(inlineLayoutBtn);
         editorToolbar.appendChild(wrapLayoutBtn);
         editorToolbar.appendChild(breakLayoutBtn);
@@ -3510,6 +3510,11 @@ document.addEventListener('DOMContentLoaded', function () {
             if (selectedImageForResize) addCaptionToImage(selectedImageForResize);
         });
 
+        const inlineBtn = document.createElement('button');
+        inlineBtn.textContent = '↔️';
+        inlineBtn.title = 'Imagen en línea';
+        inlineBtn.addEventListener('click', () => applyImageLayout('inline'));
+
         const leftBtn = document.createElement('button');
         leftBtn.textContent = '⬅️';
         leftBtn.title = 'Alinear a la izquierda';
@@ -3525,7 +3530,7 @@ document.addEventListener('DOMContentLoaded', function () {
         rightBtn.title = 'Alinear a la derecha';
         rightBtn.addEventListener('click', () => alignImage('right'));
 
-        imageContextMenu.append(captionBtn, leftBtn, centerBtn, rightBtn);
+        imageContextMenu.append(captionBtn, inlineBtn, leftBtn, centerBtn, rightBtn);
         document.body.appendChild(imageContextMenu);
     }
 
@@ -3600,9 +3605,9 @@ document.addEventListener('DOMContentLoaded', function () {
         img.style.float = '';
         img.style.display = '';
         img.style.margin = '';
-        if (type === 'wrap') {
+        if (type === 'wrapText') {
             wrapSelectedImage(lastFloatAlign);
-        } else if (type === 'break') {
+        } else if (type === 'breakText') {
             img.classList.add('break-image');
         }
         positionImageResizer(selectedImageForResize);
