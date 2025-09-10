@@ -434,7 +434,7 @@ table.resizable-table .table-resize-handle {
     border: 2px solid var(--btn-primary-bg);
     box-sizing: border-box;
     pointer-events: none;
-    z-index: 10000;
+    z-index: 10004;
 }
 
 .image-resize-handle {
@@ -461,7 +461,7 @@ table.resizable-table .table-resize-handle {
     border: 1px solid var(--border-color);
     border-radius: 0.25rem;
     padding: 0.25rem;
-    z-index: 10001;
+    z-index: 10005;
 }
 
 .image-context-menu button {
@@ -480,7 +480,7 @@ table.resizable-table .table-resize-handle {
     border: 1px solid var(--border-color);
     border-radius: 0.25rem;
     padding: 0.25rem;
-    z-index: 10001;
+    z-index: 10005;
 }
 
 .table-context-menu button {
