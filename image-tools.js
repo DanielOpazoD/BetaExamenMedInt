@@ -108,7 +108,7 @@ export function setupImageTools(editor, toolbar) {
   // --- Floating panel and resizing ---------------------------------------
   const overlay = document.createElement('div');
   overlay.className = 'image-overlay hidden';
-  const handles = ['nw','ne','sw','se'].map(dir => {
+  const handles = ['nw','ne','sw','se','e','s'].map(dir => {
     const h = document.createElement('div');
     h.className = 'image-handle ' + dir;
     overlay.appendChild(h);
@@ -136,17 +136,19 @@ export function setupImageTools(editor, toolbar) {
   document.body.appendChild(menu);
 
   const sizeGroup = menu.querySelector('.size-group');
-  [25,50,75,100].forEach(pct => {
-    const btn = document.createElement('button');
-    btn.textContent = pct + '%';
-    btn.addEventListener('click', () => {
-      if (!activeImg) return;
-      activeImg.style.width = pct + '%';
-      activeImg.style.height = 'auto';
-      positionUI();
-    });
-    sizeGroup.appendChild(btn);
-  });
+  const minusBtn = document.createElement('button');
+  minusBtn.textContent = '-';
+  minusBtn.addEventListener('click', () => resizeByFactor(0.9));
+  const plusBtn = document.createElement('button');
+  plusBtn.textContent = '+';
+  plusBtn.addEventListener('click', () => resizeByFactor(1.1));
+  const upBtn = document.createElement('button');
+  upBtn.textContent = '↑';
+  upBtn.addEventListener('click', () => moveImage(-1));
+  const downBtn = document.createElement('button');
+  downBtn.textContent = '↓';
+  downBtn.addEventListener('click', () => moveImage(1));
+  sizeGroup.append(minusBtn, plusBtn, upBtn, downBtn);
 
   menu.addEventListener('click', e => {
     const layoutBtn = e.target.closest('[data-layout]');
@@ -159,6 +161,52 @@ export function setupImageTools(editor, toolbar) {
       openTitleEditor();
     }
   });
+
+  /**
+   * Resize the active image by a factor, keeping aspect ratio.
+   * @param {number} factor Multiplicative factor (>1 enlarges, <1 shrinks)
+   */
+  function resizeByFactor(factor) {
+    if (!activeImg) return;
+    const newW = activeImg.offsetWidth * factor;
+    if (newW > 20) {
+      activeImg.style.width = newW + 'px';
+      activeImg.style.height = 'auto';
+      syncCaptionWidth();
+      positionUI();
+    }
+  }
+
+  /**
+   * Move the active image up or down in the document flow.
+   * @param {number} dir -1 to move up, 1 to move down
+   */
+  function moveImage(dir) {
+    if (!activeImg) return;
+    const caption = activeImg.nextElementSibling;
+    const bundle = [activeImg];
+    if (caption && caption.classList.contains('image-caption')) bundle.push(caption);
+    if (dir < 0) {
+      const prev = activeImg.previousSibling;
+      if (prev) prev.before(...bundle);
+    } else {
+      const afterNode = bundle[bundle.length - 1];
+      const next = afterNode.nextSibling;
+      if (next) next.after(...bundle);
+    }
+    positionUI();
+  }
+
+  /**
+   * Ensure the caption matches the image width.
+   */
+  function syncCaptionWidth() {
+    if (!activeImg) return;
+    const caption = activeImg.nextElementSibling;
+    if (caption && caption.classList.contains('image-caption')) {
+      caption.style.width = activeImg.offsetWidth + 'px';
+    }
+  }
 
   let activeImg = null;
   editor.addEventListener('click', e => {
@@ -174,6 +222,7 @@ export function setupImageTools(editor, toolbar) {
 
   function selectImage(img) {
     activeImg = img;
+    syncCaptionWidth();
     positionUI();
     overlay.classList.remove('hidden');
     menu.classList.remove('hidden');
@@ -211,7 +260,7 @@ export function setupImageTools(editor, toolbar) {
     function onMove(ev) {
       let dx = ev.clientX - startX;
       let dy = ev.clientY - startY;
-      if (!ev.shiftKey) {
+      if (!ev.shiftKey && ['nw','ne','sw','se'].includes(dir)) {
         if (Math.abs(dx) > Math.abs(dy)) dy = dx / aspect; else dx = dy * aspect;
       }
       let newW = origW;
@@ -220,9 +269,12 @@ export function setupImageTools(editor, toolbar) {
       if (dir.includes('w')) newW = origW - dx;
       if (dir.includes('s')) newH = origH + dy;
       if (dir.includes('n')) newH = origH - dy;
+      if (dir === 'e' || dir === 'w') newH = origH;
+      if (dir === 's' || dir === 'n') newW = origW;
       if (newW > 20 && newH > 20) {
         activeImg.style.width = newW + 'px';
         activeImg.style.height = newH + 'px';
+        syncCaptionWidth();
         positionUI();
       }
     }
@@ -305,6 +357,8 @@ export function setupImageTools(editor, toolbar) {
       activeImg.insertAdjacentElement('afterend', caption);
     }
     caption.textContent = text;
+    syncCaptionWidth();
+    positionUI();
   }
 
   document.addEventListener('click', e => {

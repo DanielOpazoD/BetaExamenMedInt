@@ -1074,6 +1074,8 @@ hr.hr-dashed { border-top: 1px dashed var(--text-primary); }
 .image-handle.ne { top: -6px; right: -6px; cursor: nesw-resize; }
 .image-handle.sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
 .image-handle.se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.image-handle.e { top: 50%; right: -6px; transform: translateY(-50%); cursor: ew-resize; }
+.image-handle.s { left: 50%; bottom: -6px; transform: translateX(-50%); cursor: ns-resize; }
 .image-menu {
   position: absolute;
   display: flex;
@@ -1105,4 +1107,5 @@ hr.hr-dashed { border-top: 1px dashed var(--text-primary); }
   text-align: center;
   padding: 2px 4px;
   margin-top: 4px;
+  display: block;
 }
