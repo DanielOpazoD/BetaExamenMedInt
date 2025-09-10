@@ -531,6 +531,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const alertMessage = getElem('alert-message');
     const okAlertBtn = getElem('ok-alert-btn');
 
+    // Image caption modal
+    const captionModal = getElem('caption-modal');
+    const captionInput = getElem('caption-input');
+    const saveCaptionBtn = getElem('save-caption-btn');
+    const cancelCaptionBtn = getElem('cancel-caption-btn');
+
     // Note Info Modal
     const noteInfoBtn = getElem('note-info-btn');
     const noteInfoModal = getElem('note-info-modal');
@@ -1791,111 +1797,164 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     /**
-     * Enable advanced table editing features on the given table.  When the user
-     * hovers over a cell, controls for inserting or deleting rows/columns
-     * appear.  Resizing columns is handled by initTableResize().
+     * Enable advanced table editing features on the given table.  Clicking a cell
+     * shows a floating menu for inserting/deleting rows or columns and aligning
+     * the table.
      * @param {HTMLTableElement} table
      */
     function enableTableEditing(table) {
         if (!table) return;
-        table.addEventListener('mouseover', (e) => {
+        table.addEventListener('click', (e) => {
             const cell = e.target.closest('td, th');
-            if (!cell || !table.contains(cell)) return;
-            showRowColControls(table, cell);
+            if (!cell) return;
+            selectedTableCell = cell;
+            showTableContextMenu(cell.closest('table'));
         });
     }
 
-    /**
-     * Remove any existing row/column controls from the document.
-     */
-    function removeTableControls() {
-        document.querySelectorAll('.table-insert-row-btn, .table-insert-col-btn, .table-delete-row-btn, .table-delete-col-btn').forEach(btn => btn.remove());
+    let tableContextMenu = null;
+    let selectedTableCell = null;
+
+    function createTableContextMenu() {
+        tableContextMenu = document.createElement('div');
+        tableContextMenu.className = 'table-context-menu';
+
+        const moveLeftBtn = document.createElement('button');
+        moveLeftBtn.textContent = '⬅️';
+        moveLeftBtn.title = 'Mover izquierda';
+        moveLeftBtn.addEventListener('click', () => alignTable('left'));
+
+        const moveRightBtn = document.createElement('button');
+        moveRightBtn.textContent = '➡️';
+        moveRightBtn.title = 'Mover derecha';
+        moveRightBtn.addEventListener('click', () => alignTable('right'));
+
+        const addRowBtn = document.createElement('button');
+        addRowBtn.textContent = '+fila';
+        addRowBtn.title = 'Agregar fila';
+        addRowBtn.addEventListener('click', insertRowBelow);
+
+        const delRowBtn = document.createElement('button');
+        delRowBtn.textContent = '-fila';
+        delRowBtn.title = 'Eliminar fila';
+        delRowBtn.addEventListener('click', deleteCurrentRow);
+
+        const addColBtn = document.createElement('button');
+        addColBtn.textContent = '+col';
+        addColBtn.title = 'Agregar columna';
+        addColBtn.addEventListener('click', insertColRight);
+
+        const delColBtn = document.createElement('button');
+        delColBtn.textContent = '-col';
+        delColBtn.title = 'Eliminar columna';
+        delColBtn.addEventListener('click', deleteCurrentCol);
+
+        tableContextMenu.append(moveLeftBtn, moveRightBtn, addRowBtn, delRowBtn, addColBtn, delColBtn);
+        document.body.appendChild(tableContextMenu);
     }
 
-    /**
-     * Display controls to insert or delete rows and columns based on the
-     * hovered cell.  Controls are appended to the document body and
-     * absolutely positioned relative to the cell.
-     * @param {HTMLTableElement} table
-     * @param {HTMLTableCellElement} cell
-     */
-    function showRowColControls(table, cell) {
-        removeTableControls();
-        const rowIndex = cell.parentElement.rowIndex;
-        const colIndex = cell.cellIndex;
-        const cellRect = cell.getBoundingClientRect();
-        // Insert row button (+) below the cell
-        const insertRowBtn = document.createElement('button');
-        insertRowBtn.textContent = '+';
-        insertRowBtn.title = 'Insertar fila debajo';
-        insertRowBtn.className = 'table-insert-row-btn toolbar-btn';
-        insertRowBtn.style.position = 'absolute';
-        insertRowBtn.style.left = `${cellRect.left + cellRect.width / 2 - 8 + window.scrollX}px`;
-        insertRowBtn.style.top = `${cellRect.bottom - 8 + window.scrollY}px`;
-        insertRowBtn.addEventListener('click', () => {
-            const newRow = table.insertRow(rowIndex + 1);
-            for (let i = 0; i < table.rows[0].cells.length; i++) {
-                const newCell = newRow.insertCell();
-                newCell.contentEditable = true;
-                newCell.style.border = '1px solid var(--border-color)';
-                newCell.style.padding = '4px';
+    function showTableContextMenu(table) {
+        if (!tableContextMenu) createTableContextMenu();
+        tableContextMenu.style.display = 'flex';
+        positionTableContextMenu(table);
+    }
+
+    function hideTableContextMenu() {
+        if (tableContextMenu) tableContextMenu.style.display = 'none';
+        selectedTableCell = null;
+    }
+
+    function positionTableContextMenu(table) {
+        if (!tableContextMenu || tableContextMenu.style.display === 'none') return;
+        const rect = table.getBoundingClientRect();
+        const menuRect = tableContextMenu.getBoundingClientRect();
+        let top = rect.top + window.scrollY - menuRect.height - 8;
+        if (top < 0) top = rect.bottom + window.scrollY + 8;
+        tableContextMenu.style.left = `${rect.left + window.scrollX}px`;
+        tableContextMenu.style.top = `${top}px`;
+    }
+
+    function insertRowBelow() {
+        if (!selectedTableCell) return;
+        const table = selectedTableCell.closest('table');
+        const rowIndex = selectedTableCell.parentElement.rowIndex;
+        const newRow = table.insertRow(rowIndex + 1);
+        for (let i = 0; i < table.rows[0].cells.length; i++) {
+            const newCell = newRow.insertCell();
+            newCell.contentEditable = true;
+            newCell.style.border = '1px solid var(--border-color)';
+            newCell.style.padding = '4px';
+        }
+        initTableResize(table);
+        recordHistory();
+        positionTableContextMenu(table);
+    }
+
+    function deleteCurrentRow() {
+        if (!selectedTableCell) return;
+        const table = selectedTableCell.closest('table');
+        const rowIndex = selectedTableCell.parentElement.rowIndex;
+        table.deleteRow(rowIndex);
+        initTableResize(table);
+        recordHistory();
+        hideTableContextMenu();
+    }
+
+    function insertColRight() {
+        if (!selectedTableCell) return;
+        const table = selectedTableCell.closest('table');
+        const colIndex = selectedTableCell.cellIndex;
+        Array.from(table.rows).forEach(row => {
+            const newCell = row.insertCell(colIndex + 1);
+            newCell.contentEditable = true;
+            newCell.style.border = '1px solid var(--border-color)';
+            newCell.style.padding = '4px';
+        });
+        initTableResize(table);
+        recordHistory();
+        positionTableContextMenu(table);
+    }
+
+    function deleteCurrentCol() {
+        if (!selectedTableCell) return;
+        const table = selectedTableCell.closest('table');
+        const colIndex = selectedTableCell.cellIndex;
+        Array.from(table.rows).forEach(row => {
+            if (row.cells.length > colIndex) row.deleteCell(colIndex);
+        });
+        initTableResize(table);
+        recordHistory();
+        hideTableContextMenu();
+    }
+
+    function alignTable(direction) {
+        if (!selectedTableCell) return;
+        const table = selectedTableCell.closest('table');
+        table.classList.remove('table-float-left', 'table-float-right');
+        if (direction === 'left') {
+            table.classList.add('table-float-left');
+        } else if (direction === 'right') {
+            table.classList.add('table-float-right');
+        }
+        recordHistory();
+        positionTableContextMenu(table);
+    }
+
+    document.addEventListener('click', (e) => {
+        if (tableContextMenu && tableContextMenu.style.display !== 'none') {
+            if (!tableContextMenu.contains(e.target) && !e.target.closest('table')) {
+                hideTableContextMenu();
             }
-            // After inserting, re-add resizers and controls
-            initTableResize(table);
-            removeTableControls();
-        });
-        document.body.appendChild(insertRowBtn);
-        // Insert column button (+) to the right of the cell
-        const insertColBtn = document.createElement('button');
-        insertColBtn.textContent = '+';
-        insertColBtn.title = 'Insertar columna a la derecha';
-        insertColBtn.className = 'table-insert-col-btn toolbar-btn';
-        insertColBtn.style.position = 'absolute';
-        insertColBtn.style.left = `${cellRect.right - 8 + window.scrollX}px`;
-        insertColBtn.style.top = `${cellRect.top + cellRect.height / 2 - 8 + window.scrollY}px`;
-        insertColBtn.addEventListener('click', () => {
-            Array.from(table.rows).forEach(row => {
-                const newCell = row.insertCell(colIndex + 1);
-                newCell.contentEditable = true;
-                newCell.style.border = '1px solid var(--border-color)';
-                newCell.style.padding = '4px';
-            });
-            initTableResize(table);
-            removeTableControls();
-        });
-        document.body.appendChild(insertColBtn);
-        // Delete row button (×) above the cell
-        const deleteRowBtn = document.createElement('button');
-        deleteRowBtn.textContent = '×';
-        deleteRowBtn.title = 'Eliminar fila';
-        deleteRowBtn.className = 'table-delete-row-btn toolbar-btn';
-        deleteRowBtn.style.position = 'absolute';
-        deleteRowBtn.style.left = `${cellRect.left + cellRect.width / 2 - 8 + window.scrollX}px`;
-        deleteRowBtn.style.top = `${cellRect.top - 16 + window.scrollY}px`;
-        deleteRowBtn.addEventListener('click', () => {
-            table.deleteRow(rowIndex);
-            removeTableControls();
-        });
-        document.body.appendChild(deleteRowBtn);
-        // Delete column button (×) to the left of the cell
-        const deleteColBtn = document.createElement('button');
-        deleteColBtn.textContent = '×';
-        deleteColBtn.title = 'Eliminar columna';
-        deleteColBtn.className = 'table-delete-col-btn toolbar-btn';
-        deleteColBtn.style.position = 'absolute';
-        deleteColBtn.style.left = `${cellRect.left - 16 + window.scrollX}px`;
-        deleteColBtn.style.top = `${cellRect.top + cellRect.height / 2 - 8 + window.scrollY}px`;
-        deleteColBtn.addEventListener('click', () => {
-            Array.from(table.rows).forEach(row => {
-                if (row.cells.length > colIndex) {
-                    row.deleteCell(colIndex);
-                }
-            });
-            initTableResize(table);
-            removeTableControls();
-        });
-        document.body.appendChild(deleteColBtn);
-    }
+        }
+    });
+
+    window.addEventListener('scroll', () => {
+        if (selectedTableCell) positionTableContextMenu(selectedTableCell.closest('table'));
+    });
+
+    window.addEventListener('resize', () => {
+        if (selectedTableCell) positionTableContextMenu(selectedTableCell.closest('table'));
+    });
 
     // Zoom state for image lightbox
     let currentZoom = 1;
@@ -3353,22 +3412,37 @@ document.addEventListener('DOMContentLoaded', function () {
         return fig;
     }
 
-    function addCaptionToImage(img) {
+    let imageForCaption = null;
+    function openCaptionModal(img) {
+        imageForCaption = img;
         const fig = ensureImageFigure(img);
+        const cap = fig.querySelector('figcaption.image-caption');
+        captionInput.value = cap ? cap.textContent : '';
+        captionModal.classList.add('visible');
+        captionInput.focus();
+    }
+    function closeCaptionModal() {
+        captionModal.classList.remove('visible');
+        imageForCaption = null;
+    }
+    saveCaptionBtn.addEventListener('click', () => {
+        if (!imageForCaption) return;
+        const fig = ensureImageFigure(imageForCaption);
         let cap = fig.querySelector('figcaption.image-caption');
-        const current = cap ? cap.textContent : '';
-        const text = prompt('Título de la imagen:', current);
-        if (text === null) return;
         if (!cap) {
             cap = document.createElement('figcaption');
             cap.className = 'image-caption';
             cap.contentEditable = 'true';
             fig.appendChild(cap);
         }
-        cap.textContent = text;
-        positionImageResizer(img);
+        cap.textContent = captionInput.value;
+        closeCaptionModal();
+        positionImageResizer(imageForCaption);
         recordHistory();
-    }
+    });
+    cancelCaptionBtn.addEventListener('click', closeCaptionModal);
+    captionModal.addEventListener('click', (e) => { if (e.target === captionModal) closeCaptionModal(); });
+    captionModal.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCaptionModal(); });
 
     function alignImage(direction) {
         const img = selectedImageForResize;
@@ -3393,7 +3467,7 @@ document.addEventListener('DOMContentLoaded', function () {
         captionBtn.textContent = 'ALT';
         captionBtn.title = 'Agregar título';
         captionBtn.addEventListener('click', () => {
-            if (selectedImageForResize) addCaptionToImage(selectedImageForResize);
+            if (selectedImageForResize) openCaptionModal(selectedImageForResize);
         });
 
         const inlineBtn = document.createElement('button');
@@ -3426,15 +3500,17 @@ document.addEventListener('DOMContentLoaded', function () {
         rightBtn.title = 'Alinear a la derecha';
         rightBtn.addEventListener('click', () => alignImage('right'));
 
-        const sizeButtons = [25, 50, 75, 100].map(p => {
-            const btn = document.createElement('button');
-            btn.textContent = `${p}%`;
-            btn.title = `Ancho ${p}%`;
-            btn.addEventListener('click', () => setSelectedImagePercent(p));
-            return btn;
-        });
+        const decreaseBtn = document.createElement('button');
+        decreaseBtn.textContent = '−';
+        decreaseBtn.title = 'Reducir 10%';
+        decreaseBtn.addEventListener('click', () => changeSelectedImageSize(-10));
 
-        imageContextMenu.append(captionBtn, inlineBtn, wrapBtn, breakBtn, leftBtn, centerBtn, rightBtn, ...sizeButtons);
+        const increaseBtn = document.createElement('button');
+        increaseBtn.textContent = '+';
+        increaseBtn.title = 'Aumentar 10%';
+        increaseBtn.addEventListener('click', () => changeSelectedImageSize(10));
+
+        imageContextMenu.append(captionBtn, inlineBtn, wrapBtn, breakBtn, leftBtn, centerBtn, rightBtn, decreaseBtn, increaseBtn);
         document.body.appendChild(imageContextMenu);
     }
 
@@ -3458,7 +3534,7 @@ document.addEventListener('DOMContentLoaded', function () {
         imageContextMenu.style.top = `${top}px`;
     }
 
-    function setSelectedImagePercent(percent) {
+    function changeSelectedImageSize(delta) {
         if (!selectedImageForResize) {
             showAlert("Por favor, selecciona una imagen primero para cambiar su tamaño.");
             return;
@@ -3466,7 +3542,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const container = getImageContainer(selectedImageForResize);
         container.style.maxWidth = 'none';
         container.style.maxHeight = 'none';
-        container.style.width = percent + '%';
+        const parentWidth = container.parentElement ? container.parentElement.clientWidth : container.offsetWidth;
+        let currentPercent;
+        if (container.style.width.endsWith('%')) {
+            currentPercent = parseFloat(container.style.width);
+        } else {
+            currentPercent = (container.offsetWidth / parentWidth) * 100;
+        }
+        let newPercent = Math.max(10, Math.min(200, currentPercent + delta));
+        container.style.width = newPercent + '%';
         container.style.height = 'auto';
         if (container !== selectedImageForResize) {
             selectedImageForResize.style.width = '100%';

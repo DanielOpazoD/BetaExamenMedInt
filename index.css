@@ -470,12 +470,42 @@ table.resizable-table .table-resize-handle {
     padding: 0.125rem 0.25rem;
 }
 
+/* Floating menu for table actions */
+.table-context-menu {
+    position: absolute;
+    display: none;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    padding: 0.25rem;
+    z-index: 10001;
+}
+
+.table-context-menu button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    margin: 0 0.125rem;
+    padding: 0.125rem 0.25rem;
+}
+
 /* Caption below images */
 .image-caption {
     background: var(--bg-tertiary);
     text-align: center;
     padding: 0.25rem;
     font-size: 0.875rem;
+}
+
+/* Floating table alignment */
+.table-float-left {
+    float: left;
+    margin: 0 1em 1em 0;
+}
+
+.table-float-right {
+    float: right;
+    margin: 0 0 1em 1em;
 }
 
 /* Table size selection grid */
