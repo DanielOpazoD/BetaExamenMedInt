@@ -12,6 +12,7 @@ import { setupAdvancedSearchReplace } from './search-replace.js';
 import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
 import { setupAdvancedEditing } from './editor-enhancements.js';
+import { setupImageTools } from './image-tools.js';
 import { improveText, askNotesQuestion } from './ai-tools.js';
 
 // --- IndexedDB Helper ---
@@ -5837,6 +5838,7 @@ document.addEventListener('DOMContentLoaded', function () {
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();
         setupAdvancedEditing(notesEditor);
+        setupImageTools(notesEditor, editorToolbar);
         setupCloudIntegration();
     }
 
