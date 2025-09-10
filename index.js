@@ -539,12 +539,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const infoLastEdited = getElem('info-last-edited');
     const closeNoteInfoBtn = getElem('close-note-info-btn');
 
-    // Image Gallery Modals
-    const imageGalleryLinkModal = getElem('image-gallery-link-modal');
-    const imageGalleryInputs = getElem('image-gallery-inputs');
-    const addGalleryImageUrlBtn = getElem('add-gallery-image-url-btn');
-    const cancelGalleryLinkBtn = getElem('cancel-gallery-link-btn');
-    const saveGalleryLinkBtn = getElem('save-gallery-link-btn');
     const imageLightboxModal = getElem('image-lightbox-modal');
     const closeLightboxBtn = getElem('close-lightbox-btn');
     const prevLightboxBtn = getElem('prev-lightbox-btn');
@@ -1262,18 +1256,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.execCommand('insertImage', false, url);
             }
         }));
-        // Gallery link insertion
-        const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
-        subNoteToolbar.appendChild(createSNButton('Crear Galería de Imágenes', gallerySVG, null, null, () => {
-            // Capture selection for gallery range
-            const selection = window.getSelection();
-            if (selection.rangeCount > 0 && subNoteEditor.contains(selection.anchorNode)) {
-                activeGalleryRange = selection.getRangeAt(0).cloneRange();
-            } else {
-                activeGalleryRange = null;
-            }
-            openGalleryLinkEditor();
-        }));
         // Insert hyperlink and remove hyperlink
         subNoteToolbar.appendChild(createSNButton('Insertar enlace', '🔗', null, null, () => {
             const url = prompt('Ingresa la URL:');
@@ -1282,10 +1264,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }));
         subNoteToolbar.appendChild(createSNButton('Quitar enlace', '❌', 'unlink'));
-        // Resize image buttons
-        subNoteToolbar.appendChild(createSNButton('Aumentar tamaño de imagen (+10%)', '➕', null, null, () => resizeSelectedImage(1.1)));
-        subNoteToolbar.appendChild(createSNButton('Disminuir tamaño de imagen (-10%)', '➖', null, null, () => resizeSelectedImage(0.9)));
-        subNoteToolbar.appendChild(createSNSeparator());
         // Print (save as PDF) within subnote editor
         subNoteToolbar.appendChild(createSNButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
             const printArea = getElem('print-area');
@@ -1381,8 +1359,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeNoteIndex = 0;
     let isResizing = false;
     let resolveConfirmation;
-    let activeGalleryRange = null;
-    let lastFloatAlign = 'left';
     let lightboxImages = [];
     let currentLightboxIndex = 0;
     let currentNoteRow = null;
@@ -1705,41 +1681,6 @@ document.addEventListener('DOMContentLoaded', function () {
         fig.parentNode.insertBefore(spacer, fig.nextSibling);
         // Actualizar selección de imagen para redimensionar
         selectedImageForResize = img;
-    }
-
-    /**
-     * Wraps at least two selected images in a flex container so they appear side by side.
-     */
-    function wrapSelectedImagesSideBySide() {
-        const sel = window.getSelection();
-        if (!sel || !sel.rangeCount) return;
-        const range = sel.getRangeAt(0);
-        const contents = range.cloneContents();
-        const imgCount = contents.querySelectorAll('img').length;
-        if (imgCount < 2) {
-            alertMessage.textContent = 'Selecciona al menos dos imágenes para alinearlas en fila.';
-            alertTitle.textContent = 'Imágenes insuficientes';
-            showModal(alertModal);
-            return;
-        }
-        const fragment = range.extractContents();
-        const div = document.createElement('div');
-        div.className = 'image-row';
-        div.appendChild(fragment);
-        // Replace paragraphs containing only an image with the image itself
-        div.querySelectorAll('p').forEach(p => {
-            if (p.childElementCount === 1 && p.firstElementChild.tagName === 'IMG') {
-                div.replaceChild(p.firstElementChild, p);
-            }
-        });
-        range.insertNode(div);
-        // Move caret after the inserted container
-        sel.removeAllRanges();
-        const newRange = document.createRange();
-        newRange.setStartAfter(div);
-        newRange.collapse(true);
-        sel.addRange(newRange);
-        notesEditor.focus();
     }
 
     // When loading a note into the editor, ensure any existing floating
@@ -3271,61 +3212,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(insertImageBtn);
 
-        // Floating image insertion: prompt the user for a URL and orientation,
-        // then insert the image as a floating figure (left or right) so that
-        // text wraps around it.  After insertion, enable drag to reposition
-        // the figure within the editor.
-        // Imagen flotante: en lugar de solicitar una URL, este botón aplica
-        // el estilo de imagen flotante "cuadrado" a la imagen seleccionada.
-        // Si la imagen aún no está envuelta en un figure, se envuelve y se
-        // alinea a la izquierda por defecto. En siguientes clics se alterna
-        // entre izquierda y derecha para facilitar el flujo de texto.
-        const floatImageBtn = document.createElement('button');
-        floatImageBtn.className = 'toolbar-btn';
-        floatImageBtn.title = 'Aplicar estilo de imagen cuadrada';
-        floatImageBtn.innerHTML = '🖼️';
-        floatImageBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            // Determine next alignment (toggle left/right)
-            lastFloatAlign = lastFloatAlign === 'left' ? 'right' : 'left';
-            wrapSelectedImage(lastFloatAlign);
-            notesEditor.focus();
-        });
-        editorToolbar.appendChild(floatImageBtn);
-
-        const sideBySideBtn = createButton('Alinear imágenes en fila', '🖼️🖼️', null, null, wrapSelectedImagesSideBySide);
-        editorToolbar.appendChild(sideBySideBtn);
-
-        const inlineLayoutBtn = createButton('Imagen en línea', '↔️', null, null, () => applyImageLayout('inline'));
-        const wrapLayoutBtn = createButton('Rodear texto', '📰', null, null, () => applyImageLayout('wrapText'));
-        const breakLayoutBtn = createButton('Imagen en bloque', '⛶', null, null, () => applyImageLayout('breakText'));
-        editorToolbar.appendChild(inlineLayoutBtn);
-        editorToolbar.appendChild(wrapLayoutBtn);
-        editorToolbar.appendChild(breakLayoutBtn);
-
-        [25,50,75,100].forEach(p => {
-            editorToolbar.appendChild(
-                createButton(`Ancho ${p}%`, `${p}%`, null, null, () => setSelectedImagePercent(p))
-            );
-        });
-
-        const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
-        editorToolbar.appendChild(createButton('Crear Galería de Imágenes', gallerySVG, null, null, openGalleryLinkEditor));
-
-        const resizePlusBtn = createButton('Aumentar tamaño de imagen (+10%)', '➕', null, null, () => resizeSelectedImage(1.1));
-        editorToolbar.appendChild(resizePlusBtn);
-
-        const resizeMinusBtn = createButton('Disminuir tamaño de imagen (-10%)', '➖', null, null, () => resizeSelectedImage(0.9));
-        editorToolbar.appendChild(resizeMinusBtn);
-
-        const moveLeftBtn = createButton('Mover imagen/tabla a la izquierda', '⬅️', null, null, () => moveSelectedElement(-10));
-        editorToolbar.appendChild(moveLeftBtn);
-
-        const moveRightBtn = createButton('Mover imagen/tabla a la derecha', '➡️', null, null, () => moveSelectedElement(10));
-        editorToolbar.appendChild(moveRightBtn);
-
-        // Eliminamos el botón de inserción de tablas y el separador asociado
-
         // Print/Save
         const printBtn = createButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
              const printArea = getElem('print-area');
@@ -3515,6 +3401,16 @@ document.addEventListener('DOMContentLoaded', function () {
         inlineBtn.title = 'Imagen en línea';
         inlineBtn.addEventListener('click', () => applyImageLayout('inline'));
 
+        const wrapBtn = document.createElement('button');
+        wrapBtn.textContent = '📰';
+        wrapBtn.title = 'Rodear texto';
+        wrapBtn.addEventListener('click', () => applyImageLayout('wrapText'));
+
+        const breakBtn = document.createElement('button');
+        breakBtn.textContent = '⛶';
+        breakBtn.title = 'Imagen en bloque';
+        breakBtn.addEventListener('click', () => applyImageLayout('breakText'));
+
         const leftBtn = document.createElement('button');
         leftBtn.textContent = '⬅️';
         leftBtn.title = 'Alinear a la izquierda';
@@ -3530,7 +3426,15 @@ document.addEventListener('DOMContentLoaded', function () {
         rightBtn.title = 'Alinear a la derecha';
         rightBtn.addEventListener('click', () => alignImage('right'));
 
-        imageContextMenu.append(captionBtn, inlineBtn, leftBtn, centerBtn, rightBtn);
+        const sizeButtons = [25, 50, 75, 100].map(p => {
+            const btn = document.createElement('button');
+            btn.textContent = `${p}%`;
+            btn.title = `Ancho ${p}%`;
+            btn.addEventListener('click', () => setSelectedImagePercent(p));
+            return btn;
+        });
+
+        imageContextMenu.append(captionBtn, inlineBtn, wrapBtn, breakBtn, leftBtn, centerBtn, rightBtn, ...sizeButtons);
         document.body.appendChild(imageContextMenu);
     }
 
@@ -3552,28 +3456,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (top < 0) top = rect.bottom + window.scrollY + 8;
         imageContextMenu.style.left = `${rect.left + window.scrollX}px`;
         imageContextMenu.style.top = `${top}px`;
-    }
-
-    function resizeSelectedImage(multiplier) {
-        if (selectedImageForResize) {
-            const container = getImageContainer(selectedImageForResize);
-            const currentWidth = container.style.width
-                ? parseFloat(container.style.width)
-                : container.offsetWidth;
-            const newWidth = currentWidth * multiplier;
-            container.style.maxWidth = 'none';
-            container.style.maxHeight = 'none';
-            container.style.width = `${newWidth}px`;
-            container.style.height = 'auto';
-            if (container !== selectedImageForResize) {
-                selectedImageForResize.style.width = '100%';
-                selectedImageForResize.style.height = '100%';
-            }
-            positionImageResizer(selectedImageForResize);
-            recordHistory();
-        } else {
-            showAlert("Por favor, selecciona una imagen primero para cambiar su tamaño.");
-        }
     }
 
     function setSelectedImagePercent(percent) {
@@ -3610,7 +3492,7 @@ document.addEventListener('DOMContentLoaded', function () {
         img.style.display = '';
         img.style.margin = '';
         if (type === 'wrapText') {
-            wrapSelectedImage(lastFloatAlign);
+            wrapSelectedImage('left');
         } else if (type === 'breakText') {
             img.classList.add('break-image');
         }
@@ -3702,20 +3584,6 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('resize', () => {
         if (selectedImageForResize) positionImageResizer(selectedImageForResize);
     });
-
-    function moveSelectedElement(deltaX) {
-        let elem = selectedImageForResize || selectedTableForMove;
-        if (elem && elem.tagName === 'IMG') {
-            const fig = elem.closest('figure.float-image');
-            if (fig) elem = fig;
-        }
-        if (!elem) {
-            showAlert("Selecciona una imagen o tabla para moverla.");
-            return;
-        }
-        const current = parseFloat(elem.style.marginLeft) || 0;
-        elem.style.marginLeft = `${current + deltaX}px`;
-    }
 
     function updateAllTotals() {
         let grandLectura = 0;
@@ -4912,106 +4780,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function openGalleryLinkEditor() {
-        const selection = window.getSelection();
-        if (!selection.rangeCount) return;
-        
-        activeGalleryRange = selection.getRangeAt(0).cloneRange();
-        const existingLink = activeGalleryRange.startContainer.parentElement.closest('.gallery-link');
-        
-        imageGalleryInputs.innerHTML = '';
-        
-        if (existingLink && existingLink.dataset.images) {
-            try {
-                const images = JSON.parse(existingLink.dataset.images);
-                images.forEach(img => addGalleryImageUrlInput(img.url, img.caption));
-            } catch (e) {
-                console.error("Error parsing gallery data:", e);
-                addGalleryImageUrlInput();
-            }
-        } else {
-            addGalleryImageUrlInput();
-        }
-        showModal(imageGalleryLinkModal);
-    }
-    
-    function addGalleryImageUrlInput(url = '', caption = '') {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'gallery-url-input flex flex-col gap-2 mb-2 p-2 border border-border-color rounded';
-    
-        const mainLine = document.createElement('div');
-        mainLine.className = 'flex items-center gap-2';
-    
-        const urlInput = document.createElement('input');
-        urlInput.type = 'url';
-        urlInput.placeholder = 'URL de la imagen...';
-        urlInput.className = 'flex-grow p-2 border border-border-color rounded-lg bg-secondary focus:ring-2 focus:ring-sky-400 url-field';
-        urlInput.value = url;
-        mainLine.appendChild(urlInput);
-    
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'toolbar-btn text-red-500 hover:bg-red-100 dark:hover:bg-red-900 flex-shrink-0';
-        deleteBtn.innerHTML = '🗑️';
-        deleteBtn.addEventListener('click', () => wrapper.remove());
-        mainLine.appendChild(deleteBtn);
-    
-        wrapper.appendChild(mainLine);
-    
-        const captionInput = document.createElement('input');
-        captionInput.type = 'text';
-        captionInput.placeholder = 'Descripción (opcional)...';
-        captionInput.className = 'w-full p-2 border border-border-color rounded-lg bg-secondary text-sm caption-field';
-        captionInput.value = caption;
-        wrapper.appendChild(captionInput);
-    
-        imageGalleryInputs.appendChild(wrapper);
-    }
-
-    function handleGalleryLinkSave() {
-        const imageElements = imageGalleryInputs.querySelectorAll('.gallery-url-input');
-        const images = Array.from(imageElements).map(el => {
-            const url = el.querySelector('.url-field').value;
-            const caption = el.querySelector('.caption-field').value;
-            return { url, caption };
-        }).filter(item => item.url);
-
-        if (images.length === 0) {
-            showAlert("Por favor, añade al menos una URL de imagen válida.");
-            return;
-        }
-
-        if (activeGalleryRange) {
-            const selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(activeGalleryRange);
-        
-            const existingLink = activeGalleryRange.startContainer.parentElement.closest('.gallery-link');
-            if (existingLink) {
-                existingLink.dataset.images = JSON.stringify(images);
-            } else {
-                 // Remove formatting on the selected range before wrapping it
-                 document.execCommand('removeFormat');
-                 const span = document.createElement('span');
-                 span.className = 'gallery-link';
-                 span.dataset.images = JSON.stringify(images);
-                 span.appendChild(activeGalleryRange.extractContents());
-                 activeGalleryRange.insertNode(span);
-                 // Insert a non-breaking space after the span to break out of the hyperlink context
-                 const spacer = document.createTextNode('\u00A0');
-                 span.parentNode.insertBefore(spacer, span.nextSibling);
-                 // After inserting the gallery span and spacer, collapse the selection so formatting does not persist
-                 const newRange = document.createRange();
-                 newRange.setStartAfter(spacer);
-                 newRange.collapse(true);
-                 const sel = window.getSelection();
-                 sel.removeAllRanges();
-                 sel.addRange(newRange);
-            }
-            hideModal(imageGalleryLinkModal);
-            activeGalleryRange = null;
-        }
-    }
-    
     function openImageLightbox(imagesData, startIndex = 0) {
         try {
             if (typeof imagesData === 'string') {
@@ -5966,14 +5734,6 @@ document.addEventListener('DOMContentLoaded', function () {
             editingQuickNote = false;
         });
         
-        // Image Gallery Modal Listeners
-        addGalleryImageUrlBtn.addEventListener('click', () => addGalleryImageUrlInput());
-        cancelGalleryLinkBtn.addEventListener('click', () => {
-            hideModal(imageGalleryLinkModal);
-            activeGalleryRange = null;
-        });
-        saveGalleryLinkBtn.addEventListener('click', handleGalleryLinkSave);
-
         // Lightbox Listeners
         closeLightboxBtn.addEventListener('click', () => hideModal(imageLightboxModal));
         prevLightboxBtn.addEventListener('click', () => {
