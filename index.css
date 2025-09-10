@@ -174,6 +174,26 @@
         #notes-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
         #notes-editor table.selected-for-move { outline: 2px solid var(--btn-primary-bg); }
 
+        /* Image resize overlay and handles */
+        #img-resize-overlay {
+            position: absolute;
+            border: 2px solid var(--btn-primary-bg);
+            pointer-events: none;
+            display: none;
+            z-index: 1000;
+        }
+        #img-resize-overlay .img-handle {
+            width: 8px;
+            height: 8px;
+            background: var(--btn-primary-bg);
+            position: absolute;
+            pointer-events: auto;
+        }
+        #img-resize-overlay .handle-nw { top: -4px; left: -4px; cursor: nwse-resize; }
+        #img-resize-overlay .handle-ne { top: -4px; right: -4px; cursor: nesw-resize; }
+        #img-resize-overlay .handle-se { bottom: -4px; right: -4px; cursor: nwse-resize; }
+        #img-resize-overlay .handle-sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
+
         /* Display multiple images in a row */
         #notes-editor .image-row {
             display: flex;
