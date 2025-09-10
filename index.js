@@ -116,6 +116,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const exportNoteBtn = getElem('export-note-btn');
     const importNoteBtn = getElem('import-note-btn');
     const importNoteFileInput = getElem('import-note-file-input');
+    const imageUploadInput = getElem('image-upload-input');
     const settingsBtn = getElem('settings-btn');
     const settingsDropdown = getElem('settings-dropdown');
     const statusFiltersContainer = getElem('status-filters');
@@ -564,6 +565,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const fullscreenBtn = getElem('toggle-fullscreen-btn');
 
     let htmlPasteEnabled = false;
+    let activeEditor = notesEditor;
+    [notesEditor, subNoteEditor].forEach(ed => ed && ed.addEventListener('focus', () => {
+        activeEditor = ed;
+    }));
 
     function sanitizeHtml(html) {
         const div = document.createElement('div');
@@ -1203,7 +1208,11 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             true
         ));
-        // Image from URL
+        // Image insertion
+        subNoteToolbar.appendChild(createSNButton('Insertar Imagen desde archivo', '🖼️➕', null, null, () => {
+            activeEditor = subNoteEditor;
+            imageUploadInput?.click();
+        }));
         subNoteToolbar.appendChild(createSNButton('Insertar Imagen desde URL', '🖼️', null, null, () => {
             const url = prompt('Ingresa la URL de la imagen:');
             if (url) {
@@ -1234,6 +1243,13 @@ document.addEventListener('DOMContentLoaded', function () {
         // Resize image buttons
         subNoteToolbar.appendChild(createSNButton('Aumentar tamaño de imagen (+10%)', '➕', null, null, () => resizeSelectedImage(1.1)));
         subNoteToolbar.appendChild(createSNButton('Disminuir tamaño de imagen (-10%)', '➖', null, null, () => resizeSelectedImage(0.9)));
+        subNoteToolbar.appendChild(createSNButton('Tamaño 25%', '25%', null, null, () => setSelectedImageSize(0.25)));
+        subNoteToolbar.appendChild(createSNButton('Tamaño 50%', '50%', null, null, () => setSelectedImageSize(0.5)));
+        subNoteToolbar.appendChild(createSNButton('Tamaño 75%', '75%', null, null, () => setSelectedImageSize(0.75)));
+        subNoteToolbar.appendChild(createSNButton('Tamaño 100%', '100%', null, null, () => setSelectedImageSize(1)));
+        subNoteToolbar.appendChild(createSNButton('Imagen en línea', 'Inl', null, null, () => setImageLayout('inline')));
+        subNoteToolbar.appendChild(createSNButton('Rodear texto', 'Wrap', null, null, () => setImageLayout('wrap')));
+        subNoteToolbar.appendChild(createSNButton('Imagen en bloque', 'Blk', null, null, () => setImageLayout('break')));
         subNoteToolbar.appendChild(createSNSeparator());
         // Print (save as PDF) within subnote editor
         subNoteToolbar.appendChild(createSNButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
@@ -1342,16 +1358,199 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentCallout = null;
     let lineEraseMode = false;
 
+    // --- Image Utilities ---
+    function insertImageAtCursor(src, editor = activeEditor) {
+        const img = document.createElement('img');
+        img.src = src;
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(img);
+            range.setStartAfter(img);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } else {
+            editor.appendChild(img);
+        }
+        showImageResizeHandles(img);
+    }
+
+    function insertImageFromFile(file, editor = activeEditor) {
+        const reader = new FileReader();
+        reader.onload = (e) => insertImageAtCursor(e.target.result, editor);
+        reader.readAsDataURL(file);
+    }
+
+    if (imageUploadInput) {
+        imageUploadInput.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (file) insertImageFromFile(file);
+            e.target.value = '';
+        });
+    }
+
+    function enableImageDrop(editor) {
+        if (!editor) return;
+        editor.addEventListener('dragover', (e) => {
+            if (Array.from(e.dataTransfer?.items || []).some(i => i.type.startsWith('image/'))) {
+                e.preventDefault();
+            }
+        });
+        editor.addEventListener('drop', (e) => {
+            const files = e.dataTransfer?.files;
+            const images = files ? Array.from(files).filter(f => f.type.startsWith('image/')) : [];
+            if (images.length) {
+                e.preventDefault();
+                activeEditor = editor;
+                const range = document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null;
+                if (range) {
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+                images.forEach(file => insertImageFromFile(file, editor));
+            }
+        });
+    }
+    enableImageDrop(notesEditor);
+    enableImageDrop(subNoteEditor);
+
+    function showImageResizeHandles(img) {
+        removeImageResizeHandles();
+        selectedImageForResize = img;
+        const container = img.closest('figure.float-image, figure.break-image') || (() => {
+            const span = document.createElement('span');
+            span.className = 'image-resize-wrapper';
+            img.parentNode.insertBefore(span, img);
+            span.appendChild(img);
+            return span;
+        })();
+        container.classList.add('image-resize-container');
+        ['nw','ne','sw','se'].forEach(pos => {
+            const h = document.createElement('span');
+            h.className = `image-resize-handle ${pos}`;
+            h.addEventListener('mousedown', startImageResize);
+            container.appendChild(h);
+        });
+    }
+
+    function removeImageResizeHandles() {
+        document.querySelectorAll('.image-resize-handle').forEach(h => h.remove());
+        document.querySelectorAll('.image-resize-container').forEach(c => {
+            c.classList.remove('image-resize-container');
+            if (c.classList.contains('image-resize-wrapper')) {
+                const img = c.querySelector('img');
+                c.parentNode.insertBefore(img, c);
+                c.remove();
+            }
+        });
+        selectedImageForResize = null;
+    }
+
+    let resizeHandleData = null;
+    function startImageResize(e) {
+        e.preventDefault();
+        resizeHandleData = {
+            handle: Array.from(e.target.classList).find(c => ['nw','ne','sw','se'].includes(c)),
+            startX: e.clientX,
+            startY: e.clientY,
+            startWidth: selectedImageForResize.offsetWidth,
+            startHeight: selectedImageForResize.offsetHeight,
+            ratio: selectedImageForResize.offsetWidth / selectedImageForResize.offsetHeight
+        };
+        document.addEventListener('mousemove', onImageResizeMove);
+        document.addEventListener('mouseup', stopImageResize);
+    }
+
+    function onImageResizeMove(e) {
+        if (!resizeHandleData || !selectedImageForResize) return;
+        let dx = e.clientX - resizeHandleData.startX;
+        let dy = e.clientY - resizeHandleData.startY;
+        const h = resizeHandleData.handle;
+        if (h === 'nw') { dx = -dx; dy = -dy; }
+        if (h === 'ne') { dy = -dy; }
+        if (h === 'sw') { dx = -dx; }
+        let newWidth = resizeHandleData.startWidth + dx;
+        let newHeight = resizeHandleData.startHeight + dy;
+        if (!e.shiftKey) {
+            newHeight = newWidth / resizeHandleData.ratio;
+        }
+        if (newWidth > 20 && newHeight > 20) {
+            selectedImageForResize.style.width = newWidth + 'px';
+            selectedImageForResize.style.height = newHeight + 'px';
+            const fig = selectedImageForResize.closest('figure.float-image, figure.break-image');
+            if (fig) {
+                fig.style.width = newWidth + 'px';
+                fig.style.maxWidth = 'none';
+            }
+        }
+    }
+
+    function stopImageResize() {
+        resizeHandleData = null;
+        document.removeEventListener('mousemove', onImageResizeMove);
+        document.removeEventListener('mouseup', stopImageResize);
+    }
+
+    function setSelectedImageSize(percent) {
+        if (!selectedImageForResize) {
+            showAlert('Selecciona primero una imagen para aplicar el tamaño.');
+            return;
+        }
+        const container = selectedImageForResize.closest('#subnote-editor') ? subNoteEditor : notesEditor;
+        const newWidth = container.clientWidth * percent;
+        selectedImageForResize.style.width = newWidth + 'px';
+        selectedImageForResize.style.height = 'auto';
+        const fig = selectedImageForResize.closest('figure.float-image, figure.break-image');
+        if (fig) {
+            fig.style.width = newWidth + 'px';
+            fig.style.maxWidth = 'none';
+        }
+    }
+
+    function setImageLayout(mode) {
+        if (!selectedImageForResize) {
+            showAlert('Selecciona primero una imagen para cambiar su disposición.');
+            return;
+        }
+        const img = selectedImageForResize;
+        if (mode === 'inline') {
+            const fig = img.closest('figure.float-image, figure.break-image');
+            if (fig) {
+                fig.parentNode.insertBefore(img, fig);
+                fig.remove();
+            }
+            img.style.display = '';
+            img.style.margin = '';
+        } else if (mode === 'wrap') {
+            wrapSelectedImage('left');
+        } else if (mode === 'break') {
+            let fig = img.closest('figure.float-image, figure.break-image');
+            if (!fig) {
+                fig = document.createElement('figure');
+                fig.contentEditable = 'false';
+                img.parentNode.insertBefore(fig, img);
+                fig.appendChild(img);
+            }
+            fig.className = 'break-image';
+            fig.style.float = 'none';
+            fig.style.margin = '1rem auto';
+        }
+        showImageResizeHandles(img);
+    }
+
     // Image selection handling within the sub-note editor
     if (subNoteEditor) {
         subNoteEditor.addEventListener('click', (e) => {
             if (e.target.tagName === 'IMG') {
                 subNoteEditor.querySelectorAll('img').forEach(img => img.classList.remove('selected-for-resize'));
                 e.target.classList.add('selected-for-resize');
-                selectedImageForResize = e.target;
-            } else {
+                showImageResizeHandles(e.target);
+            } else if (!e.target.classList.contains('image-resize-handle')) {
                 subNoteEditor.querySelectorAll('img').forEach(img => img.classList.remove('selected-for-resize'));
-                selectedImageForResize = null;
+                removeImageResizeHandles();
             }
         });
     }
@@ -3189,6 +3388,12 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createSeparator());
 
         // Image controls
+        const insertImageBtn = createButton('Insertar imagen', '🖼️➕', null, null, () => {
+            activeEditor = notesEditor;
+            imageUploadInput?.click();
+        });
+        editorToolbar.appendChild(insertImageBtn);
+
         // Floating image insertion: prompt the user for a URL and orientation,
         // then insert the image as a floating figure (left or right) so that
         // text wraps around it.  After insertion, enable drag to reposition
@@ -3223,6 +3428,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const resizeMinusBtn = createButton('Disminuir tamaño de imagen (-10%)', '➖', null, null, () => resizeSelectedImage(0.9));
         editorToolbar.appendChild(resizeMinusBtn);
+
+        editorToolbar.appendChild(createButton('Tamaño 25%', '25%', null, null, () => setSelectedImageSize(0.25)));
+        editorToolbar.appendChild(createButton('Tamaño 50%', '50%', null, null, () => setSelectedImageSize(0.5)));
+        editorToolbar.appendChild(createButton('Tamaño 75%', '75%', null, null, () => setSelectedImageSize(0.75)));
+        editorToolbar.appendChild(createButton('Tamaño 100%', '100%', null, null, () => setSelectedImageSize(1)));
+
+        editorToolbar.appendChild(createButton('Imagen en línea', 'Inl', null, null, () => setImageLayout('inline')));
+        editorToolbar.appendChild(createButton('Rodear texto', 'Wrap', null, null, () => setImageLayout('wrap')));
+        editorToolbar.appendChild(createButton('Imagen en bloque', 'Blk', null, null, () => setImageLayout('break')));
 
         const moveLeftBtn = createButton('Mover imagen/tabla a la izquierda', '⬅️', null, null, () => moveSelectedElement(-10));
         editorToolbar.appendChild(moveLeftBtn);
@@ -3363,6 +3577,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const newWidth = currentWidth * multiplier;
             selectedImageForResize.style.width = `${newWidth}px`;
             selectedImageForResize.style.height = 'auto'; // Keep aspect ratio
+            const fig = selectedImageForResize.closest('figure.float-image, figure.break-image');
+            if (fig) {
+                fig.style.width = `${newWidth}px`;
+                fig.style.maxWidth = 'none';
+            }
         } else {
             showAlert("Por favor, selecciona una imagen primero para cambiar su tamaño.");
         }
@@ -5377,10 +5596,10 @@ document.addEventListener('DOMContentLoaded', function () {
              if (e.target.tagName === 'IMG') {
                  document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
                  e.target.classList.add('selected-for-resize');
-                 selectedImageForResize = e.target;
-             } else {
+                 showImageResizeHandles(e.target);
+             } else if (!e.target.classList.contains('image-resize-handle')) {
                  document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
-                 selectedImageForResize = null;
+                 removeImageResizeHandles();
              }
 
              // Handle table selection
