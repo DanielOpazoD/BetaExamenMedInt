@@ -3415,6 +3415,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let imageForCaption = null;
     function openCaptionModal(img) {
         imageForCaption = img;
+        hideImageResizer();
         const fig = ensureImageFigure(img);
         const cap = fig.querySelector('figcaption.image-caption');
         captionInput.value = cap ? cap.textContent : '';
@@ -3423,6 +3424,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     function closeCaptionModal() {
         captionModal.classList.remove('visible');
+        if (selectedImageForResize) positionImageResizer(selectedImageForResize);
         imageForCaption = null;
     }
     saveCaptionBtn.addEventListener('click', () => {
@@ -3542,7 +3544,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const container = getImageContainer(selectedImageForResize);
         container.style.maxWidth = 'none';
         container.style.maxHeight = 'none';
-        const parentWidth = container.parentElement ? container.parentElement.clientWidth : container.offsetWidth;
+        let parentWidth = container.parentElement ? container.parentElement.clientWidth : container.offsetWidth;
+        if (parentWidth === 0) parentWidth = container.offsetWidth;
         let currentPercent;
         if (container.style.width.endsWith('%')) {
             currentPercent = parseFloat(container.style.width);
@@ -3591,7 +3594,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function createImageResizer() {
         imageResizeOverlay = document.createElement('div');
         imageResizeOverlay.className = 'image-resize-overlay';
-        ['nw','ne','sw','se'].forEach(dir => {
+        ['nw','ne','sw','se','e','s'].forEach(dir => {
             const h = document.createElement('div');
             h.className = `image-resize-handle ${dir}`;
             h.dataset.handle = dir;
@@ -3642,9 +3645,15 @@ document.addEventListener('DOMContentLoaded', function () {
         if (currentImageHandle && (currentImageHandle.includes('w'))) dx = -dx;
         if (currentImageHandle && (currentImageHandle.includes('n'))) dy = -dy;
         const container = getImageContainer(selectedImageForResize);
-        let newWidth = startWidth + dx;
-        let newHeight = startHeight + dy;
-        if (!e.shiftKey) {
+        let newWidth = startWidth;
+        let newHeight = startHeight;
+        if (currentImageHandle.includes('e') || currentImageHandle.includes('w')) {
+            newWidth = startWidth + dx;
+        }
+        if (currentImageHandle.includes('s') || currentImageHandle.includes('n')) {
+            newHeight = startHeight + dy;
+        }
+        if (!e.shiftKey && ['nw','ne','sw','se'].includes(currentImageHandle)) {
             newHeight = newWidth / aspectRatio;
         }
         container.style.width = `${Math.max(10, newWidth)}px`;
@@ -6014,7 +6023,10 @@ document.addEventListener('DOMContentLoaded', function () {
         populateIconPicker();
         loadState();
         setupEventListeners();
-        document.querySelectorAll('table').forEach(initTableResize);
+        document.querySelectorAll('table').forEach(t => {
+            initTableResize(t);
+            enableTableEditing(t);
+        });
         applyTheme(document.documentElement.dataset.theme || 'default');
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();
