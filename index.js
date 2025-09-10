@@ -13,6 +13,7 @@ import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
 import { setupAdvancedEditing } from './editor-enhancements.js';
 import { improveText, askNotesQuestion } from './ai-tools.js';
+import { setupImageTools } from './image-tools.js';
 
 // --- IndexedDB Helper ---
 // NOTE: The IndexedDB helper has been moved into db.js.  The following
@@ -5829,6 +5830,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function init() {
         initializeCells();
         setupEditorToolbar();
+        setupImageTools(notesEditor, editorToolbar);
         populateIconPicker();
         loadState();
         setupEventListeners();

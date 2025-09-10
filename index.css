@@ -1054,3 +1054,55 @@ hr.hr-dashed { border-top: 1px dashed var(--text-primary); }
 @keyframes blink {
   50% { border-color: transparent; }
 }
+/* Image tools overlay and panel */
+.image-overlay {
+  position: absolute;
+  border: 2px solid var(--btn-primary-bg);
+  pointer-events: none;
+  z-index: 10000;
+}
+.image-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--btn-primary-bg);
+  border: 2px solid #fff;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+.image-handle.nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.image-handle.ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.image-handle.sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+.image-handle.se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.image-menu {
+  position: absolute;
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  padding: 4px;
+  border-radius: 4px;
+  z-index: 10001;
+}
+.image-menu button {
+  padding: 2px 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  border-radius: 3px;
+}
+.image-title-popup {
+  position: absolute;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  padding: 4px;
+  display: flex;
+  gap: 4px;
+  z-index: 10002;
+}
+.image-caption {
+  background: #f3f4f6;
+  text-align: center;
+  padding: 2px 4px;
+  margin-top: 4px;
+}
