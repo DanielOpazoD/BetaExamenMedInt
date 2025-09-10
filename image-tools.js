@@ -49,10 +49,8 @@ export function setupImageTools(editor, toolbar) {
     const items = Array.from(e.clipboardData?.items || []).filter(i => i.type.startsWith('image/'));
     if (items.length) {
       e.preventDefault();
-      items.forEach(item => {
-        const file = item.getAsFile();
-        if (file) insertFiles([file]);
-      });
+      const file = items[0].getAsFile();
+      if (file) insertFiles([file]);
     }
   });
 
@@ -148,7 +146,10 @@ export function setupImageTools(editor, toolbar) {
   const downBtn = document.createElement('button');
   downBtn.textContent = '↓';
   downBtn.addEventListener('click', () => moveImage(1));
-  sizeGroup.append(minusBtn, plusBtn, upBtn, downBtn);
+  const delBtn = document.createElement('button');
+  delBtn.textContent = '🗑️';
+  delBtn.addEventListener('click', deleteImage);
+  sizeGroup.append(minusBtn, plusBtn, upBtn, downBtn, delBtn);
 
   menu.addEventListener('click', e => {
     const layoutBtn = e.target.closest('[data-layout]');
@@ -184,17 +185,25 @@ export function setupImageTools(editor, toolbar) {
   function moveImage(dir) {
     if (!activeImg) return;
     const caption = activeImg.nextElementSibling;
-    const bundle = [activeImg];
-    if (caption && caption.classList.contains('image-caption')) bundle.push(caption);
+    const nodes = [activeImg];
+    if (caption && caption.classList.contains('image-caption')) nodes.push(caption);
+    const parent = activeImg.parentNode;
     if (dir < 0) {
-      const prev = activeImg.previousSibling;
-      if (prev) prev.before(...bundle);
+      const ref = activeImg.previousSibling;
+      if (ref) nodes.forEach(n => parent.insertBefore(n, ref));
     } else {
-      const afterNode = bundle[bundle.length - 1];
-      const next = afterNode.nextSibling;
-      if (next) next.after(...bundle);
+      const ref = nodes[nodes.length - 1].nextSibling;
+      if (ref) nodes.slice().reverse().forEach(n => parent.insertBefore(n, ref.nextSibling));
     }
     positionUI();
+  }
+
+  function deleteImage() {
+    if (!activeImg) return;
+    const caption = activeImg.nextElementSibling;
+    if (caption && caption.classList.contains('image-caption')) caption.remove();
+    activeImg.remove();
+    clearSelection();
   }
 
   /**
