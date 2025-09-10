@@ -150,6 +150,16 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
     notesEditor.addEventListener('input', recordHistory);
+    notesEditor.addEventListener('input', () => {
+        if (selectedImageForResize) {
+            if (!notesEditor.contains(selectedImageForResize)) {
+                selectedImageForResize = null;
+                hideImageResizer();
+            } else {
+                positionImageResizer(selectedImageForResize);
+            }
+        }
+    });
     notesEditor.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
             e.preventDefault();
@@ -605,6 +615,47 @@ document.addEventListener('DOMContentLoaded', function () {
                     } else {
                         const text = clipboard.getData('text/plain');
                         document.execCommand('insertText', false, text);
+                    }
+                }
+            });
+
+            editor.addEventListener('dragover', (e) => {
+                const dt = e.dataTransfer;
+                if (dt && Array.from(dt.items || []).some(item => item.kind === 'file' && item.type.startsWith('image/'))) {
+                    e.preventDefault();
+                }
+            });
+
+            editor.addEventListener('drop', (e) => {
+                const files = e.dataTransfer?.files;
+                if (files && files.length) {
+                    const imgFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+                    if (imgFiles.length) {
+                        e.preventDefault();
+                        const range = document.caretRangeFromPoint
+                            ? document.caretRangeFromPoint(e.clientX, e.clientY)
+                            : (document.caretPositionFromPoint
+                                ? (() => {
+                                    const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+                                    if (!pos) return null;
+                                    const r = document.createRange();
+                                    r.setStart(pos.offsetNode, pos.offset);
+                                    r.collapse();
+                                    return r;
+                                })()
+                                : null);
+                        if (range) {
+                            const sel = window.getSelection();
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                        }
+                        imgFiles.forEach(file => {
+                            const reader = new FileReader();
+                            reader.onload = (evt) => {
+                                document.execCommand('insertImage', false, evt.target.result);
+                            };
+                            reader.readAsDataURL(file);
+                        });
                     }
                 }
             });
@@ -1331,6 +1382,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let isResizing = false;
     let resolveConfirmation;
     let activeGalleryRange = null;
+    let lastFloatAlign = 'left';
     let lightboxImages = [];
     let currentLightboxIndex = 0;
     let currentNoteRow = null;
@@ -1349,9 +1401,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 subNoteEditor.querySelectorAll('img').forEach(img => img.classList.remove('selected-for-resize'));
                 e.target.classList.add('selected-for-resize');
                 selectedImageForResize = e.target;
+                positionImageResizer(e.target);
             } else {
                 subNoteEditor.querySelectorAll('img').forEach(img => img.classList.remove('selected-for-resize'));
                 selectedImageForResize = null;
+                hideImageResizer();
             }
         });
     }
@@ -3189,6 +3243,32 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createSeparator());
 
         // Image controls
+        const insertImageBtn = createButton('Insertar imagen', '📷', null, null, () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            const sel = window.getSelection();
+            const savedRange = sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+            input.addEventListener('change', () => {
+                const file = input.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        if (savedRange) {
+                            const sel = window.getSelection();
+                            sel.removeAllRanges();
+                            sel.addRange(savedRange);
+                        }
+                        document.execCommand('insertImage', false, evt.target.result);
+                        notesEditor.focus();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            input.click();
+        });
+        editorToolbar.appendChild(insertImageBtn);
+
         // Floating image insertion: prompt the user for a URL and orientation,
         // then insert the image as a floating figure (left or right) so that
         // text wraps around it.  After insertion, enable drag to reposition
@@ -3202,7 +3282,6 @@ document.addEventListener('DOMContentLoaded', function () {
         floatImageBtn.className = 'toolbar-btn';
         floatImageBtn.title = 'Aplicar estilo de imagen cuadrada';
         floatImageBtn.innerHTML = '🖼️';
-        let lastFloatAlign = 'left';
         floatImageBtn.addEventListener('click', (e) => {
             e.preventDefault();
             // Determine next alignment (toggle left/right)
@@ -3214,6 +3293,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const sideBySideBtn = createButton('Alinear imágenes en fila', '🖼️🖼️', null, null, wrapSelectedImagesSideBySide);
         editorToolbar.appendChild(sideBySideBtn);
+
+        const inlineLayoutBtn = createButton('Imagen en línea', '↔️', null, null, () => applyImageLayout('inline'));
+        const wrapLayoutBtn = createButton('Rodear texto', '📰', null, null, () => applyImageLayout('wrap'));
+        const breakLayoutBtn = createButton('Imagen en bloque', '⛶', null, null, () => applyImageLayout('break'));
+        editorToolbar.appendChild(inlineLayoutBtn);
+        editorToolbar.appendChild(wrapLayoutBtn);
+        editorToolbar.appendChild(breakLayoutBtn);
+
+        [25,50,75,100].forEach(p => {
+            editorToolbar.appendChild(
+                createButton(`Ancho ${p}%`, `${p}%`, null, null, () => setSelectedImagePercent(p))
+            );
+        });
 
         const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
         editorToolbar.appendChild(createButton('Crear Galería de Imágenes', gallerySVG, null, null, openGalleryLinkEditor));
@@ -3355,18 +3447,147 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
+    function getImageContainer(img) {
+        return img.closest('figure.float-image') || img;
+    }
+
     function resizeSelectedImage(multiplier) {
         if (selectedImageForResize) {
-            const currentWidth = selectedImageForResize.style.width
-                ? parseFloat(selectedImageForResize.style.width)
-                : selectedImageForResize.offsetWidth;
+            const container = getImageContainer(selectedImageForResize);
+            const currentWidth = container.style.width
+                ? parseFloat(container.style.width)
+                : container.offsetWidth;
             const newWidth = currentWidth * multiplier;
-            selectedImageForResize.style.width = `${newWidth}px`;
-            selectedImageForResize.style.height = 'auto'; // Keep aspect ratio
+            container.style.width = `${newWidth}px`;
+            container.style.height = 'auto';
+            if (container !== selectedImageForResize) {
+                selectedImageForResize.style.width = '100%';
+                selectedImageForResize.style.height = '100%';
+            }
+            positionImageResizer(selectedImageForResize);
+            recordHistory();
         } else {
             showAlert("Por favor, selecciona una imagen primero para cambiar su tamaño.");
         }
     }
+
+    function setSelectedImagePercent(percent) {
+        if (!selectedImageForResize) {
+            showAlert("Por favor, selecciona una imagen primero para cambiar su tamaño.");
+            return;
+        }
+        const container = getImageContainer(selectedImageForResize);
+        container.style.width = percent + '%';
+        container.style.height = 'auto';
+        if (container !== selectedImageForResize) {
+            selectedImageForResize.style.width = '100%';
+            selectedImageForResize.style.height = '100%';
+        }
+        positionImageResizer(selectedImageForResize);
+        recordHistory();
+    }
+
+    function applyImageLayout(type) {
+        if (!selectedImageForResize) {
+            showAlert("Selecciona una imagen para cambiar su disposición.");
+            return;
+        }
+        const img = selectedImageForResize;
+        const existingFig = img.closest('figure.float-image');
+        if (existingFig) existingFig.replaceWith(img);
+        img.classList.remove('break-image');
+        img.style.float = '';
+        img.style.display = '';
+        img.style.margin = '';
+        if (type === 'wrap') {
+            wrapSelectedImage(lastFloatAlign);
+        } else if (type === 'break') {
+            img.classList.add('break-image');
+        }
+        positionImageResizer(selectedImageForResize);
+        recordHistory();
+    }
+
+    let imageResizeOverlay = null;
+    let currentImageHandle = null;
+    let startX = 0, startY = 0, startWidth = 0, startHeight = 0, aspectRatio = 1;
+
+    function createImageResizer() {
+        imageResizeOverlay = document.createElement('div');
+        imageResizeOverlay.className = 'image-resize-overlay';
+        ['nw','ne','sw','se'].forEach(dir => {
+            const h = document.createElement('div');
+            h.className = `image-resize-handle ${dir}`;
+            h.dataset.handle = dir;
+            h.addEventListener('mousedown', startImageResize);
+            imageResizeOverlay.appendChild(h);
+        });
+        document.body.appendChild(imageResizeOverlay);
+    }
+
+    function positionImageResizer(img) {
+        if (!img) return;
+        if (!imageResizeOverlay) createImageResizer();
+        const rect = getImageContainer(img).getBoundingClientRect();
+        imageResizeOverlay.style.display = 'block';
+        imageResizeOverlay.style.left = `${rect.left + window.scrollX}px`;
+        imageResizeOverlay.style.top = `${rect.top + window.scrollY}px`;
+        imageResizeOverlay.style.width = `${rect.width}px`;
+        imageResizeOverlay.style.height = `${rect.height}px`;
+    }
+
+    function hideImageResizer() {
+        if (imageResizeOverlay) imageResizeOverlay.style.display = 'none';
+    }
+
+    function startImageResize(e) {
+        if (!selectedImageForResize) return;
+        e.preventDefault();
+        e.stopPropagation();
+        currentImageHandle = e.target.dataset.handle;
+        const container = getImageContainer(selectedImageForResize);
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = container.offsetWidth;
+        startHeight = container.offsetHeight;
+        aspectRatio = startWidth / startHeight;
+        document.addEventListener('mousemove', onImageResize);
+        document.addEventListener('mouseup', stopImageResize);
+    }
+
+    function onImageResize(e) {
+        if (!selectedImageForResize) return;
+        let dx = e.clientX - startX;
+        let dy = e.clientY - startY;
+        if (currentImageHandle && (currentImageHandle.includes('w'))) dx = -dx;
+        if (currentImageHandle && (currentImageHandle.includes('n'))) dy = -dy;
+        const container = getImageContainer(selectedImageForResize);
+        let newWidth = startWidth + dx;
+        let newHeight = startHeight + dy;
+        if (!e.shiftKey) {
+            newHeight = newWidth / aspectRatio;
+        }
+        container.style.width = `${Math.max(10, newWidth)}px`;
+        container.style.height = `${Math.max(10, newHeight)}px`;
+        if (container !== selectedImageForResize) {
+            selectedImageForResize.style.width = '100%';
+            selectedImageForResize.style.height = '100%';
+        }
+        positionImageResizer(selectedImageForResize);
+    }
+
+    function stopImageResize() {
+        document.removeEventListener('mousemove', onImageResize);
+        document.removeEventListener('mouseup', stopImageResize);
+        recordHistory();
+    }
+
+    window.addEventListener('scroll', () => {
+        if (selectedImageForResize) positionImageResizer(selectedImageForResize);
+    }, true);
+    window.addEventListener('resize', () => {
+        if (selectedImageForResize) positionImageResizer(selectedImageForResize);
+    });
 
     function moveSelectedElement(deltaX) {
         let elem = selectedImageForResize || selectedTableForMove;
@@ -5378,9 +5599,11 @@ document.addEventListener('DOMContentLoaded', function () {
                  document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
                  e.target.classList.add('selected-for-resize');
                  selectedImageForResize = e.target;
+                 positionImageResizer(e.target);
              } else {
                  document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
                  selectedImageForResize = null;
+                 hideImageResizer();
              }
 
              // Handle table selection

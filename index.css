@@ -431,6 +431,37 @@ table.resizable-table .table-resize-handle {
     border-radius: 0.25rem;
 }
 
+/* Break text layout: image occupies its own line and is centered */
+.break-image {
+    display: block;
+    margin: 1rem auto;
+    clear: both;
+    max-width: 100%;
+}
+
+/* Overlay and handles for image resizing */
+.image-resize-overlay {
+    position: absolute;
+    border: 2px solid var(--btn-primary-bg);
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 10000;
+}
+
+.image-resize-handle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: var(--btn-primary-bg);
+    border: 1px solid #fff;
+    box-sizing: border-box;
+    pointer-events: all;
+}
+.image-resize-handle.nw { left: -4px; top: -4px; cursor: nwse-resize; }
+.image-resize-handle.ne { right: -4px; top: -4px; cursor: nesw-resize; }
+.image-resize-handle.sw { left: -4px; bottom: -4px; cursor: nesw-resize; }
+.image-resize-handle.se { right: -4px; bottom: -4px; cursor: nwse-resize; }
+
 /* Table size selection grid */
 #table-grid {
     display: grid;
