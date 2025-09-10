@@ -1928,8 +1928,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function alignTable(direction) {
-        if (!selectedTableCell) return;
-        const table = selectedTableCell.closest('table');
+        const table = selectedTableCell ? selectedTableCell.closest('table') : selectedTableForMove;
+        if (!table) return;
         table.classList.remove('table-float-left', 'table-float-right');
         if (direction === 'left') {
             table.classList.add('table-float-left');
@@ -1938,6 +1938,14 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         recordHistory();
         positionTableContextMenu(table);
+    }
+
+    function moveSelectionHorizontal(direction) {
+        if (selectedImageForResize) {
+            alignImage(direction);
+        } else if (selectedTableCell || selectedTableForMove) {
+            alignTable(direction);
+        }
     }
 
     document.addEventListener('click', (e) => {
@@ -3302,6 +3310,9 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             true
         ));
+
+        editorToolbar.appendChild(createButton('Mover izquierda', '⬅️', null, null, () => moveSelectionHorizontal('left')));
+        editorToolbar.appendChild(createButton('Mover derecha', '➡️', null, null, () => moveSelectionHorizontal('right')));
     }
 
     function rgbToHex(rgb) {
@@ -3461,6 +3472,23 @@ document.addEventListener('DOMContentLoaded', function () {
         recordHistory();
     }
 
+    function moveImageVertical(direction) {
+        const img = selectedImageForResize;
+        if (!img) return;
+        const fig = ensureImageFigure(img);
+        const parent = fig.parentNode;
+        if (!parent) return;
+        if (direction === 'up') {
+            const prev = fig.previousElementSibling;
+            if (prev) parent.insertBefore(fig, prev);
+        } else if (direction === 'down') {
+            const next = fig.nextElementSibling;
+            if (next) parent.insertBefore(fig, next.nextSibling);
+        }
+        positionImageResizer(img);
+        recordHistory();
+    }
+
     function createImageContextMenu() {
         imageContextMenu = document.createElement('div');
         imageContextMenu.className = 'image-context-menu';
@@ -3512,7 +3540,17 @@ document.addEventListener('DOMContentLoaded', function () {
         increaseBtn.title = 'Aumentar 10%';
         increaseBtn.addEventListener('click', () => changeSelectedImageSize(10));
 
-        imageContextMenu.append(captionBtn, inlineBtn, wrapBtn, breakBtn, leftBtn, centerBtn, rightBtn, decreaseBtn, increaseBtn);
+        const upBtn = document.createElement('button');
+        upBtn.textContent = '⬆️';
+        upBtn.title = 'Mover arriba';
+        upBtn.addEventListener('click', () => moveImageVertical('up'));
+
+        const downBtn = document.createElement('button');
+        downBtn.textContent = '⬇️';
+        downBtn.title = 'Mover abajo';
+        downBtn.addEventListener('click', () => moveImageVertical('down'));
+
+        imageContextMenu.append(captionBtn, inlineBtn, wrapBtn, breakBtn, leftBtn, centerBtn, rightBtn, decreaseBtn, increaseBtn, upBtn, downBtn);
         document.body.appendChild(imageContextMenu);
     }
 
@@ -5588,9 +5626,13 @@ document.addEventListener('DOMContentLoaded', function () {
                  notesEditor.querySelectorAll('table').forEach(t => t.classList.remove('selected-for-move'));
                  tbl.classList.add('selected-for-move');
                  selectedTableForMove = tbl;
+                 const cell = e.target.closest('td, th') || tbl.querySelector('td, th');
+                 if (cell) selectedTableCell = cell;
+                 showTableContextMenu(tbl);
              } else {
                  notesEditor.querySelectorAll('table').forEach(t => t.classList.remove('selected-for-move'));
                  selectedTableForMove = null;
+                 hideTableContextMenu();
              }
 
              // Handle gallery link clicks
