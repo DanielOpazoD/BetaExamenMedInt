@@ -462,6 +462,33 @@ table.resizable-table .table-resize-handle {
 .image-resize-handle.sw { left: -4px; bottom: -4px; cursor: nesw-resize; }
 .image-resize-handle.se { right: -4px; bottom: -4px; cursor: nwse-resize; }
 
+/* Floating menu for image actions */
+.image-context-menu {
+    position: absolute;
+    display: none;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    padding: 0.25rem;
+    z-index: 10001;
+}
+
+.image-context-menu button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    margin: 0 0.125rem;
+    padding: 0.125rem 0.25rem;
+}
+
+/* Caption below images */
+.image-caption {
+    background: var(--bg-tertiary);
+    text-align: center;
+    padding: 0.25rem;
+    font-size: 0.875rem;
+}
+
 /* Table size selection grid */
 #table-grid {
     display: grid;

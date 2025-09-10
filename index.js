@@ -1402,6 +1402,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 e.target.classList.add('selected-for-resize');
                 selectedImageForResize = e.target;
                 positionImageResizer(e.target);
+                showImageContextMenu(e.target);
             } else {
                 subNoteEditor.querySelectorAll('img').forEach(img => img.classList.remove('selected-for-resize'));
                 selectedImageForResize = null;
@@ -1685,9 +1686,10 @@ document.addEventListener('DOMContentLoaded', function () {
             showModal(alertModal);
             return;
         }
-        // Si ya está en un figure flotante, actualiza la clase de alineación
-        const existingFig = img.closest('figure.float-image');
+        // Si ya está en un figure, actualiza la clase de alineación
+        const existingFig = img.closest('figure');
         if (existingFig) {
+            existingFig.classList.add('float-image');
             existingFig.classList.remove('float-left', 'float-right');
             existingFig.classList.add(`float-${align}`);
             return;
@@ -3448,7 +3450,103 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     function getImageContainer(img) {
-        return img.closest('figure.float-image') || img;
+        return img.closest('figure') || img;
+    }
+
+    // --- Floating image menu ---
+    let imageContextMenu = null;
+
+    function ensureImageFigure(img) {
+        let fig = img.closest('figure');
+        if (!fig) {
+            fig = document.createElement('figure');
+            img.parentNode.insertBefore(fig, img);
+            fig.appendChild(img);
+        }
+        fig.contentEditable = 'false';
+        return fig;
+    }
+
+    function addCaptionToImage(img) {
+        const fig = ensureImageFigure(img);
+        let cap = fig.querySelector('figcaption.image-caption');
+        const current = cap ? cap.textContent : '';
+        const text = prompt('Título de la imagen:', current);
+        if (text === null) return;
+        if (!cap) {
+            cap = document.createElement('figcaption');
+            cap.className = 'image-caption';
+            cap.contentEditable = 'true';
+            fig.appendChild(cap);
+        }
+        cap.textContent = text;
+        positionImageResizer(img);
+        recordHistory();
+    }
+
+    function alignImage(direction) {
+        const img = selectedImageForResize;
+        if (!img) return;
+        const fig = ensureImageFigure(img);
+        fig.classList.remove('float-left', 'float-right', 'float-image');
+        img.classList.remove('break-image');
+        if (direction === 'left' || direction === 'right') {
+            fig.classList.add('float-image', `float-${direction}`);
+        } else if (direction === 'center') {
+            img.classList.add('break-image');
+        }
+        positionImageResizer(img);
+        recordHistory();
+    }
+
+    function createImageContextMenu() {
+        imageContextMenu = document.createElement('div');
+        imageContextMenu.className = 'image-context-menu';
+
+        const captionBtn = document.createElement('button');
+        captionBtn.textContent = 'ALT';
+        captionBtn.title = 'Agregar título';
+        captionBtn.addEventListener('click', () => {
+            if (selectedImageForResize) addCaptionToImage(selectedImageForResize);
+        });
+
+        const leftBtn = document.createElement('button');
+        leftBtn.textContent = '⬅️';
+        leftBtn.title = 'Alinear a la izquierda';
+        leftBtn.addEventListener('click', () => alignImage('left'));
+
+        const centerBtn = document.createElement('button');
+        centerBtn.textContent = '⏺';
+        centerBtn.title = 'Centrar';
+        centerBtn.addEventListener('click', () => alignImage('center'));
+
+        const rightBtn = document.createElement('button');
+        rightBtn.textContent = '➡️';
+        rightBtn.title = 'Alinear a la derecha';
+        rightBtn.addEventListener('click', () => alignImage('right'));
+
+        imageContextMenu.append(captionBtn, leftBtn, centerBtn, rightBtn);
+        document.body.appendChild(imageContextMenu);
+    }
+
+    function showImageContextMenu(img) {
+        if (!imageContextMenu) createImageContextMenu();
+        imageContextMenu.style.display = 'flex';
+        positionImageContextMenu(img);
+    }
+
+    function hideImageContextMenu() {
+        if (imageContextMenu) imageContextMenu.style.display = 'none';
+    }
+
+    function positionImageContextMenu(img) {
+        if (!imageContextMenu || imageContextMenu.style.display === 'none') return;
+        const rect = getImageContainer(img).getBoundingClientRect();
+        const menuRect = imageContextMenu.getBoundingClientRect();
+        let top = rect.top + window.scrollY - menuRect.height - 8;
+        if (top < 0) top = rect.bottom + window.scrollY + 8;
+        imageContextMenu.style.left = `${rect.left + window.scrollX}px`;
+        imageContextMenu.style.top = `${top}px`;
     }
 
     function resizeSelectedImage(multiplier) {
@@ -3493,8 +3591,11 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         const img = selectedImageForResize;
-        const existingFig = img.closest('figure.float-image');
-        if (existingFig) existingFig.replaceWith(img);
+        const fig = img.closest('figure');
+        if (fig) {
+            fig.classList.remove('float-image', 'float-left', 'float-right');
+            if (type === 'inline') fig.replaceWith(img);
+        }
         img.classList.remove('break-image');
         img.style.float = '';
         img.style.display = '';
@@ -3534,10 +3635,12 @@ document.addEventListener('DOMContentLoaded', function () {
         imageResizeOverlay.style.top = `${rect.top + window.scrollY}px`;
         imageResizeOverlay.style.width = `${rect.width}px`;
         imageResizeOverlay.style.height = `${rect.height}px`;
+        positionImageContextMenu(img);
     }
 
     function hideImageResizer() {
         if (imageResizeOverlay) imageResizeOverlay.style.display = 'none';
+        hideImageContextMenu();
     }
 
     function startImageResize(e) {
@@ -5600,6 +5703,7 @@ document.addEventListener('DOMContentLoaded', function () {
                  e.target.classList.add('selected-for-resize');
                  selectedImageForResize = e.target;
                  positionImageResizer(e.target);
+                 showImageContextMenu(e.target);
              } else {
                  document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
                  selectedImageForResize = null;
