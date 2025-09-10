@@ -68,6 +68,7 @@
                     </button>
                     <button id="ask-notes-btn" class="px-3 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 flex items-center" title="Preguntar sobre las notas" aria-label="Preguntar sobre las notas">🤖</button>
                     <input type="file" id="import-file-input" accept=".json" class="hidden">
+                    <input type="file" id="insert-image-input" accept="image/*" class="hidden">
                     <div class="h-6 border-l mx-2"></div>
                     <div class="relative">
                         <button id="settings-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="Configuración del tema/apariencia" aria-label="Configuración del tema/apariencia">
@@ -640,5 +641,6 @@
 
     <div id="print-area" class="hidden"></div>
 <script src="index.js" type="module"></script>
+<script src="image-tools.js" type="module"></script>
 </body>
 </html>
