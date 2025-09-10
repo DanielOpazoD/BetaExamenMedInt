@@ -3561,6 +3561,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? parseFloat(container.style.width)
                 : container.offsetWidth;
             const newWidth = currentWidth * multiplier;
+            container.style.maxWidth = 'none';
+            container.style.maxHeight = 'none';
             container.style.width = `${newWidth}px`;
             container.style.height = 'auto';
             if (container !== selectedImageForResize) {
@@ -3580,6 +3582,8 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         const container = getImageContainer(selectedImageForResize);
+        container.style.maxWidth = 'none';
+        container.style.maxHeight = 'none';
         container.style.width = percent + '%';
         container.style.height = 'auto';
         if (container !== selectedImageForResize) {
@@ -3654,6 +3658,8 @@ document.addEventListener('DOMContentLoaded', function () {
         e.stopPropagation();
         currentImageHandle = e.target.dataset.handle;
         const container = getImageContainer(selectedImageForResize);
+        container.style.maxWidth = 'none';
+        container.style.maxHeight = 'none';
         startX = e.clientX;
         startY = e.clientY;
         startWidth = container.offsetWidth;
