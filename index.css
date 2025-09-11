@@ -173,6 +173,7 @@
         #notes-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; cursor: pointer; }
         #notes-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
         #notes-editor table.selected-for-move { outline: 2px solid var(--btn-primary-bg); }
+        #notes-editor p[draggable="true"] { cursor: text; }
 
         /* Display multiple images in a row */
         #notes-editor .image-row {
