@@ -13,6 +13,7 @@ import { setupKeyboardShortcuts } from './shortcuts.js';
 import { setupCloudIntegration } from './cloud-sync.js';
 import { setupAdvancedEditing } from './editor-enhancements.js';
 import { improveText, askNotesQuestion } from './ai-tools.js';
+import { setupImageTools } from './image-tools.js';
 
 // --- IndexedDB Helper ---
 // NOTE: The IndexedDB helper has been moved into db.js.  The following
@@ -586,26 +587,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 const items = clipboard.items;
                 const imageItems = items ? Array.from(items).filter(item => item.type && item.type.startsWith('image/')) : [];
                 if (imageItems.length > 0) {
-                    e.preventDefault();
-                    imageItems.forEach(item => {
-                        const file = item.getAsFile();
-                        if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (evt) => {
-                                document.execCommand('insertImage', false, evt.target.result);
-                            };
-                            reader.readAsDataURL(file);
-                        }
-                    });
+                    // Let image-tools.js handle image pasting to avoid duplicates
+                    return;
+                }
+                e.preventDefault();
+                const html = clipboard.getData('text/html');
+                if (htmlPasteEnabled && html) {
+                    document.execCommand('insertHTML', false, sanitizeHtml(html));
                 } else {
-                    e.preventDefault();
-                    const html = clipboard.getData('text/html');
-                    if (htmlPasteEnabled && html) {
-                        document.execCommand('insertHTML', false, sanitizeHtml(html));
-                    } else {
-                        const text = clipboard.getData('text/plain');
-                        document.execCommand('insertText', false, text);
-                    }
+                    const text = clipboard.getData('text/plain');
+                    document.execCommand('insertText', false, text);
                 }
             });
         }
@@ -5829,6 +5820,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function init() {
         initializeCells();
         setupEditorToolbar();
+        setupImageTools(notesEditor, editorToolbar);
         populateIconPicker();
         loadState();
         setupEventListeners();
