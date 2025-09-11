@@ -83,7 +83,24 @@ export function setupAdvancedEditing(editor) {
   }
 
   let dragLine = null;
+  editor.addEventListener('mousedown', e => {
+    const p = e.target.closest('p');
+    if (!p) return;
+    if (e.ctrlKey) {
+      p.setAttribute('draggable', 'true');
+    } else {
+      p.removeAttribute('draggable');
+    }
+  });
+  document.addEventListener('mouseup', () => {
+    editor.querySelectorAll('p[draggable]')
+      .forEach(p => p.removeAttribute('draggable'));
+  });
   editor.addEventListener('dragstart', e => {
+    if (!e.ctrlKey) {
+      e.preventDefault();
+      return;
+    }
     const line = e.target.closest('p');
     if (!line) return;
     dragLine = line;
@@ -101,12 +118,4 @@ export function setupAdvancedEditing(editor) {
     editor.insertBefore(dragLine, line);
     dragLine = null;
   });
-
-  editor.querySelectorAll('p').forEach(p => p.setAttribute('draggable', 'true'));
-  const observer = new MutationObserver(() => {
-    editor.querySelectorAll('p').forEach(p => {
-      if (!p.getAttribute('draggable')) p.setAttribute('draggable', 'true');
-    });
-  });
-  observer.observe(editor, { childList: true, subtree: true });
 }

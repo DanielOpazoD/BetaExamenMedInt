@@ -17,7 +17,15 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   });
 
   table.addEventListener('mousemove', onHover);
-  table.addEventListener('mousedown', startResize);
+  table.addEventListener('mousedown', e => {
+    table.classList.add('selected');
+    startResize(e);
+  });
+  document.addEventListener('mousedown', e => {
+    if (!table.contains(e.target)) {
+      table.classList.remove('selected');
+    }
+  });
   handle.addEventListener('mousedown', startTableResize);
   document.addEventListener('mousemove', onDrag);
   document.addEventListener('mouseup', stopResize);
@@ -33,12 +41,15 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
     if (col > -1) {
       table.style.cursor = 'col-resize';
       hoverEdge = { type: 'col', index: col };
+      // visual guides disabled per user request
     } else if (row > -1) {
       table.style.cursor = 'row-resize';
       hoverEdge = { type: 'row', index: row };
+      // visual guides disabled per user request
     } else {
       table.style.cursor = '';
       hoverEdge = null;
+      // no visual guide to hide
     }
   }
 
@@ -70,10 +81,12 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
       const dx = e.clientX - startX;
       const newWidth = Math.max(minSize, startSize + dx);
       setColWidth(activeResize.index, newWidth);
+      // visual guides disabled
     } else if (activeResize.type === 'row') {
       const dy = e.clientY - startY;
       const newHeight = Math.max(minSize, startSize + dy);
       setRowHeight(activeResize.index, newHeight);
+      // visual guides disabled
     } else {
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
@@ -88,6 +101,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
     if (!activeResize) return;
     activeResize = null;
     table.style.cursor = '';
+    // nothing to hide
   }
 
   function cancelOnEsc(e) {
@@ -144,5 +158,23 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   function setRowHeight(index, height) {
     const row = table.rows[index];
     if (row) row.style.height = height + 'px';
+  }
+
+  function getEdgePosition(type, index) {
+    if (type === 'col') {
+      let left = 0;
+      const row = table.rows[0];
+      if (!row) return 0;
+      for (let i = 0; i <= index; i++) {
+        left += row.cells[i].offsetWidth;
+      }
+      return left;
+    } else {
+      let top = 0;
+      for (let i = 0; i <= index; i++) {
+        top += table.rows[i].offsetHeight;
+      }
+      return top;
+    }
   }
 }

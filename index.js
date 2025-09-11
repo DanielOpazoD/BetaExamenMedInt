@@ -171,12 +171,14 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!sel || sel.rangeCount === 0) return;
             let node = sel.anchorNode;
             if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
-            while (node && node !== notesEditor) {
-                if (node.hasAttribute && node.hasAttribute('style')) {
-                    node.removeAttribute('style');
-                    break;
-                }
-                node = node.parentElement;
+            if (!node || node === notesEditor) return;
+            const prev = node.previousElementSibling;
+            if (prev) {
+                ['marginLeft', 'paddingLeft', 'textIndent'].forEach(prop => {
+                    node.style[prop] = prev.style[prop];
+                });
+                const indentClass = Array.from(prev.classList).find(c => c.startsWith('indent-'));
+                if (indentClass) node.classList.add(indentClass);
             }
         }
     });
@@ -4226,10 +4228,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 50);
     }
     function initTableResize(table) {
-        if (table.dataset.resizableInitialized === 'true') return;
+        table.querySelector('.table-resize-handle')?.remove();
+        table.querySelector('.table-resize-guide')?.remove();
         table.classList.add('resizable-table');
+        table.removeAttribute('data-resizable-initialized');
         makeTableResizable(table);
-        table.dataset.resizableInitialized = 'true';
     }
 
     function renderNotesList() {
