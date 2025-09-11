@@ -170,10 +170,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const sel = window.getSelection();
             if (!sel || sel.rangeCount === 0) return;
             let node = sel.anchorNode;
-            if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+            if (node && node.nodeType === Node.TEXT_NODE) node = node.parentElement;
             while (node && node !== notesEditor) {
-                if (node.hasAttribute && node.hasAttribute('style')) {
+                if (node instanceof HTMLElement && node.hasAttribute('style')) {
+                    const { marginLeft, paddingLeft, textIndent } = node.style;
                     node.removeAttribute('style');
+                    if (marginLeft) node.style.marginLeft = marginLeft;
+                    if (paddingLeft) node.style.paddingLeft = paddingLeft;
+                    if (textIndent) node.style.textIndent = textIndent;
                     break;
                 }
                 node = node.parentElement;
@@ -4231,6 +4235,11 @@ document.addEventListener('DOMContentLoaded', function () {
         makeTableResizable(table);
         table.dataset.resizableInitialized = 'true';
     }
+
+    notesEditor.addEventListener('click', e => {
+        const table = e.target.closest('table');
+        if (table) initTableResize(table);
+    });
 
     function renderNotesList() {
         notesList.innerHTML = '';
