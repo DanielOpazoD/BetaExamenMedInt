@@ -4228,10 +4228,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 50);
     }
     function initTableResize(table) {
-        if (table.dataset.resizableInitialized === 'true') return;
+        table.querySelector('.table-resize-handle')?.remove();
+        table.querySelector('.table-resize-guide')?.remove();
         table.classList.add('resizable-table');
+        table.removeAttribute('data-resizable-initialized');
         makeTableResizable(table);
-        table.dataset.resizableInitialized = 'true';
     }
 
     function renderNotesList() {

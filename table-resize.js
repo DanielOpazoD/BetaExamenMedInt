@@ -11,9 +11,6 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   const handle = document.createElement('div');
   handle.className = 'table-resize-handle';
   table.appendChild(handle);
-  const guide = document.createElement('div');
-  guide.className = 'table-resize-guide';
-  table.appendChild(guide);
   handle.addEventListener('mousemove', e => {
     e.stopPropagation();
     table.style.cursor = 'se-resize';
@@ -27,7 +24,6 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   document.addEventListener('mousedown', e => {
     if (!table.contains(e.target)) {
       table.classList.remove('selected');
-      guide.style.display = 'none';
     }
   });
   handle.addEventListener('mousedown', startTableResize);
@@ -45,23 +41,15 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
     if (col > -1) {
       table.style.cursor = 'col-resize';
       hoverEdge = { type: 'col', index: col };
-      guide.style.display = 'block';
-      guide.style.width = '2px';
-      guide.style.height = table.offsetHeight + 'px';
-      guide.style.left = getEdgePosition('col', col) + 'px';
-      guide.style.top = '0';
+      // visual guides disabled per user request
     } else if (row > -1) {
       table.style.cursor = 'row-resize';
       hoverEdge = { type: 'row', index: row };
-      guide.style.display = 'block';
-      guide.style.height = '2px';
-      guide.style.width = table.offsetWidth + 'px';
-      guide.style.top = getEdgePosition('row', row) + 'px';
-      guide.style.left = '0';
+      // visual guides disabled per user request
     } else {
       table.style.cursor = '';
       hoverEdge = null;
-      if (!activeResize) guide.style.display = 'none';
+      // no visual guide to hide
     }
   }
 
@@ -93,12 +81,12 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
       const dx = e.clientX - startX;
       const newWidth = Math.max(minSize, startSize + dx);
       setColWidth(activeResize.index, newWidth);
-      guide.style.left = getEdgePosition('col', activeResize.index) + 'px';
+      // visual guides disabled
     } else if (activeResize.type === 'row') {
       const dy = e.clientY - startY;
       const newHeight = Math.max(minSize, startSize + dy);
       setRowHeight(activeResize.index, newHeight);
-      guide.style.top = getEdgePosition('row', activeResize.index) + 'px';
+      // visual guides disabled
     } else {
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
@@ -113,7 +101,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
     if (!activeResize) return;
     activeResize = null;
     table.style.cursor = '';
-    guide.style.display = 'none';
+    // nothing to hide
   }
 
   function cancelOnEsc(e) {

@@ -416,14 +416,6 @@ table.resizable-table.selected .table-resize-handle {
     display: block;
 }
 
-table.resizable-table .table-resize-guide {
-    position: absolute;
-    background: var(--text-muted);
-    opacity: 0.5;
-    pointer-events: none;
-    display: none;
-}
-
 /* Floating image styles */
 .float-image {
     display: block;
