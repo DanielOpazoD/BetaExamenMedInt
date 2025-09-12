@@ -3321,8 +3321,11 @@ document.addEventListener('DOMContentLoaded', function () {
             if (currentLine) {
                 currentLine.style.cssText = style;
             } else {
+                // Ensure the editor retains focus so the divider is inserted
+                // at the current caret position even when no text is selected.
+                notesEditor.focus();
+                const selection = window.getSelection();
                 if (savedEditorSelection) {
-                    const selection = window.getSelection();
                     selection.removeAllRanges();
                     selection.addRange(savedEditorSelection);
                 }
