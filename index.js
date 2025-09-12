@@ -2967,6 +2967,106 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!stylePopup.contains(e.target)) hideStylePopup();
         });
 
+        // --- Pills text styles ---
+        const PILL_TEXT_STYLES = [
+            ['#fffde7', '#fff176', '#795548'],
+            ['#ffe0b2', '#ff9800', '#4e342e'],
+            ['#bbdefb', '#2196f3', '#0d47a1'],
+            ['#e1f5fe', '#4fc3f7', '#01579b'],
+            ['#c8e6c9', '#388e3c', '#1b5e20'],
+            ['#dcedc8', '#8bc34a', '#33691e'],
+            ['#e1bee7', '#9c27b0', '#4a148c'],
+            ['#d7ccc8', '#795548', '#3e2723'],
+            ['#f5f5f5', '#9e9e9e', '#212121'],
+            ['#ffcdd2', '#f44336', '#b71c1c']
+        ];
+
+        const pillTextPopup = document.createElement('div');
+        pillTextPopup.className = 'preset-style-popup';
+        document.body.appendChild(pillTextPopup);
+        let currentPillSpan = null;
+
+        const hidePillTextPopup = () => {
+            pillTextPopup.style.display = 'none';
+            currentPillSpan = null;
+        };
+
+        const applyPillTextStyle = (colors, existingSpan = null) => {
+            const css = `background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;`;
+            if (existingSpan) {
+                existingSpan.style.cssText = css;
+                existingSpan.dataset.pillText = colors.join('|');
+                return;
+            }
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount || sel.isCollapsed) return;
+            const range = sel.getRangeAt(0);
+            const span = document.createElement('span');
+            span.style.cssText = css;
+            span.dataset.pillText = colors.join('|');
+            span.textContent = range.toString();
+            range.deleteContents();
+            range.insertNode(span);
+            const newRange = document.createRange();
+            newRange.setStartAfter(span);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+        };
+
+        const showPillTextPopup = (span = null) => {
+            pillTextPopup.innerHTML = '';
+            PILL_TEXT_STYLES.forEach(colors => {
+                const b = document.createElement('button');
+                b.className = 'toolbar-btn';
+                b.innerHTML = `<span style="background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;">A</span>`;
+                b.addEventListener('click', () => {
+                    applyPillTextStyle(colors, currentPillSpan);
+                    hidePillTextPopup();
+                    notesEditor.focus();
+                });
+                pillTextPopup.appendChild(b);
+            });
+            pillTextPopup.style.display = 'block';
+            let rect;
+            if (span) {
+                rect = span.getBoundingClientRect();
+            } else {
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount) rect = sel.getRangeAt(0).getBoundingClientRect();
+            }
+            if (rect) {
+                pillTextPopup.style.top = `${window.scrollY + rect.top - pillTextPopup.offsetHeight - 8}px`;
+                pillTextPopup.style.left = `${window.scrollX + rect.left}px`;
+            }
+        };
+
+        const setPillsText = (span = null) => {
+            currentPillSpan = span;
+            showPillTextPopup(span);
+        };
+
+        const pillTextBtn = createButton('Texto Píldora', '💊', null, null, () => {
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed) {
+                setPillsText();
+            }
+        });
+        editorToolbar.appendChild(pillTextBtn);
+
+        notesEditor.addEventListener('click', (e) => {
+            const span = e.target.closest('span[data-pill-text]');
+            if (span) {
+                e.stopPropagation();
+                setPillsText(span);
+            } else if (!e.target.closest('.preset-style-popup')) {
+                hidePillTextPopup();
+            }
+        });
+        document.addEventListener('click', (e) => {
+            if (!pillTextPopup.contains(e.target)) hidePillTextPopup();
+        });
+
         // Floating menu for table tools
         const tableMenu = document.createElement('div');
         tableMenu.className = 'table-menu-popup';
@@ -2987,7 +3087,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const TABLE_THEMES = [
             { label: 'Azul', class: 'table-theme-blue' },
             { label: 'Verde', class: 'table-theme-green' },
-            { label: 'Gris', class: 'table-theme-gray' }
+            { label: 'Gris', class: 'table-theme-gray' },
+            { label: 'Rojo', class: 'table-theme-red' },
+            { label: 'Morado', class: 'table-theme-purple' },
+            { label: 'Turquesa', class: 'table-theme-teal' }
         ];
         const showTableMenu = (table, cell, x, y) => {
             currentTable = table;
@@ -3014,6 +3117,29 @@ document.addEventListener('DOMContentLoaded', function () {
                 b.addEventListener('click', () => {
                     TABLE_THEMES.forEach(tt => table.classList.remove(tt.class));
                     table.classList.add(t.class);
+                    hideTableMenu();
+                    notesEditor.focus();
+                });
+                tableMenu.appendChild(b);
+            });
+            const HEADER_COLORS = [
+                { label: 'Cabecera azul', bg: '#bbdefb', color: '#0d47a1' },
+                { label: 'Cabecera verde', bg: '#c8e6c9', color: '#1b5e20' },
+                { label: 'Cabecera gris', bg: '#e0e0e0', color: '#212121' },
+                { label: 'Cabecera roja', bg: '#ffcdd2', color: '#b71c1c' },
+                { label: 'Cabecera morada', bg: '#e1bee7', color: '#4a148c' },
+                { label: 'Cabecera turquesa', bg: '#e0f2f1', color: '#004d40' }
+            ];
+            HEADER_COLORS.forEach(h => {
+                const b = document.createElement('button');
+                b.className = 'toolbar-btn';
+                b.textContent = h.label;
+                b.addEventListener('click', () => {
+                    const row = table.rows[0];
+                    if (row) Array.from(row.cells).forEach(c => {
+                        c.style.backgroundColor = h.bg;
+                        c.style.color = h.color;
+                    });
                     hideTableMenu();
                     notesEditor.focus();
                 });
@@ -3090,6 +3216,86 @@ document.addEventListener('DOMContentLoaded', function () {
         
         editorToolbar.appendChild(createHighlightSizeDropdown());
 
+        const LINE_GRADIENTS = [
+            ['#fffde7','#fff176'],
+            ['#ffe0b2','#ff9800'],
+            ['#bbdefb','#2196f3'],
+            ['#e1f5fe','#4fc3f7'],
+            ['#c8e6c9','#388e3c'],
+            ['#dcedc8','#8bc34a'],
+            ['#e1bee7','#9c27b0'],
+            ['#d7ccc8','#795548'],
+            ['#f5f5f5','#9e9e9e'],
+            ['#ffcdd2','#f44336']
+        ];
+        const lineStylePopup = document.createElement('div');
+        lineStylePopup.className = 'preset-style-popup';
+        document.body.appendChild(lineStylePopup);
+        let currentLine = null;
+        let selectedGradient = LINE_GRADIENTS[0];
+        const thicknessInput = document.createElement('input');
+        thicknessInput.type = 'number';
+        thicknessInput.min = '1';
+        thicknessInput.max = '20';
+        thicknessInput.value = '4';
+
+        const renderLineStylePopup = () => {
+            lineStylePopup.innerHTML = '';
+            const colorsDiv = document.createElement('div');
+            LINE_GRADIENTS.forEach(g => {
+                const b = document.createElement('button');
+                b.className = 'toolbar-btn';
+                b.innerHTML = `<div style="height:4px; width:40px; border-radius:2px; background:linear-gradient(to right, ${g[0]}, ${g[1]});"></div>`;
+                b.addEventListener('click', () => { selectedGradient = g; });
+                colorsDiv.appendChild(b);
+            });
+            lineStylePopup.appendChild(colorsDiv);
+            const label = document.createElement('div');
+            label.textContent = 'Grosor';
+            lineStylePopup.appendChild(label);
+            lineStylePopup.appendChild(thicknessInput);
+            const applyBtn = document.createElement('button');
+            applyBtn.className = 'toolbar-btn';
+            applyBtn.textContent = 'Aplicar';
+            applyBtn.addEventListener('click', () => {
+                const [c1,c2] = selectedGradient;
+                const t = parseInt(thicknessInput.value) || 4;
+                const style = `height:${t}px; margin:20px 0; border-radius:${t/2}px; background:linear-gradient(to right, ${c1}, ${c2}); border:none;`;
+                if (currentLine) {
+                    currentLine.style.cssText = style;
+                } else {
+                    document.execCommand('insertHTML', false, `<hr style="${style}">`);
+                }
+                hideLineStylePopup();
+                notesEditor.focus();
+            });
+            lineStylePopup.appendChild(applyBtn);
+        };
+
+        const showLineStylePopup = (hr = null) => {
+            currentLine = hr;
+            selectedGradient = LINE_GRADIENTS[0];
+            thicknessInput.value = hr ? parseInt(hr.style.height) || 4 : 4;
+            renderLineStylePopup();
+            lineStylePopup.style.display = 'block';
+            let rect;
+            if (hr) {
+                rect = hr.getBoundingClientRect();
+            } else {
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount) rect = sel.getRangeAt(0).getBoundingClientRect();
+            }
+            if (rect) {
+                lineStylePopup.style.top = `${window.scrollY + rect.top - lineStylePopup.offsetHeight - 8}px`;
+                lineStylePopup.style.left = `${window.scrollX + rect.left}px`;
+            }
+        };
+
+        const hideLineStylePopup = () => {
+            lineStylePopup.style.display = 'none';
+            currentLine = null;
+        };
+
         const lineDropdown = document.createElement('div');
         lineDropdown.className = 'symbol-dropdown';
         const lineBtn = createButton('Insertar línea separadora', '—', null, null, null);
@@ -3097,19 +3303,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const lineContent = document.createElement('div');
         lineContent.className = 'symbol-dropdown-content flex-dropdown';
         lineContent.style.minWidth = '80px';
-        const lineStyles = ['solid', 'dotted', 'dashed'];
-        lineStyles.forEach(style => {
-            const btn = document.createElement('button');
-            btn.className = 'toolbar-btn';
-            btn.innerHTML = `<div style="border-top:1px ${style} var(--text-primary); width:40px;"></div>`;
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                document.execCommand('insertHTML', false, `<hr class="hr-${style}">`);
-                lineContent.classList.remove('visible');
-                notesEditor.focus();
-            });
-            lineContent.appendChild(btn);
+        const customLineBtn = document.createElement('button');
+        customLineBtn.className = 'toolbar-btn';
+        customLineBtn.textContent = 'Línea';
+        customLineBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            lineContent.classList.remove('visible');
+            showLineStylePopup();
         });
+        lineContent.appendChild(customLineBtn);
         const pillsBtn = document.createElement('button');
         pillsBtn.className = 'toolbar-btn';
         pillsBtn.textContent = 'Píldoras';
@@ -3161,6 +3363,15 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(lineDropdown);
         editorToolbar.appendChild(createSeparator());
+        notesEditor.addEventListener('click', (e) => {
+            if (e.target.tagName === 'HR') {
+                e.stopPropagation();
+                showLineStylePopup(e.target);
+            }
+        });
+        document.addEventListener('click', (e) => {
+            if (!lineStylePopup.contains(e.target)) hideLineStylePopup();
+        });
 
         const outdentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-decrease w-5 h-5"><polyline points="7 8 3 12 7 16"/><line x1="21" x2="3" y1="12" y2="12"/><line x1="21" x2="3" y1="6" y2="6"/><line x1="21" x2="3" y1="18" y2="18"/></svg>`;
         const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
