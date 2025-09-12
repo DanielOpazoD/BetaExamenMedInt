@@ -3021,7 +3021,7 @@ document.addEventListener('DOMContentLoaded', function () {
             savedEditorSelection = null;
         };
 
-        const showPillTextPopup = (span = null) => {
+        const showPillTextPopup = (span = null, anchor = null) => {
             const sample = span ? span.textContent : (savedEditorSelection ? savedEditorSelection.toString() : window.getSelection().toString());
             pillTextPopup.innerHTML = '';
             PILL_TEXT_STYLES.forEach(colors => {
@@ -3041,6 +3041,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 rect = span.getBoundingClientRect();
             } else if (savedEditorSelection) {
                 rect = savedEditorSelection.getBoundingClientRect();
+            } else if (anchor) {
+                rect = anchor.getBoundingClientRect();
             } else {
                 const sel = window.getSelection();
                 if (sel && sel.rangeCount) rect = sel.getRangeAt(0).getBoundingClientRect();
@@ -3051,9 +3053,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
 
-        const setPillsText = (span = null) => {
+        const setPillsText = (span = null, anchor = null) => {
             currentPillSpan = span;
-            showPillTextPopup(span);
+            showPillTextPopup(span, anchor);
         };
 
         const pillTextBtn = createButton('Texto Píldora', '💊', null, null, null);
@@ -3068,11 +3070,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         pillTextBtn.addEventListener('click', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             if (savedEditorSelection && !savedEditorSelection.collapsed) {
                 const sel = window.getSelection();
                 sel.removeAllRanges();
                 sel.addRange(savedEditorSelection);
-                setPillsText();
+                setPillsText(null, pillTextBtn);
             }
         });
         editorToolbar.appendChild(pillTextBtn);
@@ -3354,7 +3357,7 @@ document.addEventListener('DOMContentLoaded', function () {
             addGroup('Degradadas', gradientsGroup);
         };
 
-        const showLineStylePopup = (hr = null) => {
+        const showLineStylePopup = (hr = null, anchor = null) => {
             currentLine = hr;
             renderLineStylePopup();
             if (!hr && savedEditorSelection) {
@@ -3368,6 +3371,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 rect = hr.getBoundingClientRect();
             } else if (savedEditorSelection) {
                 rect = savedEditorSelection.getBoundingClientRect();
+            } else if (anchor) {
+                rect = anchor.getBoundingClientRect();
             } else {
                 const sel = window.getSelection();
                 if (sel && sel.rangeCount) rect = sel.getRangeAt(0).getBoundingClientRect();
@@ -3397,7 +3402,7 @@ document.addEventListener('DOMContentLoaded', function () {
             e.preventDefault();
             e.stopPropagation();
             document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => d.classList.remove('visible'));
-            showLineStylePopup();
+            showLineStylePopup(null, lineBtn);
         });
         editorToolbar.appendChild(lineBtn);
         editorToolbar.appendChild(createSeparator());
