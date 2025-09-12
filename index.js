@@ -2116,6 +2116,7 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.className = 'toolbar-btn';
             btn.title = title;
             btn.innerHTML = content;
+            btn.addEventListener('mousedown', e => e.preventDefault());
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 if (command) {
@@ -2998,6 +2999,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 existingSpan.dataset.pillText = colors.join('|');
                 return;
             }
+            if (savedEditorSelection) {
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(savedEditorSelection);
+            }
             const sel = window.getSelection();
             if (!sel || !sel.rangeCount || sel.isCollapsed) return;
             const range = sel.getRangeAt(0);
@@ -3012,14 +3018,16 @@ document.addEventListener('DOMContentLoaded', function () {
             newRange.collapse(true);
             sel.removeAllRanges();
             sel.addRange(newRange);
+            savedEditorSelection = null;
         };
 
-        const showPillTextPopup = (span = null) => {
+        const showPillTextPopup = (span = null, anchor = null) => {
+            const sample = span ? span.textContent : (savedEditorSelection ? savedEditorSelection.toString() : window.getSelection().toString());
             pillTextPopup.innerHTML = '';
             PILL_TEXT_STYLES.forEach(colors => {
                 const b = document.createElement('button');
                 b.className = 'toolbar-btn';
-                b.innerHTML = `<span style="background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;">A</span>`;
+                b.innerHTML = `<span style=\"background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;\">${sample}</span>`;
                 b.addEventListener('click', () => {
                     applyPillTextStyle(colors, currentPillSpan);
                     hidePillTextPopup();
@@ -3031,6 +3039,10 @@ document.addEventListener('DOMContentLoaded', function () {
             let rect;
             if (span) {
                 rect = span.getBoundingClientRect();
+            } else if (savedEditorSelection) {
+                rect = savedEditorSelection.getBoundingClientRect();
+            } else if (anchor) {
+                rect = anchor.getBoundingClientRect();
             } else {
                 const sel = window.getSelection();
                 if (sel && sel.rangeCount) rect = sel.getRangeAt(0).getBoundingClientRect();
@@ -3041,15 +3053,29 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
 
-        const setPillsText = (span = null) => {
+        const setPillsText = (span = null, anchor = null) => {
             currentPillSpan = span;
-            showPillTextPopup(span);
+            showPillTextPopup(span, anchor);
         };
 
-        const pillTextBtn = createButton('Texto Píldora', '💊', null, null, () => {
-            const sel = window.getSelection();
-            if (sel && !sel.isCollapsed) {
-                setPillsText();
+        const pillTextBtn = createButton('Texto Píldora', '💊', null, null, null);
+        pillTextBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
+                savedEditorSelection = selection.getRangeAt(0).cloneRange();
+            } else {
+                savedEditorSelection = null;
+            }
+        });
+        pillTextBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (savedEditorSelection && !savedEditorSelection.collapsed) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(savedEditorSelection);
+                setPillsText(null, pillTextBtn);
             }
         });
         editorToolbar.appendChild(pillTextBtn);
@@ -3058,6 +3084,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const span = e.target.closest('span[data-pill-text]');
             if (span) {
                 e.stopPropagation();
+                savedEditorSelection = null;
                 setPillsText(span);
             } else if (!e.target.closest('.preset-style-popup')) {
                 hidePillTextPopup();
@@ -3072,6 +3099,8 @@ document.addEventListener('DOMContentLoaded', function () {
         tableMenu.className = 'table-menu-popup';
         document.body.appendChild(tableMenu);
         let currentTable = null;
+        let editingTable = null;
+        let tableEditMode = false;
         const hideTableMenu = () => {
             tableMenu.style.display = 'none';
             currentTable = null;
@@ -3095,67 +3124,118 @@ document.addEventListener('DOMContentLoaded', function () {
         const showTableMenu = (table, cell, x, y) => {
             currentTable = table;
             tableMenu.innerHTML = '';
+
+            const resizeBtn = document.createElement('button');
+            resizeBtn.className = 'toolbar-btn';
+            resizeBtn.innerHTML = '↔️ Ajustar tamaño';
+            resizeBtn.addEventListener('click', () => {
+                tableEditMode = true;
+                editingTable = table;
+                hideTableMenu();
+            });
+            tableMenu.appendChild(resizeBtn);
+
+            const tabsBar = document.createElement('div');
+            tabsBar.className = 'table-menu-tabs';
+            const tabContent = document.createElement('div');
+            tabContent.className = 'tab-content';
+            tableMenu.appendChild(tabsBar);
+            tableMenu.appendChild(tabContent);
+
             const rIndex = cell ? cell.parentElement.rowIndex : 0;
             const cIndex = cell ? cell.cellIndex : 0;
-            const makeBtn = (label, fn) => {
-                const b = document.createElement('button');
-                b.className = 'toolbar-btn';
-                b.textContent = label;
-                b.addEventListener('click', () => { fn(); hideTableMenu(); notesEditor.focus(); });
-                tableMenu.appendChild(b);
+
+            const buildEditTab = () => {
+                tabContent.innerHTML = '';
+                const makeBtn = (label, icon, fn) => {
+                    const b = document.createElement('button');
+                    b.className = 'toolbar-btn';
+                    b.innerHTML = `${icon} ${label}`;
+                    b.addEventListener('click', () => { fn(); hideTableMenu(); notesEditor.focus(); });
+                    tabContent.appendChild(b);
+                };
+                makeBtn('Fila arriba', '⬆️', () => addRow(table, rIndex));
+                makeBtn('Fila abajo', '⬇️', () => addRow(table, rIndex + 1));
+                makeBtn('Eliminar fila', '🗑️', () => deleteRow(table, rIndex));
+                makeBtn('Columna izq', '⬅️', () => addColumn(table, cIndex));
+                makeBtn('Columna der', '➡️', () => addColumn(table, cIndex + 1));
+                makeBtn('Eliminar columna', '🗑️', () => deleteColumn(table, cIndex));
             };
-            makeBtn('Fila arriba', () => addRow(table, rIndex));
-            makeBtn('Fila abajo', () => addRow(table, rIndex + 1));
-            makeBtn('Eliminar fila', () => deleteRow(table, rIndex));
-            makeBtn('Columna izq', () => addColumn(table, cIndex));
-            makeBtn('Columna der', () => addColumn(table, cIndex + 1));
-            makeBtn('Eliminar columna', () => deleteColumn(table, cIndex));
-            TABLE_THEMES.forEach(t => {
-                const b = document.createElement('button');
-                b.className = 'toolbar-btn';
-                b.textContent = t.label;
-                b.addEventListener('click', () => {
-                    TABLE_THEMES.forEach(tt => table.classList.remove(tt.class));
-                    table.classList.add(t.class);
-                    hideTableMenu();
-                    notesEditor.focus();
-                });
-                tableMenu.appendChild(b);
-            });
-            const HEADER_COLORS = [
-                { label: 'Cabecera azul', bg: '#bbdefb', color: '#0d47a1' },
-                { label: 'Cabecera verde', bg: '#c8e6c9', color: '#1b5e20' },
-                { label: 'Cabecera gris', bg: '#e0e0e0', color: '#212121' },
-                { label: 'Cabecera roja', bg: '#ffcdd2', color: '#b71c1c' },
-                { label: 'Cabecera morada', bg: '#e1bee7', color: '#4a148c' },
-                { label: 'Cabecera turquesa', bg: '#e0f2f1', color: '#004d40' }
-            ];
-            HEADER_COLORS.forEach(h => {
-                const b = document.createElement('button');
-                b.className = 'toolbar-btn';
-                b.textContent = h.label;
-                b.addEventListener('click', () => {
-                    const row = table.rows[0];
-                    if (row) Array.from(row.cells).forEach(c => {
-                        c.style.backgroundColor = h.bg;
-                        c.style.color = h.color;
+
+            const buildStyleTab = () => {
+                tabContent.innerHTML = '';
+                TABLE_THEMES.forEach(t => {
+                    const b = document.createElement('button');
+                    b.className = 'toolbar-btn';
+                    b.textContent = t.label;
+                    b.addEventListener('click', () => {
+                        TABLE_THEMES.forEach(tt => table.classList.remove(tt.class));
+                        table.classList.add(t.class);
+                        hideTableMenu();
+                        notesEditor.focus();
                     });
-                    hideTableMenu();
-                    notesEditor.focus();
+                    tabContent.appendChild(b);
                 });
-                tableMenu.appendChild(b);
+                const HEADER_COLORS = [
+                    { label: 'Cabecera azul', bg: '#bbdefb', color: '#0d47a1' },
+                    { label: 'Cabecera verde', bg: '#c8e6c9', color: '#1b5e20' },
+                    { label: 'Cabecera gris', bg: '#e0e0e0', color: '#212121' },
+                    { label: 'Cabecera roja', bg: '#ffcdd2', color: '#b71c1c' },
+                    { label: 'Cabecera morada', bg: '#e1bee7', color: '#4a148c' },
+                    { label: 'Cabecera turquesa', bg: '#e0f2f1', color: '#004d40' }
+                ];
+                HEADER_COLORS.forEach(h => {
+                    const b = document.createElement('button');
+                    b.className = 'toolbar-btn';
+                    b.textContent = h.label;
+                    b.addEventListener('click', () => {
+                        const row = table.rows[0];
+                        if (row) Array.from(row.cells).forEach(c => {
+                            c.style.backgroundColor = h.bg;
+                            c.style.color = h.color;
+                        });
+                        hideTableMenu();
+                        notesEditor.focus();
+                    });
+                    tabContent.appendChild(b);
+                });
+            };
+
+            const tabs = [
+                { label: '✏️', build: buildEditTab },
+                { label: '🎨', build: buildStyleTab }
+            ];
+            tabs.forEach((t, i) => {
+                const b = document.createElement('button');
+                b.className = 'tab-btn';
+                b.innerHTML = t.label;
+                b.addEventListener('click', () => {
+                    tabsBar.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+                    b.classList.add('active');
+                    t.build();
+                });
+                if (i === 0) { b.classList.add('active'); t.build(); }
+                tabsBar.appendChild(b);
             });
+
             tableMenu.style.display = 'block';
             tableMenu.style.top = `${y}px`;
             tableMenu.style.left = `${x}px`;
             tableMenu.style.zIndex = 10001;
         };
         notesEditor.addEventListener('click', (e) => {
+            if (tableEditMode) return;
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
             if (table && notesEditor.contains(table)) {
                 showTableMenu(table, cell, e.pageX, e.pageY);
                 e.stopPropagation();
+            }
+        });
+        document.addEventListener('click', (e) => {
+            if (tableEditMode && editingTable && !editingTable.contains(e.target)) {
+                tableEditMode = false;
+                editingTable = null;
             }
         });
         document.addEventListener('click', (e) => {
@@ -3232,55 +3312,70 @@ document.addEventListener('DOMContentLoaded', function () {
         lineStylePopup.className = 'preset-style-popup';
         document.body.appendChild(lineStylePopup);
         let currentLine = null;
-        let selectedGradient = LINE_GRADIENTS[0];
-        const thicknessInput = document.createElement('input');
-        thicknessInput.type = 'number';
-        thicknessInput.min = '1';
-        thicknessInput.max = '20';
-        thicknessInput.value = '4';
+
+        const SIMPLE_LINES = [1,3,5].map(t => `border:none; border-top:${t}px solid #000; height:${t}px; margin:20px 0;`);
+        const DASHED_LINES = [1,3,5].map(t => `border:none; border-top:${t}px dashed #000; height:${t}px; margin:20px 0;`);
+        const DOTTED_LINES = [1,3,5].map(t => `border:none; border-top:${t}px dotted #000; height:${t}px; margin:20px 0;`);
+
+        const applyLineStyle = (style) => {
+            if (currentLine) {
+                currentLine.style.cssText = style;
+            } else {
+                // Ensure the editor retains focus so the divider is inserted
+                // at the current caret position even when no text is selected.
+                notesEditor.focus();
+                const selection = window.getSelection();
+                if (savedEditorSelection) {
+                    selection.removeAllRanges();
+                    selection.addRange(savedEditorSelection);
+                }
+                document.execCommand('insertHTML', false, `<hr style="${style}">`);
+                savedEditorSelection = null;
+            }
+            hideLineStylePopup();
+            notesEditor.focus();
+        };
 
         const renderLineStylePopup = () => {
             lineStylePopup.innerHTML = '';
-            const colorsDiv = document.createElement('div');
-            LINE_GRADIENTS.forEach(g => {
-                const b = document.createElement('button');
-                b.className = 'toolbar-btn';
-                b.innerHTML = `<div style="height:4px; width:40px; border-radius:2px; background:linear-gradient(to right, ${g[0]}, ${g[1]});"></div>`;
-                b.addEventListener('click', () => { selectedGradient = g; });
-                colorsDiv.appendChild(b);
-            });
-            lineStylePopup.appendChild(colorsDiv);
-            const label = document.createElement('div');
-            label.textContent = 'Grosor';
-            lineStylePopup.appendChild(label);
-            lineStylePopup.appendChild(thicknessInput);
-            const applyBtn = document.createElement('button');
-            applyBtn.className = 'toolbar-btn';
-            applyBtn.textContent = 'Aplicar';
-            applyBtn.addEventListener('click', () => {
-                const [c1,c2] = selectedGradient;
-                const t = parseInt(thicknessInput.value) || 4;
-                const style = `height:${t}px; margin:20px 0; border-radius:${t/2}px; background:linear-gradient(to right, ${c1}, ${c2}); border:none;`;
-                if (currentLine) {
-                    currentLine.style.cssText = style;
-                } else {
-                    document.execCommand('insertHTML', false, `<hr style="${style}">`);
-                }
-                hideLineStylePopup();
-                notesEditor.focus();
-            });
-            lineStylePopup.appendChild(applyBtn);
+            const addGroup = (title, styles) => {
+                const label = document.createElement('div');
+                label.textContent = title;
+                lineStylePopup.appendChild(label);
+                const group = document.createElement('div');
+                group.className = 'line-style-group';
+                styles.forEach(s => {
+                    const b = document.createElement('button');
+                    b.className = 'toolbar-btn';
+                    b.innerHTML = `<div style="${s} width:40px;"></div>`;
+                    b.addEventListener('click', () => applyLineStyle(s));
+                    group.appendChild(b);
+                });
+                lineStylePopup.appendChild(group);
+            };
+            addGroup('Sólidas', SIMPLE_LINES);
+            addGroup('Segmentadas', DASHED_LINES);
+            addGroup('Punteadas', DOTTED_LINES);
+            const gradientsGroup = LINE_GRADIENTS.map(([c1,c2]) => `height:4px; border:none; margin:20px 0; border-radius:2px; background:linear-gradient(to right, ${c1}, ${c2});`);
+            addGroup('Degradadas', gradientsGroup);
         };
 
-        const showLineStylePopup = (hr = null) => {
+        const showLineStylePopup = (hr = null, anchor = null) => {
             currentLine = hr;
-            selectedGradient = LINE_GRADIENTS[0];
-            thicknessInput.value = hr ? parseInt(hr.style.height) || 4 : 4;
             renderLineStylePopup();
+            if (!hr && savedEditorSelection) {
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(savedEditorSelection);
+            }
             lineStylePopup.style.display = 'block';
             let rect;
             if (hr) {
                 rect = hr.getBoundingClientRect();
+            } else if (savedEditorSelection) {
+                rect = savedEditorSelection.getBoundingClientRect();
+            } else if (anchor) {
+                rect = anchor.getBoundingClientRect();
             } else {
                 const sel = window.getSelection();
                 if (sel && sel.rangeCount) rect = sel.getRangeAt(0).getBoundingClientRect();
@@ -3296,72 +3391,23 @@ document.addEventListener('DOMContentLoaded', function () {
             currentLine = null;
         };
 
-        const lineDropdown = document.createElement('div');
-        lineDropdown.className = 'symbol-dropdown';
         const lineBtn = createButton('Insertar línea separadora', '—', null, null, null);
-        lineDropdown.appendChild(lineBtn);
-        const lineContent = document.createElement('div');
-        lineContent.className = 'symbol-dropdown-content flex-dropdown';
-        lineContent.style.minWidth = '80px';
-        const customLineBtn = document.createElement('button');
-        customLineBtn.className = 'toolbar-btn';
-        customLineBtn.textContent = 'Línea';
-        customLineBtn.addEventListener('click', (e) => {
+        lineBtn.addEventListener('mousedown', (e) => {
             e.preventDefault();
-            lineContent.classList.remove('visible');
-            showLineStylePopup();
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
+                savedEditorSelection = selection.getRangeAt(0).cloneRange();
+            } else {
+                savedEditorSelection = null;
+            }
         });
-        lineContent.appendChild(customLineBtn);
-        const pillsBtn = document.createElement('button');
-        pillsBtn.className = 'toolbar-btn';
-        pillsBtn.textContent = 'Píldoras';
-        pillsBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const pillColors = [
-                ['#fffde7','#fff176','#795548'],
-                ['#ffe0b2','#ff9800','#4e342e'],
-                ['#bbdefb','#2196f3','#0d47a1'],
-                ['#e1f5fe','#4fc3f7','#01579b'],
-                ['#c8e6c9','#388e3c','#1b5e20'],
-                ['#dcedc8','#8bc34a','#33691e'],
-                ['#e1bee7','#9c27b0','#4a148c'],
-                ['#d7ccc8','#795548','#3e2723'],
-                ['#f5f5f5','#9e9e9e','#212121'],
-                ['#ffcdd2','#f44336','#b71c1c']
-            ];
-            const gradients = [
-                ['#fffde7','#fff176'],
-                ['#ffe0b2','#ff9800'],
-                ['#bbdefb','#2196f3'],
-                ['#e1f5fe','#4fc3f7'],
-                ['#c8e6c9','#388e3c'],
-                ['#dcedc8','#8bc34a'],
-                ['#e1bee7','#9c27b0'],
-                ['#d7ccc8','#795548'],
-                ['#f5f5f5','#9e9e9e'],
-                ['#ffcdd2','#f44336']
-            ];
-            let html = '<div style="--pill-indent:0px; padding-left:0; padding-right:0; margin:0; border-radius:6px;">';
-            pillColors.forEach(c=>{html += `<div style="background: linear-gradient(to right, ${c[0]}, ${c[1]}); color:${c[2]}; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px var(--pill-indent);"><span class=\"pill-text\">&nbsp;</span></div>`;});
-            html += '</div>';
-            gradients.forEach(g=>{html += `<div style="height:12px; margin:20px 0; border-radius:6px; background: linear-gradient(to right, ${g[0]}, ${g[1]});"></div>`;});
-            gradients.forEach(g=>{html += `<div style="height:4px; margin:12px 0; border-radius:2px; background: linear-gradient(to right, ${g[0]}, ${g[1]});"></div>`;});
-            html += `<script>(function(){try{var root;if(document.currentScript){var prev=document.currentScript.previousSibling;while(prev&&prev.nodeType!==1)prev=prev.previousSibling;root=prev||document.currentScript.parentElement;}else{root=document.body;}var sel="";try{sel=(window.getSelection&&window.getSelection().toString())||"";}catch(e){}sel=(sel||"").trim();var texto=sel||(typeof prompt==='function'?prompt('Texto para las píldoras:',sel):"");if(!texto)return;var nodes=(root&&root.querySelectorAll)?root.querySelectorAll('.pill-text'):[];nodes.forEach(function(el){el.textContent=texto;});}catch(err){}})();</script>`;
-            document.execCommand('insertHTML', false, html);
-            lineContent.classList.remove('visible');
-            notesEditor.focus();
-        });
-        lineContent.appendChild(pillsBtn);
-        lineDropdown.appendChild(lineContent);
         lineBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
-                if (d !== lineContent) d.classList.remove('visible');
-            });
-            lineContent.classList.toggle('visible');
+            document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => d.classList.remove('visible'));
+            showLineStylePopup(null, lineBtn);
         });
-        editorToolbar.appendChild(lineDropdown);
+        editorToolbar.appendChild(lineBtn);
         editorToolbar.appendChild(createSeparator());
         notesEditor.addEventListener('click', (e) => {
             if (e.target.tagName === 'HR') {

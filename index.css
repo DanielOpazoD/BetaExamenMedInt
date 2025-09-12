@@ -903,6 +903,30 @@ table.resizable-table.selected .table-resize-handle {
     text-align: left;
     margin: 2px 0;
 }
+.table-menu-popup .tab-content .toolbar-btn,
+.line-style-group .toolbar-btn {
+    display: inline-block;
+    width: auto;
+}
+.table-menu-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 4px;
+}
+.table-menu-tabs .tab-btn {
+    flex: 1;
+    padding: 4px;
+}
+.table-menu-tabs .tab-btn.active {
+    background: var(--bg-tertiary);
+    font-weight: bold;
+}
+.line-style-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 4px;
+}
 .table-theme-blue { border-collapse: collapse; }
 .table-theme-blue th, .table-theme-blue td { border:1px solid #2196f3; }
 .table-theme-blue th { background:#bbdefb; color:#0d47a1; }
