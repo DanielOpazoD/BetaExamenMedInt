@@ -3052,6 +3052,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 setPillsText();
             }
         });
+        pillTextBtn.addEventListener('mousedown', e => e.preventDefault());
         editorToolbar.appendChild(pillTextBtn);
 
         notesEditor.addEventListener('click', (e) => {
@@ -3072,6 +3073,7 @@ document.addEventListener('DOMContentLoaded', function () {
         tableMenu.className = 'table-menu-popup';
         document.body.appendChild(tableMenu);
         let currentTable = null;
+        let tableResizeMode = false;
         const hideTableMenu = () => {
             tableMenu.style.display = 'none';
             currentTable = null;
@@ -3097,19 +3099,40 @@ document.addEventListener('DOMContentLoaded', function () {
             tableMenu.innerHTML = '';
             const rIndex = cell ? cell.parentElement.rowIndex : 0;
             const cIndex = cell ? cell.cellIndex : 0;
-            const makeBtn = (label, fn) => {
+
+            const tabs = document.createElement('div');
+            tabs.className = 'table-menu-tabs';
+            const structureTab = document.createElement('button');
+            structureTab.className = 'table-menu-tab active';
+            structureTab.textContent = '🛠️ Estructura';
+            const styleTab = document.createElement('button');
+            styleTab.className = 'table-menu-tab';
+            styleTab.textContent = '🎨 Estilos';
+            tabs.appendChild(structureTab);
+            tabs.appendChild(styleTab);
+            tableMenu.appendChild(tabs);
+
+            const structureSection = document.createElement('div');
+            structureSection.className = 'table-menu-section active';
+            const styleSection = document.createElement('div');
+            styleSection.className = 'table-menu-section';
+
+            const makeBtn = (label, fn, container = structureSection) => {
                 const b = document.createElement('button');
                 b.className = 'toolbar-btn';
                 b.textContent = label;
                 b.addEventListener('click', () => { fn(); hideTableMenu(); notesEditor.focus(); });
-                tableMenu.appendChild(b);
+                container.appendChild(b);
             };
+
+            makeBtn('📐 Redimensionar', () => { tableResizeMode = true; initTableResize(table); });
             makeBtn('Fila arriba', () => addRow(table, rIndex));
             makeBtn('Fila abajo', () => addRow(table, rIndex + 1));
             makeBtn('Eliminar fila', () => deleteRow(table, rIndex));
             makeBtn('Columna izq', () => addColumn(table, cIndex));
             makeBtn('Columna der', () => addColumn(table, cIndex + 1));
             makeBtn('Eliminar columna', () => deleteColumn(table, cIndex));
+
             TABLE_THEMES.forEach(t => {
                 const b = document.createElement('button');
                 b.className = 'toolbar-btn';
@@ -3120,7 +3143,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     hideTableMenu();
                     notesEditor.focus();
                 });
-                tableMenu.appendChild(b);
+                styleSection.appendChild(b);
             });
             const HEADER_COLORS = [
                 { label: 'Cabecera azul', bg: '#bbdefb', color: '#0d47a1' },
@@ -3143,8 +3166,25 @@ document.addEventListener('DOMContentLoaded', function () {
                     hideTableMenu();
                     notesEditor.focus();
                 });
-                tableMenu.appendChild(b);
+                styleSection.appendChild(b);
             });
+
+            tableMenu.appendChild(structureSection);
+            tableMenu.appendChild(styleSection);
+
+            structureTab.addEventListener('click', () => {
+                structureTab.classList.add('active');
+                styleTab.classList.remove('active');
+                structureSection.classList.add('active');
+                styleSection.classList.remove('active');
+            });
+            styleTab.addEventListener('click', () => {
+                styleTab.classList.add('active');
+                structureTab.classList.remove('active');
+                styleSection.classList.add('active');
+                structureSection.classList.remove('active');
+            });
+
             tableMenu.style.display = 'block';
             tableMenu.style.top = `${y}px`;
             tableMenu.style.left = `${x}px`;
@@ -3153,13 +3193,14 @@ document.addEventListener('DOMContentLoaded', function () {
         notesEditor.addEventListener('click', (e) => {
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
-            if (table && notesEditor.contains(table)) {
+            if (table && notesEditor.contains(table) && !tableResizeMode) {
                 showTableMenu(table, cell, e.pageX, e.pageY);
                 e.stopPropagation();
             }
         });
         document.addEventListener('click', (e) => {
             if (!tableMenu.contains(e.target)) hideTableMenu();
+            if (tableResizeMode && !e.target.closest('table')) tableResizeMode = false;
         });
 
         const applyBlockVerticalPadding = (level) => {
@@ -3302,10 +3343,41 @@ document.addEventListener('DOMContentLoaded', function () {
         lineDropdown.appendChild(lineBtn);
         const lineContent = document.createElement('div');
         lineContent.className = 'symbol-dropdown-content flex-dropdown';
-        lineContent.style.minWidth = '80px';
+        lineContent.style.minWidth = '120px';
+        const simpleLines = [
+            { label: 'Fina', style: 'height:1px; background:#000; border:none;' },
+            { label: 'Media', style: 'height:3px; background:#000; border:none;' },
+            { label: 'Gruesa', style: 'height:5px; background:#000; border:none;' },
+            { label: 'Segmentada', style: 'border-top:3px dashed #000; height:0;' },
+            { label: 'Punteada', style: 'border-top:3px dotted #000; height:0;' }
+        ];
+        simpleLines.forEach(l => {
+            const b = document.createElement('button');
+            b.className = 'toolbar-btn';
+            b.textContent = l.label;
+            b.addEventListener('click', e => {
+                e.preventDefault();
+                document.execCommand('insertHTML', false, `<hr style="${l.style}">`);
+                lineContent.classList.remove('visible');
+                notesEditor.focus();
+            });
+            lineContent.appendChild(b);
+        });
+        LINE_GRADIENTS.forEach(g => {
+            const b = document.createElement('button');
+            b.className = 'toolbar-btn';
+            b.innerHTML = `<div style="height:4px; width:40px; border-radius:2px; background:linear-gradient(to right, ${g[0]}, ${g[1]});"></div>`;
+            b.addEventListener('click', e => {
+                e.preventDefault();
+                document.execCommand('insertHTML', false, `<hr style="height:4px; border:none; background:linear-gradient(to right, ${g[0]}, ${g[1]});">`);
+                lineContent.classList.remove('visible');
+                notesEditor.focus();
+            });
+            lineContent.appendChild(b);
+        });
         const customLineBtn = document.createElement('button');
         customLineBtn.className = 'toolbar-btn';
-        customLineBtn.textContent = 'Línea';
+        customLineBtn.textContent = 'Personalizar';
         customLineBtn.addEventListener('click', (e) => {
             e.preventDefault();
             lineContent.classList.remove('visible');
