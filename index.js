@@ -3052,6 +3052,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 setPillsText();
             }
         });
+        // Prevent losing text selection when clicking the toolbar button
+        pillTextBtn.addEventListener('mousedown', e => e.preventDefault());
         editorToolbar.appendChild(pillTextBtn);
 
         notesEditor.addEventListener('click', (e) => {
@@ -3072,6 +3074,7 @@ document.addEventListener('DOMContentLoaded', function () {
         tableMenu.className = 'table-menu-popup';
         document.body.appendChild(tableMenu);
         let currentTable = null;
+        let tableEditMode = false;
         const hideTableMenu = () => {
             tableMenu.style.display = 'none';
             currentTable = null;
@@ -3093,34 +3096,62 @@ document.addEventListener('DOMContentLoaded', function () {
             { label: 'Turquesa', class: 'table-theme-teal' }
         ];
         const showTableMenu = (table, cell, x, y) => {
+            if (tableEditMode) return;
             currentTable = table;
             tableMenu.innerHTML = '';
             const rIndex = cell ? cell.parentElement.rowIndex : 0;
             const cIndex = cell ? cell.cellIndex : 0;
-            const makeBtn = (label, fn) => {
+
+            const tabs = document.createElement('div');
+            tabs.className = 'table-menu-tabs';
+            const structureTab = document.createElement('button');
+            structureTab.textContent = 'Estructura';
+            const styleTab = document.createElement('button');
+            styleTab.textContent = 'Estilo';
+            tabs.appendChild(structureTab);
+            tabs.appendChild(styleTab);
+            tableMenu.appendChild(tabs);
+
+            const structureDiv = document.createElement('div');
+            const styleDiv = document.createElement('div');
+            styleDiv.style.display = 'none';
+            tableMenu.appendChild(structureDiv);
+            tableMenu.appendChild(styleDiv);
+
+            const makeBtn = (label, fn, icon = '') => {
                 const b = document.createElement('button');
                 b.className = 'toolbar-btn';
-                b.textContent = label;
+                b.innerHTML = icon ? `${icon} ${label}` : label;
                 b.addEventListener('click', () => { fn(); hideTableMenu(); notesEditor.focus(); });
-                tableMenu.appendChild(b);
+                return b;
             };
-            makeBtn('Fila arriba', () => addRow(table, rIndex));
-            makeBtn('Fila abajo', () => addRow(table, rIndex + 1));
-            makeBtn('Eliminar fila', () => deleteRow(table, rIndex));
-            makeBtn('Columna izq', () => addColumn(table, cIndex));
-            makeBtn('Columna der', () => addColumn(table, cIndex + 1));
-            makeBtn('Eliminar columna', () => deleteColumn(table, cIndex));
+
+            const resizeBtn = makeBtn('Redimensionar', () => {
+                tableEditMode = true;
+                hideTableMenu();
+                const exit = (ev) => {
+                    if (!table.contains(ev.target)) {
+                        tableEditMode = false;
+                        document.removeEventListener('click', exit);
+                    }
+                };
+                document.addEventListener('click', exit);
+            }, '↔️');
+            structureDiv.appendChild(resizeBtn);
+
+            structureDiv.appendChild(makeBtn('Fila arriba', () => addRow(table, rIndex), '⬆️'));
+            structureDiv.appendChild(makeBtn('Fila abajo', () => addRow(table, rIndex + 1), '⬇️'));
+            structureDiv.appendChild(makeBtn('Eliminar fila', () => deleteRow(table, rIndex), '🗑️'));
+            structureDiv.appendChild(makeBtn('Columna izq', () => addColumn(table, cIndex), '⬅️'));
+            structureDiv.appendChild(makeBtn('Columna der', () => addColumn(table, cIndex + 1), '➡️'));
+            structureDiv.appendChild(makeBtn('Eliminar columna', () => deleteColumn(table, cIndex), '🗑️'));
+
             TABLE_THEMES.forEach(t => {
-                const b = document.createElement('button');
-                b.className = 'toolbar-btn';
-                b.textContent = t.label;
-                b.addEventListener('click', () => {
+                const b = makeBtn(t.label, () => {
                     TABLE_THEMES.forEach(tt => table.classList.remove(tt.class));
                     table.classList.add(t.class);
-                    hideTableMenu();
-                    notesEditor.focus();
-                });
-                tableMenu.appendChild(b);
+                }, '🎨');
+                styleDiv.appendChild(b);
             });
             const HEADER_COLORS = [
                 { label: 'Cabecera azul', bg: '#bbdefb', color: '#0d47a1' },
@@ -3131,26 +3162,33 @@ document.addEventListener('DOMContentLoaded', function () {
                 { label: 'Cabecera turquesa', bg: '#e0f2f1', color: '#004d40' }
             ];
             HEADER_COLORS.forEach(h => {
-                const b = document.createElement('button');
-                b.className = 'toolbar-btn';
-                b.textContent = h.label;
-                b.addEventListener('click', () => {
+                const b = makeBtn(h.label, () => {
                     const row = table.rows[0];
                     if (row) Array.from(row.cells).forEach(c => {
                         c.style.backgroundColor = h.bg;
                         c.style.color = h.color;
                     });
-                    hideTableMenu();
-                    notesEditor.focus();
-                });
-                tableMenu.appendChild(b);
+                }, '🖌️');
+                styleDiv.appendChild(b);
             });
+
+            structureTab.addEventListener('click', () => {
+                structureDiv.style.display = 'block';
+                styleDiv.style.display = 'none';
+            });
+            styleTab.addEventListener('click', () => {
+                structureDiv.style.display = 'none';
+                styleDiv.style.display = 'block';
+            });
+            structureTab.click();
+
             tableMenu.style.display = 'block';
             tableMenu.style.top = `${y}px`;
             tableMenu.style.left = `${x}px`;
             tableMenu.style.zIndex = 10001;
         };
         notesEditor.addEventListener('click', (e) => {
+            if (tableEditMode) return;
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
             if (table && notesEditor.contains(table)) {
@@ -3216,6 +3254,17 @@ document.addEventListener('DOMContentLoaded', function () {
         
         editorToolbar.appendChild(createHighlightSizeDropdown());
 
+        const SIMPLE_LINE_STYLES = [
+            { style: 'solid', size: 2 },
+            { style: 'solid', size: 4 },
+            { style: 'solid', size: 8 },
+            { style: 'dashed', size: 2 },
+            { style: 'dashed', size: 4 },
+            { style: 'dashed', size: 8 },
+            { style: 'dotted', size: 2 },
+            { style: 'dotted', size: 4 },
+            { style: 'dotted', size: 8 }
+        ];
         const LINE_GRADIENTS = [
             ['#fffde7','#fff176'],
             ['#ffe0b2','#ff9800'],
@@ -3241,6 +3290,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const renderLineStylePopup = () => {
             lineStylePopup.innerHTML = '';
+            const simpleDiv = document.createElement('div');
+            SIMPLE_LINE_STYLES.forEach(s => {
+                const b = document.createElement('button');
+                b.className = 'toolbar-btn';
+                b.innerHTML = `<div style="border-top:${s.size}px ${s.style} #000; width:40px; margin:4px 0;"></div>`;
+                b.addEventListener('click', () => {
+                    const style = `border:none; border-top:${s.size}px ${s.style} #000;`;
+                    if (currentLine) {
+                        currentLine.style.cssText = style;
+                    } else {
+                        document.execCommand('insertHTML', false, `<hr style="${style}">`);
+                    }
+                    hideLineStylePopup();
+                    notesEditor.focus();
+                });
+                simpleDiv.appendChild(b);
+            });
+            lineStylePopup.appendChild(simpleDiv);
+
             const colorsDiv = document.createElement('div');
             LINE_GRADIENTS.forEach(g => {
                 const b = document.createElement('button');
