@@ -173,6 +173,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
             if (!node || node === notesEditor) return;
             const prev = node.previousElementSibling;
+            node.removeAttribute('style');
+            node.classList.remove('preset-style');
             if (prev) {
                 ['marginLeft', 'paddingLeft', 'textIndent'].forEach(prop => {
                     node.style[prop] = prev.style[prop];
@@ -2286,18 +2288,23 @@ document.addEventListener('DOMContentLoaded', function () {
             const callout = node.closest('.note-callout-content');
             sanitizeCalloutContent(callout);
 
-            const blocks = [];
-            const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
-                acceptNode(n) {
-                    if (!range.intersectsNode(n)) return NodeFilter.FILTER_SKIP;
-                    if (!n.matches('p, li, div, table')) return NodeFilter.FILTER_SKIP;
-                    if (n.closest('table') && n.tagName !== 'TABLE') return NodeFilter.FILTER_SKIP;
-                    return NodeFilter.FILTER_ACCEPT;
+            let blocks = [];
+            if (root === notesEditor) {
+                blocks = getSelectedBlockElements();
+            }
+            if (!blocks.length) {
+                const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+                    acceptNode(n) {
+                        if (!range.intersectsNode(n)) return NodeFilter.FILTER_SKIP;
+                        if (!n.matches('p, li, div, table')) return NodeFilter.FILTER_SKIP;
+                        if (n.closest('table') && n.tagName !== 'TABLE') return NodeFilter.FILTER_SKIP;
+                        return NodeFilter.FILTER_ACCEPT;
+                    }
+                });
+                let current;
+                while ((current = walker.nextNode())) {
+                    if (!blocks.some(b => b.contains(current))) blocks.push(current);
                 }
-            });
-            let current;
-            while ((current = walker.nextNode())) {
-                if (!blocks.some(b => b.contains(current))) blocks.push(current);
             }
             if (!blocks.length) {
                 let block = range.startContainer;
@@ -2752,20 +2759,90 @@ document.addEventListener('DOMContentLoaded', function () {
             notesEditor.focus();
         };
 
+        const presetStyles = [
+            { label: 'Texto estilo celeste', style: 'font-family:Arial; font-weight:600; background:#e0f7fa; color:#01579b; padding:2px 4px; border-radius:4px;' },
+            { label: 'Texto estilo lila', style: 'font-family:Arial; font-weight:600; background:#f3e5f5; color:#6a1b9a; padding:2px 4px; border-radius:4px;' },
+            { label: 'Texto estilo menta', style: 'font-family:Arial; font-weight:600; background:#e8f5e9; color:#1b5e20; padding:2px 4px; border-radius:4px;' },
+            { label: 'Texto estilo durazno', style: 'font-family:Arial; font-weight:600; background:#fff3e0; color:#e65100; padding:2px 4px; border-radius:4px;' },
+            { label: 'Texto estilo amarillo', style: 'font-family:Arial; font-weight:600; background:#fffde7; color:#f57f17; padding:2px 4px; border-radius:4px;' },
+            { label: 'Texto estilo rosado', style: 'font-family:Arial; font-weight:600; background:#fce4ec; color:#ad1457; padding:2px 4px; border-radius:4px;' },
+            { label: 'Texto estilo azul', style: 'font-family:Arial; font-weight:600; background:#e3f2fd; color:#1a237e; padding:2px 4px; border-radius:4px;' },
+            { label: 'Texto estilo turquesa', style: 'font-family:Arial; font-weight:600; background:#e0f2f1; color:#004d40; padding:2px 4px; border-radius:4px;' },
+            { label: 'Texto estilo arena', style: 'font-family:Arial; font-weight:600; background:#fbe9e7; color:#4e342e; padding:2px 4px; border-radius:4px;' },
+            { label: 'Texto estilo café', style: 'font-family:Arial; font-weight:600; background:#efebe9; color:#5d4037; padding:2px 4px; border-radius:4px;' },
+            { label: 'Texto estilo rojo', style: 'font-family:Arial; font-weight:600; background:#f44336; color:#ffffff; padding:2px 4px; border-radius:4px;' },
+            { label: 'Texto estilo verde oscuro', style: 'font-family:Arial; font-weight:600; background:#1b5e20; color:#ffffff; padding:2px 4px; border-radius:4px;' }
+        ];
+
+        const styleTooltip = document.createElement('div');
+        styleTooltip.id = 'style-tooltip';
+        let currentStyledSpan = null;
+        presetStyles.forEach(s => {
+            const b = document.createElement('button');
+            b.textContent = s.label;
+            b.addEventListener('click', () => {
+                if (currentStyledSpan) {
+                    currentStyledSpan.style.cssText = s.style;
+                }
+                styleTooltip.style.display = 'none';
+            });
+            styleTooltip.appendChild(b);
+        });
+        document.body.appendChild(styleTooltip);
+
+        const tableMenu = document.createElement('div');
+        tableMenu.id = 'table-menu';
+        tableMenu.innerHTML = `
+            <button data-action="add-row">Agregar fila</button>
+            <button data-action="del-row">Eliminar fila</button>
+            <button data-action="add-col">Agregar columna</button>
+            <button data-action="del-col">Eliminar columna</button>
+            <button data-theme="">Tema por defecto</button>
+            <button data-theme="table-theme-blue">Tema azul</button>
+            <button data-theme="table-theme-green">Tema verde</button>
+        `;
+        document.body.appendChild(tableMenu);
+        let currentTable = null;
+        tableMenu.addEventListener('click', (e) => {
+            const action = e.target.dataset.action;
+            const theme = e.target.dataset.theme;
+            if (!currentTable) return;
+            if (action) {
+                if (action === 'add-row') {
+                    currentTable.insertRow(-1);
+                } else if (action === 'del-row') {
+                    if (currentTable.rows.length) currentTable.deleteRow(-1);
+                } else if (action === 'add-col') {
+                    Array.from(currentTable.rows).forEach(r => r.insertCell(-1));
+                } else if (action === 'del-col') {
+                    Array.from(currentTable.rows).forEach(r => {
+                        if (r.cells.length) r.deleteCell(-1);
+                    });
+                }
+            } else if (theme !== undefined) {
+                currentTable.classList.remove('table-theme-blue', 'table-theme-green');
+                if (theme) currentTable.classList.add(theme);
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('span.preset-style')) {
+                styleTooltip.style.display = 'none';
+                currentStyledSpan = null;
+            }
+            if (!e.target.closest('table') && !tableMenu.contains(e.target)) {
+                tableMenu.style.display = 'none';
+                currentTable = null;
+            }
+        });
+
         const applyPresetStyle = (cssText) => {
             const sel = window.getSelection();
             if (!sel || sel.rangeCount === 0) return;
-            const range = sel.getRangeAt(0);
-            if (range.collapsed) return;
-            const span = document.createElement('span');
-            span.style.cssText = cssText;
-            span.appendChild(range.extractContents());
-            range.insertNode(span);
-            const newRange = document.createRange();
-            newRange.setStartAfter(span);
-            newRange.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(newRange);
+            const text = sel.toString();
+            if (!text) return;
+            const html = `<span class="preset-style" style="${cssText}">${text}</span>`;
+            document.execCommand('insertHTML', false, html);
         };
 
         const createPresetStyleDropdown = () => {
@@ -2960,6 +3037,41 @@ document.addEventListener('DOMContentLoaded', function () {
         
         editorToolbar.appendChild(createHighlightSizeDropdown());
 
+        const fancySeparatorHTML = `<!-- Píldoras autollenables + Separadores gruesos y finos con degradé -->
+<div style="--pill-indent:0px; padding-left:0; padding-right:0; margin:0; border-radius:6px;">
+  <div style="background: linear-gradient(to right, #fffde7, #fff176); color:#795548; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px var(--pill-indent);"><span class="pill-text">&nbsp;</span></div>
+  <div style="background: linear-gradient(to right, #ffe0b2, #ff9800); color:#4e342e; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px var(--pill-indent);"><span class="pill-text">&nbsp;</span></div>
+  <div style="background: linear-gradient(to right, #bbdefb, #2196f3); color:#0d47a1; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px var(--pill-indent);"><span class="pill-text">&nbsp;</span></div>
+  <div style="background: linear-gradient(to right, #e1f5fe, #4fc3f7); color:#01579b; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px var(--pill-indent);"><span class="pill-text">&nbsp;</span></div>
+  <div style="background: linear-gradient(to right, #c8e6c9, #388e3c); color:#1b5e20; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px var(--pill-indent);"><span class="pill-text">&nbsp;</span></div>
+  <div style="background: linear-gradient(to right, #dcedc8, #8bc34a); color:#33691e; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px var(--pill-indent);"><span class="pill-text">&nbsp;</span></div>
+  <div style="background: linear-gradient(to right, #e1bee7, #9c27b0); color:#4a148c; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px var(--pill-indent);"><span class="pill-text">&nbsp;</span></div>
+  <div style="background: linear-gradient(to right, #d7ccc8, #795548); color:#3e2723; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px var(--pill-indent);"><span class="pill-text">&nbsp;</span></div>
+  <div style="background: linear-gradient(to right, #f5f5f5, #9e9e9e); color:#212121; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px var(--pill-indent);"><span class="pill-text">&nbsp;</span></div>
+  <div style="background: linear-gradient(to right, #ffcdd2, #f44336); color:#b71c1c; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px var(--pill-indent);"><span class="pill-text">&nbsp;</span></div>
+</div>
+<div style="height:12px; margin:20px 0; border-radius:6px; background: linear-gradient(to right, #fffde7, #fff176);"></div>
+<div style="height:12px; margin:20px 0; border-radius:6px; background: linear-gradient(to right, #ffe0b2, #ff9800);"></div>
+<div style="height:12px; margin:20px 0; border-radius:6px; background: linear-gradient(to right, #bbdefb, #2196f3);"></div>
+<div style="height:12px; margin:20px 0; border-radius:6px; background: linear-gradient(to right, #e1f5fe, #4fc3f7);"></div>
+<div style="height:12px; margin:20px 0; border-radius:6px; background: linear-gradient(to right, #c8e6c9, #388e3c);"></div>
+<div style="height:12px; margin:20px 0; border-radius:6px; background: linear-gradient(to right, #dcedc8, #8bc34a);"></div>
+<div style="height:12px; margin:20px 0; border-radius:6px; background: linear-gradient(to right, #e1bee7, #9c27b0);"></div>
+<div style="height:12px; margin:20px 0; border-radius:6px; background: linear-gradient(to right, #d7ccc8, #795548);"></div>
+<div style="height:12px; margin:20px 0; border-radius:6px; background: linear-gradient(to right, #f5f5f5, #9e9e9e);"></div>
+<div style="height:12px; margin:20px 0; border-radius:6px; background: linear-gradient(to right, #ffcdd2, #f44336);"></div>
+<div style="height:4px; margin:12px 0; border-radius:2px; background: linear-gradient(to right, #fffde7, #fff176);"></div>
+<div style="height:4px; margin:12px 0; border-radius:2px; background: linear-gradient(to right, #ffe0b2, #ff9800);"></div>
+<div style="height:4px; margin:12px 0; border-radius:2px; background: linear-gradient(to right, #bbdefb, #2196f3);"></div>
+<div style="height:4px; margin:12px 0; border-radius:2px; background: linear-gradient(to right, #e1f5fe, #4fc3f7);"></div>
+<div style="height:4px; margin:12px 0; border-radius:2px; background: linear-gradient(to right, #c8e6c9, #388e3c);"></div>
+<div style="height:4px; margin:12px 0; border-radius:2px; background: linear-gradient(to right, #dcedc8, #8bc34a);"></div>
+<div style="height:4px; margin:12px 0; border-radius:2px; background: linear-gradient(to right, #e1bee7, #9c27b0);"></div>
+<div style="height:4px; margin:12px 0; border-radius:2px; background: linear-gradient(to right, #d7ccc8, #795548);"></div>
+<div style="height:4px; margin:12px 0; border-radius:2px; background: linear-gradient(to right, #f5f5f5, #9e9e9e);"></div>
+<div style="height:4px; margin:12px 0; border-radius:2px; background: linear-gradient(to right, #ffcdd2, #f44336);"></div>
+<script>(function(){try{var root;if(document.currentScript){var prev=document.currentScript.previousSibling;while(prev&&prev.nodeType!==1)prev=prev.previousSibling;root=prev||document.currentScript.parentElement;}else{root=document.body;}var sel="";try{sel=(window.getSelection&&window.getSelection().toString())||"";}catch(e){}sel=(sel||"").trim();var texto=sel||(typeof prompt==='function'?prompt('Texto para las píldoras:', sel):"");if(!texto)return;var nodes=(root&&root.querySelectorAll)?root.querySelectorAll('.pill-text'):[];nodes.forEach(function(el){el.textContent=texto;});}catch(err){}})();</script>`;
+
         const lineDropdown = document.createElement('div');
         lineDropdown.className = 'symbol-dropdown';
         const lineBtn = createButton('Insertar línea separadora', '—', null, null, null);
@@ -2980,6 +3092,16 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             lineContent.appendChild(btn);
         });
+        const fancyBtn = document.createElement('button');
+        fancyBtn.className = 'toolbar-btn';
+        fancyBtn.textContent = 'Avanzado';
+        fancyBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.execCommand('insertHTML', false, fancySeparatorHTML);
+            lineContent.classList.remove('visible');
+            notesEditor.focus();
+        });
+        lineContent.appendChild(fancyBtn);
         lineDropdown.appendChild(lineContent);
         lineBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -5378,15 +5500,34 @@ document.addEventListener('DOMContentLoaded', function () {
              }
 
              // Handle table selection
-             const tbl = e.target.closest('table');
-             if (tbl && notesEditor.contains(tbl)) {
-                 notesEditor.querySelectorAll('table').forEach(t => t.classList.remove('selected-for-move'));
-                 tbl.classList.add('selected-for-move');
-                 selectedTableForMove = tbl;
-             } else {
-                 notesEditor.querySelectorAll('table').forEach(t => t.classList.remove('selected-for-move'));
-                 selectedTableForMove = null;
-             }
+            const tbl = e.target.closest('table');
+            if (tbl && notesEditor.contains(tbl)) {
+                notesEditor.querySelectorAll('table').forEach(t => t.classList.remove('selected-for-move'));
+                tbl.classList.add('selected-for-move');
+                selectedTableForMove = tbl;
+                const rect = tbl.getBoundingClientRect();
+                tableMenu.style.left = `${rect.left + window.scrollX}px`;
+                tableMenu.style.top = `${rect.top + window.scrollY - tableMenu.offsetHeight - 4}px`;
+                tableMenu.style.display = 'block';
+                currentTable = tbl;
+            } else {
+                notesEditor.querySelectorAll('table').forEach(t => t.classList.remove('selected-for-move'));
+                selectedTableForMove = null;
+                tableMenu.style.display = 'none';
+                currentTable = null;
+            }
+
+            const styledSpan = e.target.closest('span.preset-style');
+            if (styledSpan) {
+                const rect = styledSpan.getBoundingClientRect();
+                styleTooltip.style.left = `${rect.left + window.scrollX}px`;
+                styleTooltip.style.top = `${rect.bottom + window.scrollY}px`;
+                styleTooltip.style.display = 'block';
+                currentStyledSpan = styledSpan;
+            } else {
+                styleTooltip.style.display = 'none';
+                currentStyledSpan = null;
+            }
 
              // Handle gallery link clicks
              const galleryLink = e.target.closest('.gallery-link');
