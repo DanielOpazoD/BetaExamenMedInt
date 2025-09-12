@@ -2999,6 +2999,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 existingSpan.dataset.pillText = colors.join('|');
                 return;
             }
+            if (savedEditorSelection) {
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(savedEditorSelection);
+            }
             const sel = window.getSelection();
             if (!sel || !sel.rangeCount || sel.isCollapsed) return;
             const range = sel.getRangeAt(0);
@@ -3013,14 +3018,16 @@ document.addEventListener('DOMContentLoaded', function () {
             newRange.collapse(true);
             sel.removeAllRanges();
             sel.addRange(newRange);
+            savedEditorSelection = null;
         };
 
         const showPillTextPopup = (span = null) => {
+            const sample = span ? span.textContent : (savedEditorSelection ? savedEditorSelection.toString() : window.getSelection().toString());
             pillTextPopup.innerHTML = '';
             PILL_TEXT_STYLES.forEach(colors => {
                 const b = document.createElement('button');
                 b.className = 'toolbar-btn';
-                b.innerHTML = `<span style="background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;">A</span>`;
+                b.innerHTML = `<span style=\"background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;\">${sample}</span>`;
                 b.addEventListener('click', () => {
                     applyPillTextStyle(colors, currentPillSpan);
                     hidePillTextPopup();
@@ -3032,6 +3039,8 @@ document.addEventListener('DOMContentLoaded', function () {
             let rect;
             if (span) {
                 rect = span.getBoundingClientRect();
+            } else if (savedEditorSelection) {
+                rect = savedEditorSelection.getBoundingClientRect();
             } else {
                 const sel = window.getSelection();
                 if (sel && sel.rangeCount) rect = sel.getRangeAt(0).getBoundingClientRect();
@@ -3047,9 +3056,22 @@ document.addEventListener('DOMContentLoaded', function () {
             showPillTextPopup(span);
         };
 
-        const pillTextBtn = createButton('Texto Píldora', '💊', null, null, () => {
-            const sel = window.getSelection();
-            if (sel && !sel.isCollapsed) {
+        const pillTextBtn = createButton('Texto Píldora', '💊', null, null, null);
+        pillTextBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
+                savedEditorSelection = selection.getRangeAt(0).cloneRange();
+            } else {
+                savedEditorSelection = null;
+            }
+        });
+        pillTextBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (savedEditorSelection && !savedEditorSelection.collapsed) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(savedEditorSelection);
                 setPillsText();
             }
         });
@@ -3059,6 +3081,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const span = e.target.closest('span[data-pill-text]');
             if (span) {
                 e.stopPropagation();
+                savedEditorSelection = null;
                 setPillsText(span);
             } else if (!e.target.closest('.preset-style-popup')) {
                 hidePillTextPopup();
@@ -3295,7 +3318,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (currentLine) {
                 currentLine.style.cssText = style;
             } else {
+                if (savedEditorSelection) {
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(savedEditorSelection);
+                }
                 document.execCommand('insertHTML', false, `<hr style="${style}">`);
+                savedEditorSelection = null;
             }
             hideLineStylePopup();
             notesEditor.focus();
@@ -3328,10 +3357,17 @@ document.addEventListener('DOMContentLoaded', function () {
         const showLineStylePopup = (hr = null) => {
             currentLine = hr;
             renderLineStylePopup();
+            if (!hr && savedEditorSelection) {
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(savedEditorSelection);
+            }
             lineStylePopup.style.display = 'block';
             let rect;
             if (hr) {
                 rect = hr.getBoundingClientRect();
+            } else if (savedEditorSelection) {
+                rect = savedEditorSelection.getBoundingClientRect();
             } else {
                 const sel = window.getSelection();
                 if (sel && sel.rangeCount) rect = sel.getRangeAt(0).getBoundingClientRect();
@@ -3347,72 +3383,23 @@ document.addEventListener('DOMContentLoaded', function () {
             currentLine = null;
         };
 
-        const lineDropdown = document.createElement('div');
-        lineDropdown.className = 'symbol-dropdown';
         const lineBtn = createButton('Insertar línea separadora', '—', null, null, null);
-        lineDropdown.appendChild(lineBtn);
-        const lineContent = document.createElement('div');
-        lineContent.className = 'symbol-dropdown-content flex-dropdown';
-        lineContent.style.minWidth = '80px';
-        const customLineBtn = document.createElement('button');
-        customLineBtn.className = 'toolbar-btn';
-        customLineBtn.textContent = 'Línea';
-        customLineBtn.addEventListener('click', (e) => {
+        lineBtn.addEventListener('mousedown', (e) => {
             e.preventDefault();
-            lineContent.classList.remove('visible');
-            showLineStylePopup();
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
+                savedEditorSelection = selection.getRangeAt(0).cloneRange();
+            } else {
+                savedEditorSelection = null;
+            }
         });
-        lineContent.appendChild(customLineBtn);
-        const pillsBtn = document.createElement('button');
-        pillsBtn.className = 'toolbar-btn';
-        pillsBtn.textContent = 'Píldoras';
-        pillsBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const pillColors = [
-                ['#fffde7','#fff176','#795548'],
-                ['#ffe0b2','#ff9800','#4e342e'],
-                ['#bbdefb','#2196f3','#0d47a1'],
-                ['#e1f5fe','#4fc3f7','#01579b'],
-                ['#c8e6c9','#388e3c','#1b5e20'],
-                ['#dcedc8','#8bc34a','#33691e'],
-                ['#e1bee7','#9c27b0','#4a148c'],
-                ['#d7ccc8','#795548','#3e2723'],
-                ['#f5f5f5','#9e9e9e','#212121'],
-                ['#ffcdd2','#f44336','#b71c1c']
-            ];
-            const gradients = [
-                ['#fffde7','#fff176'],
-                ['#ffe0b2','#ff9800'],
-                ['#bbdefb','#2196f3'],
-                ['#e1f5fe','#4fc3f7'],
-                ['#c8e6c9','#388e3c'],
-                ['#dcedc8','#8bc34a'],
-                ['#e1bee7','#9c27b0'],
-                ['#d7ccc8','#795548'],
-                ['#f5f5f5','#9e9e9e'],
-                ['#ffcdd2','#f44336']
-            ];
-            let html = '<div style="--pill-indent:0px; padding-left:0; padding-right:0; margin:0; border-radius:6px;">';
-            pillColors.forEach(c=>{html += `<div style="background: linear-gradient(to right, ${c[0]}, ${c[1]}); color:${c[2]}; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px var(--pill-indent);"><span class=\"pill-text\">&nbsp;</span></div>`;});
-            html += '</div>';
-            gradients.forEach(g=>{html += `<div style="height:12px; margin:20px 0; border-radius:6px; background: linear-gradient(to right, ${g[0]}, ${g[1]});"></div>`;});
-            gradients.forEach(g=>{html += `<div style="height:4px; margin:12px 0; border-radius:2px; background: linear-gradient(to right, ${g[0]}, ${g[1]});"></div>`;});
-            html += `<script>(function(){try{var root;if(document.currentScript){var prev=document.currentScript.previousSibling;while(prev&&prev.nodeType!==1)prev=prev.previousSibling;root=prev||document.currentScript.parentElement;}else{root=document.body;}var sel="";try{sel=(window.getSelection&&window.getSelection().toString())||"";}catch(e){}sel=(sel||"").trim();var texto=sel||(typeof prompt==='function'?prompt('Texto para las píldoras:',sel):"");if(!texto)return;var nodes=(root&&root.querySelectorAll)?root.querySelectorAll('.pill-text'):[];nodes.forEach(function(el){el.textContent=texto;});}catch(err){}})();</script>`;
-            document.execCommand('insertHTML', false, html);
-            lineContent.classList.remove('visible');
-            notesEditor.focus();
-        });
-        lineContent.appendChild(pillsBtn);
-        lineDropdown.appendChild(lineContent);
         lineBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
-                if (d !== lineContent) d.classList.remove('visible');
-            });
-            lineContent.classList.toggle('visible');
+            document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => d.classList.remove('visible'));
+            showLineStylePopup();
         });
-        editorToolbar.appendChild(lineDropdown);
+        editorToolbar.appendChild(lineBtn);
         editorToolbar.appendChild(createSeparator());
         notesEditor.addEventListener('click', (e) => {
             if (e.target.tagName === 'HR') {
