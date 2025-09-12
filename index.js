@@ -2116,6 +2116,7 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.className = 'toolbar-btn';
             btn.title = title;
             btn.innerHTML = content;
+            btn.addEventListener('mousedown', e => e.preventDefault());
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 if (command) {
@@ -3072,6 +3073,8 @@ document.addEventListener('DOMContentLoaded', function () {
         tableMenu.className = 'table-menu-popup';
         document.body.appendChild(tableMenu);
         let currentTable = null;
+        let editingTable = null;
+        let tableEditMode = false;
         const hideTableMenu = () => {
             tableMenu.style.display = 'none';
             currentTable = null;
@@ -3095,67 +3098,118 @@ document.addEventListener('DOMContentLoaded', function () {
         const showTableMenu = (table, cell, x, y) => {
             currentTable = table;
             tableMenu.innerHTML = '';
+
+            const resizeBtn = document.createElement('button');
+            resizeBtn.className = 'toolbar-btn';
+            resizeBtn.innerHTML = '↔️ Ajustar tamaño';
+            resizeBtn.addEventListener('click', () => {
+                tableEditMode = true;
+                editingTable = table;
+                hideTableMenu();
+            });
+            tableMenu.appendChild(resizeBtn);
+
+            const tabsBar = document.createElement('div');
+            tabsBar.className = 'table-menu-tabs';
+            const tabContent = document.createElement('div');
+            tabContent.className = 'tab-content';
+            tableMenu.appendChild(tabsBar);
+            tableMenu.appendChild(tabContent);
+
             const rIndex = cell ? cell.parentElement.rowIndex : 0;
             const cIndex = cell ? cell.cellIndex : 0;
-            const makeBtn = (label, fn) => {
-                const b = document.createElement('button');
-                b.className = 'toolbar-btn';
-                b.textContent = label;
-                b.addEventListener('click', () => { fn(); hideTableMenu(); notesEditor.focus(); });
-                tableMenu.appendChild(b);
+
+            const buildEditTab = () => {
+                tabContent.innerHTML = '';
+                const makeBtn = (label, icon, fn) => {
+                    const b = document.createElement('button');
+                    b.className = 'toolbar-btn';
+                    b.innerHTML = `${icon} ${label}`;
+                    b.addEventListener('click', () => { fn(); hideTableMenu(); notesEditor.focus(); });
+                    tabContent.appendChild(b);
+                };
+                makeBtn('Fila arriba', '⬆️', () => addRow(table, rIndex));
+                makeBtn('Fila abajo', '⬇️', () => addRow(table, rIndex + 1));
+                makeBtn('Eliminar fila', '🗑️', () => deleteRow(table, rIndex));
+                makeBtn('Columna izq', '⬅️', () => addColumn(table, cIndex));
+                makeBtn('Columna der', '➡️', () => addColumn(table, cIndex + 1));
+                makeBtn('Eliminar columna', '🗑️', () => deleteColumn(table, cIndex));
             };
-            makeBtn('Fila arriba', () => addRow(table, rIndex));
-            makeBtn('Fila abajo', () => addRow(table, rIndex + 1));
-            makeBtn('Eliminar fila', () => deleteRow(table, rIndex));
-            makeBtn('Columna izq', () => addColumn(table, cIndex));
-            makeBtn('Columna der', () => addColumn(table, cIndex + 1));
-            makeBtn('Eliminar columna', () => deleteColumn(table, cIndex));
-            TABLE_THEMES.forEach(t => {
-                const b = document.createElement('button');
-                b.className = 'toolbar-btn';
-                b.textContent = t.label;
-                b.addEventListener('click', () => {
-                    TABLE_THEMES.forEach(tt => table.classList.remove(tt.class));
-                    table.classList.add(t.class);
-                    hideTableMenu();
-                    notesEditor.focus();
-                });
-                tableMenu.appendChild(b);
-            });
-            const HEADER_COLORS = [
-                { label: 'Cabecera azul', bg: '#bbdefb', color: '#0d47a1' },
-                { label: 'Cabecera verde', bg: '#c8e6c9', color: '#1b5e20' },
-                { label: 'Cabecera gris', bg: '#e0e0e0', color: '#212121' },
-                { label: 'Cabecera roja', bg: '#ffcdd2', color: '#b71c1c' },
-                { label: 'Cabecera morada', bg: '#e1bee7', color: '#4a148c' },
-                { label: 'Cabecera turquesa', bg: '#e0f2f1', color: '#004d40' }
-            ];
-            HEADER_COLORS.forEach(h => {
-                const b = document.createElement('button');
-                b.className = 'toolbar-btn';
-                b.textContent = h.label;
-                b.addEventListener('click', () => {
-                    const row = table.rows[0];
-                    if (row) Array.from(row.cells).forEach(c => {
-                        c.style.backgroundColor = h.bg;
-                        c.style.color = h.color;
+
+            const buildStyleTab = () => {
+                tabContent.innerHTML = '';
+                TABLE_THEMES.forEach(t => {
+                    const b = document.createElement('button');
+                    b.className = 'toolbar-btn';
+                    b.textContent = t.label;
+                    b.addEventListener('click', () => {
+                        TABLE_THEMES.forEach(tt => table.classList.remove(tt.class));
+                        table.classList.add(t.class);
+                        hideTableMenu();
+                        notesEditor.focus();
                     });
-                    hideTableMenu();
-                    notesEditor.focus();
+                    tabContent.appendChild(b);
                 });
-                tableMenu.appendChild(b);
+                const HEADER_COLORS = [
+                    { label: 'Cabecera azul', bg: '#bbdefb', color: '#0d47a1' },
+                    { label: 'Cabecera verde', bg: '#c8e6c9', color: '#1b5e20' },
+                    { label: 'Cabecera gris', bg: '#e0e0e0', color: '#212121' },
+                    { label: 'Cabecera roja', bg: '#ffcdd2', color: '#b71c1c' },
+                    { label: 'Cabecera morada', bg: '#e1bee7', color: '#4a148c' },
+                    { label: 'Cabecera turquesa', bg: '#e0f2f1', color: '#004d40' }
+                ];
+                HEADER_COLORS.forEach(h => {
+                    const b = document.createElement('button');
+                    b.className = 'toolbar-btn';
+                    b.textContent = h.label;
+                    b.addEventListener('click', () => {
+                        const row = table.rows[0];
+                        if (row) Array.from(row.cells).forEach(c => {
+                            c.style.backgroundColor = h.bg;
+                            c.style.color = h.color;
+                        });
+                        hideTableMenu();
+                        notesEditor.focus();
+                    });
+                    tabContent.appendChild(b);
+                });
+            };
+
+            const tabs = [
+                { label: '✏️', build: buildEditTab },
+                { label: '🎨', build: buildStyleTab }
+            ];
+            tabs.forEach((t, i) => {
+                const b = document.createElement('button');
+                b.className = 'tab-btn';
+                b.innerHTML = t.label;
+                b.addEventListener('click', () => {
+                    tabsBar.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+                    b.classList.add('active');
+                    t.build();
+                });
+                if (i === 0) { b.classList.add('active'); t.build(); }
+                tabsBar.appendChild(b);
             });
+
             tableMenu.style.display = 'block';
             tableMenu.style.top = `${y}px`;
             tableMenu.style.left = `${x}px`;
             tableMenu.style.zIndex = 10001;
         };
         notesEditor.addEventListener('click', (e) => {
+            if (tableEditMode) return;
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
             if (table && notesEditor.contains(table)) {
                 showTableMenu(table, cell, e.pageX, e.pageY);
                 e.stopPropagation();
+            }
+        });
+        document.addEventListener('click', (e) => {
+            if (tableEditMode && editingTable && !editingTable.contains(e.target)) {
+                tableEditMode = false;
+                editingTable = null;
             }
         });
         document.addEventListener('click', (e) => {
@@ -3232,50 +3286,47 @@ document.addEventListener('DOMContentLoaded', function () {
         lineStylePopup.className = 'preset-style-popup';
         document.body.appendChild(lineStylePopup);
         let currentLine = null;
-        let selectedGradient = LINE_GRADIENTS[0];
-        const thicknessInput = document.createElement('input');
-        thicknessInput.type = 'number';
-        thicknessInput.min = '1';
-        thicknessInput.max = '20';
-        thicknessInput.value = '4';
+
+        const SIMPLE_LINES = [1,3,5].map(t => `border:none; border-top:${t}px solid #000; height:${t}px; margin:20px 0;`);
+        const DASHED_LINES = [1,3,5].map(t => `border:none; border-top:${t}px dashed #000; height:${t}px; margin:20px 0;`);
+        const DOTTED_LINES = [1,3,5].map(t => `border:none; border-top:${t}px dotted #000; height:${t}px; margin:20px 0;`);
+
+        const applyLineStyle = (style) => {
+            if (currentLine) {
+                currentLine.style.cssText = style;
+            } else {
+                document.execCommand('insertHTML', false, `<hr style="${style}">`);
+            }
+            hideLineStylePopup();
+            notesEditor.focus();
+        };
 
         const renderLineStylePopup = () => {
             lineStylePopup.innerHTML = '';
-            const colorsDiv = document.createElement('div');
-            LINE_GRADIENTS.forEach(g => {
-                const b = document.createElement('button');
-                b.className = 'toolbar-btn';
-                b.innerHTML = `<div style="height:4px; width:40px; border-radius:2px; background:linear-gradient(to right, ${g[0]}, ${g[1]});"></div>`;
-                b.addEventListener('click', () => { selectedGradient = g; });
-                colorsDiv.appendChild(b);
-            });
-            lineStylePopup.appendChild(colorsDiv);
-            const label = document.createElement('div');
-            label.textContent = 'Grosor';
-            lineStylePopup.appendChild(label);
-            lineStylePopup.appendChild(thicknessInput);
-            const applyBtn = document.createElement('button');
-            applyBtn.className = 'toolbar-btn';
-            applyBtn.textContent = 'Aplicar';
-            applyBtn.addEventListener('click', () => {
-                const [c1,c2] = selectedGradient;
-                const t = parseInt(thicknessInput.value) || 4;
-                const style = `height:${t}px; margin:20px 0; border-radius:${t/2}px; background:linear-gradient(to right, ${c1}, ${c2}); border:none;`;
-                if (currentLine) {
-                    currentLine.style.cssText = style;
-                } else {
-                    document.execCommand('insertHTML', false, `<hr style="${style}">`);
-                }
-                hideLineStylePopup();
-                notesEditor.focus();
-            });
-            lineStylePopup.appendChild(applyBtn);
+            const addGroup = (title, styles) => {
+                const label = document.createElement('div');
+                label.textContent = title;
+                lineStylePopup.appendChild(label);
+                const group = document.createElement('div');
+                group.className = 'line-style-group';
+                styles.forEach(s => {
+                    const b = document.createElement('button');
+                    b.className = 'toolbar-btn';
+                    b.innerHTML = `<div style="${s} width:40px;"></div>`;
+                    b.addEventListener('click', () => applyLineStyle(s));
+                    group.appendChild(b);
+                });
+                lineStylePopup.appendChild(group);
+            };
+            addGroup('Sólidas', SIMPLE_LINES);
+            addGroup('Segmentadas', DASHED_LINES);
+            addGroup('Punteadas', DOTTED_LINES);
+            const gradientsGroup = LINE_GRADIENTS.map(([c1,c2]) => `height:4px; border:none; margin:20px 0; border-radius:2px; background:linear-gradient(to right, ${c1}, ${c2});`);
+            addGroup('Degradadas', gradientsGroup);
         };
 
         const showLineStylePopup = (hr = null) => {
             currentLine = hr;
-            selectedGradient = LINE_GRADIENTS[0];
-            thicknessInput.value = hr ? parseInt(hr.style.height) || 4 : 4;
             renderLineStylePopup();
             lineStylePopup.style.display = 'block';
             let rect;
