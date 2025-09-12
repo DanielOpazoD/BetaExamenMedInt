@@ -1114,3 +1114,30 @@ hr.hr-dashed { border-top: 1px dashed var(--text-primary); }
   margin-top: 4px;
   display: block;
 }
+
+.style-float-menu,
+.table-float-menu {
+  position: absolute;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  padding: 4px;
+  border-radius: 4px;
+  z-index: 10002;
+  display: flex;
+  gap: 4px;
+}
+
+.table-theme {
+  border-collapse: collapse;
+}
+.table-theme td,
+.table-theme th {
+  border: 1px solid var(--tbl-border);
+  padding: 4px;
+}
+.table-theme th {
+  background: var(--tbl-header);
+}
+.table-theme-blue { --tbl-border: #93c5fd; --tbl-header: #bfdbfe; }
+.table-theme-green { --tbl-border: #86efac; --tbl-header: #bbf7d0; }
+.table-theme-purple { --tbl-border: #d8b4fe; --tbl-header: #e9d5ff; }

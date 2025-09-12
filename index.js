@@ -124,6 +124,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
 
+    let presetStyles = [];
+
     // --- Undo/Redo History ---
     const historyStack = [];
     let historyIndex = -1;
@@ -179,6 +181,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 const indentClass = Array.from(prev.classList).find(c => c.startsWith('indent-'));
                 if (indentClass) node.classList.add(indentClass);
+            }
+            const span = node.closest('span[data-preset-style]');
+            if (span) {
+                while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+                span.remove();
             }
         }
     });
@@ -1799,6 +1806,12 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!cell || !table.contains(cell)) return;
             showRowColControls(table, cell);
         });
+        table.addEventListener('click', (e) => {
+            const cell = e.target.closest('td, th');
+            if (!cell) return;
+            e.stopPropagation();
+            showTableContextMenu(table, cell, e.clientX, e.clientY);
+        });
     }
 
     /**
@@ -1891,6 +1904,71 @@ document.addEventListener('DOMContentLoaded', function () {
             removeTableControls();
         });
         document.body.appendChild(deleteColBtn);
+    }
+
+    function showTableContextMenu(table, cell, x, y) {
+        removeFloatingMenus();
+        const menu = document.createElement('div');
+        menu.className = 'table-float-menu';
+        menu.style.left = `${x + window.scrollX}px`;
+        menu.style.top = `${y + window.scrollY}px`;
+
+        const addRow = document.createElement('button');
+        addRow.textContent = '+fila';
+        addRow.addEventListener('click', () => {
+            const newRow = table.insertRow(cell.parentElement.rowIndex + 1);
+            for (let i = 0; i < table.rows[0].cells.length; i++) {
+                const newCell = newRow.insertCell();
+                newCell.contentEditable = true;
+            }
+            removeFloatingMenus();
+        });
+        menu.appendChild(addRow);
+
+        const addCol = document.createElement('button');
+        addCol.textContent = '+col';
+        addCol.addEventListener('click', () => {
+            Array.from(table.rows).forEach(r => {
+                const newCell = r.insertCell(cell.cellIndex + 1);
+                newCell.contentEditable = true;
+            });
+            removeFloatingMenus();
+        });
+        menu.appendChild(addCol);
+
+        const delRow = document.createElement('button');
+        delRow.textContent = '−fila';
+        delRow.addEventListener('click', () => {
+            table.deleteRow(cell.parentElement.rowIndex);
+            removeFloatingMenus();
+        });
+        menu.appendChild(delRow);
+
+        const delCol = document.createElement('button');
+        delCol.textContent = '−col';
+        delCol.addEventListener('click', () => {
+            Array.from(table.rows).forEach(r => { if (r.cells.length > cell.cellIndex) r.deleteCell(cell.cellIndex); });
+            removeFloatingMenus();
+        });
+        menu.appendChild(delCol);
+
+        const themeSelect = document.createElement('select');
+        ['default','blue','green','purple'].forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            themeSelect.appendChild(opt);
+        });
+        themeSelect.addEventListener('change', () => {
+            table.classList.remove('table-theme','table-theme-blue','table-theme-green','table-theme-purple');
+            if (themeSelect.value !== 'default') {
+                table.classList.add('table-theme', `table-theme-${themeSelect.value}`);
+            }
+            removeFloatingMenus();
+        });
+        menu.appendChild(themeSelect);
+
+        document.body.appendChild(menu);
     }
 
     // Zoom state for image lightbox
@@ -2070,7 +2148,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const endIndex = allBlocks.indexOf(endBlock);
 
         if (startIndex !== -1 && endIndex !== -1) {
-            return allBlocks.slice(startIndex, endIndex + 1);
+            const s = Math.min(startIndex, endIndex);
+            const e = Math.max(startIndex, endIndex);
+            return allBlocks.slice(s, e + 1);
         }
 
         return [startBlock]; // Fallback
@@ -2752,14 +2832,17 @@ document.addEventListener('DOMContentLoaded', function () {
             notesEditor.focus();
         };
 
-        const applyPresetStyle = (cssText) => {
+        const applyPresetStyle = (styleObj) => {
             const sel = window.getSelection();
             if (!sel || sel.rangeCount === 0) return;
             const range = sel.getRangeAt(0);
             if (range.collapsed) return;
             const span = document.createElement('span');
-            span.style.cssText = cssText;
-            span.appendChild(range.extractContents());
+            span.style.cssText = styleObj.style;
+            span.dataset.presetStyle = styleObj.id;
+            const contents = range.cloneContents();
+            range.deleteContents();
+            span.appendChild(contents);
             range.insertNode(span);
             const newRange = document.createRange();
             newRange.setStartAfter(span);
@@ -2768,6 +2851,124 @@ document.addEventListener('DOMContentLoaded', function () {
             sel.addRange(newRange);
         };
 
+        const showPresetStyleMenu = (span) => {
+            removeFloatingMenus();
+            const rect = span.getBoundingClientRect();
+            const menu = document.createElement('div');
+            menu.className = 'style-float-menu';
+            menu.style.left = `${rect.left + window.scrollX}px`;
+            menu.style.top = `${rect.top + window.scrollY - 40}px`;
+            presetStyles.forEach(s => {
+                const btn = document.createElement('button');
+                btn.className = 'toolbar-btn';
+                btn.innerHTML = `<span style="${s.style}">${s.label}</span>`;
+                btn.addEventListener('click', () => {
+                    span.style.cssText = s.style;
+                    span.dataset.presetStyle = s.id;
+                    removeFloatingMenus();
+                });
+                menu.appendChild(btn);
+            });
+            document.body.appendChild(menu);
+        };
+
+        function removeFloatingMenus() {
+            document.querySelectorAll('.style-float-menu, .table-float-menu').forEach(m => m.remove());
+        }
+
+        const separatorColors = [
+            { name: 'Amarillo', gradient: 'linear-gradient(to right, #fffde7, #fff176)', text: '#795548' },
+            { name: 'Naranjo', gradient: 'linear-gradient(to right, #ffe0b2, #ff9800)', text: '#4e342e' },
+            { name: 'Azul', gradient: 'linear-gradient(to right, #bbdefb, #2196f3)', text: '#0d47a1' },
+            { name: 'Celeste', gradient: 'linear-gradient(to right, #e1f5fe, #4fc3f7)', text: '#01579b' },
+            { name: 'Verde oscuro', gradient: 'linear-gradient(to right, #c8e6c9, #388e3c)', text: '#1b5e20' },
+            { name: 'Verde claro', gradient: 'linear-gradient(to right, #dcedc8, #8bc34a)', text: '#33691e' },
+            { name: 'Morado', gradient: 'linear-gradient(to right, #e1bee7, #9c27b0)', text: '#4a148c' },
+            { name: 'Café', gradient: 'linear-gradient(to right, #d7ccc8, #795548)', text: '#3e2723' },
+            { name: 'Gris', gradient: 'linear-gradient(to right, #f5f5f5, #9e9e9e)', text: '#212121' },
+            { name: 'Rojo', gradient: 'linear-gradient(to right, #ffcdd2, #f44336)', text: '#b71c1c' }
+        ];
+
+        const insertPill = (style) => {
+            const sel = window.getSelection();
+            const text = sel ? sel.toString().trim() : '';
+            const html = `<div style="background:${style.gradient}; color:${style.text}; font-weight:bold; padding:6px 12px; border-radius:20px; display:inline-block; margin:6px 0;">${text || '&nbsp;'}</div>`;
+            document.execCommand('insertHTML', false, html);
+        };
+
+        const insertSeparator = (style, thick) => {
+            const h = thick ? 12 : 4;
+            const m = thick ? 20 : 12;
+            const r = thick ? 6 : 2;
+            const html = `<div style="height:${h}px; margin:${m}px 0; border-radius:${r}px; background:${style.gradient};"></div>`;
+            document.execCommand('insertHTML', false, html);
+        };
+
+        const createSeparatorDropdown = () => {
+            const dropdown = document.createElement('div');
+            dropdown.className = 'symbol-dropdown';
+            const btn = createButton('Separadores', '⎯', null, null, null);
+            dropdown.appendChild(btn);
+            const content = document.createElement('div');
+            content.className = 'symbol-dropdown-content flex-dropdown';
+            separatorColors.forEach(st => {
+                const pillBtn = document.createElement('button');
+                pillBtn.className = 'toolbar-btn';
+                pillBtn.innerHTML = `<div style="background:${st.gradient}; color:${st.text}; padding:2px 6px; border-radius:20px;">Píldora ${st.name}</div>`;
+                pillBtn.addEventListener('click', () => { insertPill(st); content.classList.remove('visible'); notesEditor.focus(); });
+                content.appendChild(pillBtn);
+
+                const thickBtn = document.createElement('button');
+                thickBtn.className = 'toolbar-btn';
+                thickBtn.innerHTML = `<div style="height:12px; width:60px; background:${st.gradient}; border-radius:6px;"></div>`;
+                thickBtn.addEventListener('click', () => { insertSeparator(st, true); content.classList.remove('visible'); notesEditor.focus(); });
+                content.appendChild(thickBtn);
+
+                const thinBtn = document.createElement('button');
+                thinBtn.className = 'toolbar-btn';
+                thinBtn.innerHTML = `<div style="height:4px; width:60px; background:${st.gradient}; border-radius:2px;"></div>`;
+                thinBtn.addEventListener('click', () => { insertSeparator(st, false); content.classList.remove('visible'); notesEditor.focus(); });
+                content.appendChild(thinBtn);
+            });
+            dropdown.appendChild(content);
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                    if (d !== content) d.classList.remove('visible');
+                });
+                content.classList.toggle('visible');
+                if (content.classList.contains('visible')) {
+                    const editorRect = notesModalContent.getBoundingClientRect();
+                    const dropdownRect = dropdown.getBoundingClientRect();
+                    const contentRect = content.getBoundingClientRect();
+                    const editorCenter = editorRect.left + editorRect.width / 2;
+                    let left = editorCenter - dropdownRect.left - contentRect.width / 2;
+                    const minLeft = editorRect.left - dropdownRect.left;
+                    const maxLeft = editorRect.right - dropdownRect.left - contentRect.width;
+                    if (left < minLeft) left = minLeft;
+                    if (left > maxLeft) left = maxLeft;
+                    content.style.left = `${left}px`;
+                }
+            });
+            return dropdown;
+        };
+
+        notesEditor.addEventListener('click', (e) => {
+            const span = e.target.closest('span[data-preset-style]');
+            if (span) {
+                e.stopPropagation();
+                showPresetStyleMenu(span);
+            } else {
+                removeFloatingMenus();
+            }
+        });
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.style-float-menu') && !e.target.closest('.table-float-menu')) {
+                removeFloatingMenus();
+            }
+        });
+
         const createPresetStyleDropdown = () => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
@@ -2775,7 +2976,7 @@ document.addEventListener('DOMContentLoaded', function () {
             dropdown.appendChild(btn);
             const content = document.createElement('div');
             content.className = 'symbol-dropdown-content flex-dropdown';
-            const styles = [
+            presetStyles = [
                 { label: 'Texto estilo celeste', style: 'font-family:Arial; font-weight:600; background:#e0f7fa; color:#01579b; padding:2px 4px; border-radius:4px;' },
                 { label: 'Texto estilo lila', style: 'font-family:Arial; font-weight:600; background:#f3e5f5; color:#6a1b9a; padding:2px 4px; border-radius:4px;' },
                 { label: 'Texto estilo menta', style: 'font-family:Arial; font-weight:600; background:#e8f5e9; color:#1b5e20; padding:2px 4px; border-radius:4px;' },
@@ -2789,13 +2990,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 { label: 'Texto estilo rojo', style: 'font-family:Arial; font-weight:600; background:#f44336; color:#ffffff; padding:2px 4px; border-radius:4px;' },
                 { label: 'Texto estilo verde oscuro', style: 'font-family:Arial; font-weight:600; background:#1b5e20; color:#ffffff; padding:2px 4px; border-radius:4px;' }
             ];
-            styles.forEach(s => {
+            presetStyles.forEach((s,i)=>{ if(!s.id) s.id = `style-${i}`; });
+            presetStyles.forEach(s => {
                 const opt = document.createElement('button');
                 opt.className = 'toolbar-btn';
                 opt.innerHTML = `<span style="${s.style}">${s.label}</span>`;
                 opt.addEventListener('click', (e) => {
                     e.preventDefault();
-                    applyPresetStyle(s.style);
+                    applyPresetStyle(s);
                     content.classList.remove('visible');
                     notesEditor.focus();
                 });
@@ -2905,6 +3107,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
         editorToolbar.appendChild(lineHighlightPalette);
         editorToolbar.appendChild(createPresetStyleDropdown());
+        editorToolbar.appendChild(createSeparatorDropdown());
 
         const applyBlockVerticalPadding = (level) => {
             const paddingValues = [0, 2, 4, 6, 8, 10];
