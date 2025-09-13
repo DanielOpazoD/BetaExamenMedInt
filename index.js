@@ -2095,6 +2095,121 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function saveBlob(blob, filename) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        }, 0);
+    }
+
+    function escapeXml(unsafe) {
+        return unsafe.replace(/[<>&'\"]/g, c => ({
+            '<': '&lt;',
+            '>': '&gt;',
+            '&': '&amp;',
+            "'": '&apos;',
+            '"': '&quot;'
+        })[c]);
+    }
+
+    function exportContent(format) {
+        const html = `<html><head><meta charset="utf-8"/></head><body>${notesEditor.innerHTML}</body></html>`;
+        switch (format) {
+            case 'html':
+                saveBlob(new Blob([html], { type: 'text/html' }), 'contenido.html');
+                break;
+            case 'pdf':
+                if (window.html2pdf) {
+                    window.html2pdf().from(notesEditor.innerHTML).set({ filename: 'contenido.pdf' }).save();
+                } else {
+                    alert('Biblioteca PDF no disponible');
+                }
+                break;
+            case 'docx':
+                if (window.JSZip) {
+                    const zip = new JSZip();
+                    const contentTypes =
+                        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+                        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+                        '<Default Extension="xml" ContentType="application/xml"/>' +
+                        '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+                        '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+                        '</Types>';
+                    const rels =
+                        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+                        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+                        '</Relationships>';
+                    const docXml =
+                        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' +
+                        notesEditor.innerText.split('\n').map(p => `<w:p><w:r><w:t>${escapeXml(p)}</w:t></w:r></w:p>`).join('') +
+                        '<w:sectPr/></w:body></w:document>';
+                    const docRels =
+                        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>';
+                    const styles =
+                        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                        '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>';
+
+                    zip.file('[Content_Types].xml', contentTypes);
+                    zip.folder('_rels').file('.rels', rels);
+                    const word = zip.folder('word');
+                    word.file('document.xml', docXml);
+                    word.folder('_rels').file('document.xml.rels', docRels);
+                    word.file('styles.xml', styles);
+                    zip.generateAsync({ type: 'blob' }).then(blob => saveBlob(blob, 'contenido.docx'));
+                } else {
+                    alert('Biblioteca JSZip no disponible');
+                }
+                break;
+            case 'odt':
+                if (window.JSZip) {
+                    const zip = new JSZip();
+                    zip.file('mimetype', 'application/vnd.oasis.opendocument.text', { compression: 'STORE' });
+                    const contentXml = `<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"><office:body><office:text>${notesEditor.innerText.split('\n').map(p => `<text:p>${p}</text:p>`).join('')}</office:text></office:body></office:document-content>`;
+                    zip.file('content.xml', contentXml);
+                    const manifest = `<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:media-type="application/vnd.oasis.opendocument.text" manifest:full-path="/"/><manifest:file-entry manifest:media-type="text/xml" manifest:full-path="content.xml"/></manifest:manifest>`;
+                    zip.folder('META-INF').file('manifest.xml', manifest);
+                    zip.generateAsync({ type: 'blob' }).then(blob => saveBlob(blob, 'contenido.odt'));
+                } else {
+                    alert('Biblioteca JSZip no disponible');
+                }
+                break;
+            case 'epub':
+                if (window.JSZip) {
+                    const zip = new JSZip();
+                    zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' });
+                    const containerXml = `<?xml version="1.0" encoding="UTF-8"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`;
+                    zip.folder('META-INF').file('container.xml', containerXml);
+                    const xhtml = `<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="utf-8"/></head><body>${notesEditor.innerHTML}</body></html>`;
+                    const opf = `<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" unique-identifier="bookid" version="2.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Export</dc:title></metadata><manifest><item id="content" href="content.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="content"/></spine></package>`;
+                    const oebps = zip.folder('OEBPS');
+                    oebps.file('content.xhtml', xhtml);
+                    oebps.file('content.opf', opf);
+                    zip.generateAsync({ type: 'blob' }).then(blob => saveBlob(blob, 'contenido.epub'));
+                } else {
+                    alert('Biblioteca JSZip no disponible');
+                }
+                break;
+            case 'md':
+                if (window.TurndownService) {
+                    const turndownService = new TurndownService();
+                    const markdown = turndownService.turndown(notesEditor.innerHTML);
+                    saveBlob(new Blob([markdown], { type: 'text/markdown' }), 'contenido.md');
+                } else {
+                    alert('Biblioteca Markdown no disponible');
+                }
+                break;
+        }
+    }
+
     function setupEditorToolbar() {
         editorToolbar.innerHTML = ''; // Clear existing toolbar
 
@@ -3652,13 +3767,41 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Eliminamos el botón de inserción de tablas y el separador asociado
 
-        // Print/Save
-        const printBtn = createButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
-             const printArea = getElem('print-area');
-             printArea.innerHTML = `<div>${notesEditor.innerHTML}</div>`;
-             window.print();
+        // Save menu
+        const saveWrapper = document.createElement('div');
+        saveWrapper.className = 'relative inline-block';
+        const saveBtn = createButton('Guardar', '💾', null, null, null);
+        const formatMenu = document.createElement('div');
+        formatMenu.className = 'absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded shadow-lg z-10 hidden';
+        const formats = [
+            { label: 'HTML', ext: 'html' },
+            { label: 'PDF', ext: 'pdf' },
+            { label: 'DOCX', ext: 'docx' },
+            { label: 'ODT', ext: 'odt' },
+            { label: 'EPUB', ext: 'epub' },
+            { label: 'Markdown', ext: 'md' }
+        ];
+        formats.forEach(f => {
+            const opt = document.createElement('button');
+            opt.textContent = f.label;
+            opt.className = 'block w-full text-left px-4 py-2 hover:bg-gray-100';
+            opt.addEventListener('click', () => {
+                formatMenu.classList.add('hidden');
+                exportContent(f.ext);
+            });
+            formatMenu.appendChild(opt);
         });
-        editorToolbar.appendChild(printBtn);
+        saveBtn.addEventListener('click', () => {
+            formatMenu.classList.toggle('hidden');
+        });
+        saveWrapper.appendChild(saveBtn);
+        saveWrapper.appendChild(formatMenu);
+        document.addEventListener('click', (e) => {
+            if (!saveWrapper.contains(e.target)) {
+                formatMenu.classList.add('hidden');
+            }
+        });
+        editorToolbar.appendChild(saveWrapper);
 
         editorToolbar.appendChild(createSeparator());
 
