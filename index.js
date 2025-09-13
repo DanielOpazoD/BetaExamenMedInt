@@ -151,6 +151,16 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
     notesEditor.addEventListener('input', recordHistory);
+    notesEditor.addEventListener('input', () => {
+        if (selectedImageForResize) {
+            if (!notesEditor.contains(selectedImageForResize)) {
+                selectedImageForResize = null;
+                hideImageResizer();
+            } else {
+                positionImageResizer(selectedImageForResize);
+            }
+        }
+    });
     notesEditor.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
             e.preventDefault();
@@ -525,6 +535,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const alertMessage = getElem('alert-message');
     const okAlertBtn = getElem('ok-alert-btn');
 
+    // Image caption modal
+    const captionModal = getElem('caption-modal');
+    const captionInput = getElem('caption-input');
+    const saveCaptionBtn = getElem('save-caption-btn');
+    const cancelCaptionBtn = getElem('cancel-caption-btn');
+
     // Note Info Modal
     const noteInfoBtn = getElem('note-info-btn');
     const noteInfoModal = getElem('note-info-modal');
@@ -533,12 +549,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const infoLastEdited = getElem('info-last-edited');
     const closeNoteInfoBtn = getElem('close-note-info-btn');
 
-    // Image Gallery Modals
-    const imageGalleryLinkModal = getElem('image-gallery-link-modal');
-    const imageGalleryInputs = getElem('image-gallery-inputs');
-    const addGalleryImageUrlBtn = getElem('add-gallery-image-url-btn');
-    const cancelGalleryLinkBtn = getElem('cancel-gallery-link-btn');
-    const saveGalleryLinkBtn = getElem('save-gallery-link-btn');
     const imageLightboxModal = getElem('image-lightbox-modal');
     const closeLightboxBtn = getElem('close-lightbox-btn');
     const prevLightboxBtn = getElem('prev-lightbox-btn');
@@ -600,6 +610,47 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     const text = clipboard.getData('text/plain');
                     document.execCommand('insertText', false, text);
+                }
+            });
+
+            editor.addEventListener('dragover', (e) => {
+                const dt = e.dataTransfer;
+                if (dt && Array.from(dt.items || []).some(item => item.kind === 'file' && item.type.startsWith('image/'))) {
+                    e.preventDefault();
+                }
+            });
+
+            editor.addEventListener('drop', (e) => {
+                const files = e.dataTransfer?.files;
+                if (files && files.length) {
+                    const imgFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+                    if (imgFiles.length) {
+                        e.preventDefault();
+                        const range = document.caretRangeFromPoint
+                            ? document.caretRangeFromPoint(e.clientX, e.clientY)
+                            : (document.caretPositionFromPoint
+                                ? (() => {
+                                    const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+                                    if (!pos) return null;
+                                    const r = document.createRange();
+                                    r.setStart(pos.offsetNode, pos.offset);
+                                    r.collapse();
+                                    return r;
+                                })()
+                                : null);
+                        if (range) {
+                            const sel = window.getSelection();
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                        }
+                        imgFiles.forEach(file => {
+                            const reader = new FileReader();
+                            reader.onload = (evt) => {
+                                document.execCommand('insertImage', false, evt.target.result);
+                            };
+                            reader.readAsDataURL(file);
+                        });
+                    }
                 }
             });
         }
@@ -1205,18 +1256,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.execCommand('insertImage', false, url);
             }
         }));
-        // Gallery link insertion
-        const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
-        subNoteToolbar.appendChild(createSNButton('Crear Galería de Imágenes', gallerySVG, null, null, () => {
-            // Capture selection for gallery range
-            const selection = window.getSelection();
-            if (selection.rangeCount > 0 && subNoteEditor.contains(selection.anchorNode)) {
-                activeGalleryRange = selection.getRangeAt(0).cloneRange();
-            } else {
-                activeGalleryRange = null;
-            }
-            openGalleryLinkEditor();
-        }));
         // Insert hyperlink and remove hyperlink
         subNoteToolbar.appendChild(createSNButton('Insertar enlace', '🔗', null, null, () => {
             const url = prompt('Ingresa la URL:');
@@ -1225,10 +1264,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }));
         subNoteToolbar.appendChild(createSNButton('Quitar enlace', '❌', 'unlink'));
-        // Resize image buttons
-        subNoteToolbar.appendChild(createSNButton('Aumentar tamaño de imagen (+10%)', '➕', null, null, () => resizeSelectedImage(1.1)));
-        subNoteToolbar.appendChild(createSNButton('Disminuir tamaño de imagen (-10%)', '➖', null, null, () => resizeSelectedImage(0.9)));
-        subNoteToolbar.appendChild(createSNSeparator());
         // Print (save as PDF) within subnote editor
         subNoteToolbar.appendChild(createSNButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
             const printArea = getElem('print-area');
@@ -1324,7 +1359,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeNoteIndex = 0;
     let isResizing = false;
     let resolveConfirmation;
-    let activeGalleryRange = null;
     let lightboxImages = [];
     let currentLightboxIndex = 0;
     let currentNoteRow = null;
@@ -1343,9 +1377,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 subNoteEditor.querySelectorAll('img').forEach(img => img.classList.remove('selected-for-resize'));
                 e.target.classList.add('selected-for-resize');
                 selectedImageForResize = e.target;
+                positionImageResizer(e.target);
+                showImageContextMenu(e.target);
             } else {
                 subNoteEditor.querySelectorAll('img').forEach(img => img.classList.remove('selected-for-resize'));
                 selectedImageForResize = null;
+                hideImageResizer();
             }
         });
     }
@@ -1625,9 +1662,10 @@ document.addEventListener('DOMContentLoaded', function () {
             showModal(alertModal);
             return;
         }
-        // Si ya está en un figure flotante, actualiza la clase de alineación
-        const existingFig = img.closest('figure.float-image');
+        // Si ya está en un figure, actualiza la clase de alineación
+        const existingFig = img.closest('figure');
         if (existingFig) {
+            existingFig.classList.add('float-image');
             existingFig.classList.remove('float-left', 'float-right');
             existingFig.classList.add(`float-${align}`);
             return;
@@ -1643,41 +1681,6 @@ document.addEventListener('DOMContentLoaded', function () {
         fig.parentNode.insertBefore(spacer, fig.nextSibling);
         // Actualizar selección de imagen para redimensionar
         selectedImageForResize = img;
-    }
-
-    /**
-     * Wraps at least two selected images in a flex container so they appear side by side.
-     */
-    function wrapSelectedImagesSideBySide() {
-        const sel = window.getSelection();
-        if (!sel || !sel.rangeCount) return;
-        const range = sel.getRangeAt(0);
-        const contents = range.cloneContents();
-        const imgCount = contents.querySelectorAll('img').length;
-        if (imgCount < 2) {
-            alertMessage.textContent = 'Selecciona al menos dos imágenes para alinearlas en fila.';
-            alertTitle.textContent = 'Imágenes insuficientes';
-            showModal(alertModal);
-            return;
-        }
-        const fragment = range.extractContents();
-        const div = document.createElement('div');
-        div.className = 'image-row';
-        div.appendChild(fragment);
-        // Replace paragraphs containing only an image with the image itself
-        div.querySelectorAll('p').forEach(p => {
-            if (p.childElementCount === 1 && p.firstElementChild.tagName === 'IMG') {
-                div.replaceChild(p.firstElementChild, p);
-            }
-        });
-        range.insertNode(div);
-        // Move caret after the inserted container
-        sel.removeAllRanges();
-        const newRange = document.createRange();
-        newRange.setStartAfter(div);
-        newRange.collapse(true);
-        sel.addRange(newRange);
-        notesEditor.focus();
     }
 
     // When loading a note into the editor, ensure any existing floating
@@ -1788,111 +1791,172 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     /**
-     * Enable advanced table editing features on the given table.  When the user
-     * hovers over a cell, controls for inserting or deleting rows/columns
-     * appear.  Resizing columns is handled by initTableResize().
+     * Enable advanced table editing features on the given table.  Clicking a cell
+     * shows a floating menu for inserting/deleting rows or columns and aligning
+     * the table.
      * @param {HTMLTableElement} table
      */
     function enableTableEditing(table) {
         if (!table) return;
-        table.addEventListener('mouseover', (e) => {
+        table.addEventListener('click', (e) => {
             const cell = e.target.closest('td, th');
-            if (!cell || !table.contains(cell)) return;
-            showRowColControls(table, cell);
+            if (!cell) return;
+            selectedTableCell = cell;
+            showTableContextMenu(cell.closest('table'));
         });
     }
 
-    /**
-     * Remove any existing row/column controls from the document.
-     */
-    function removeTableControls() {
-        document.querySelectorAll('.table-insert-row-btn, .table-insert-col-btn, .table-delete-row-btn, .table-delete-col-btn').forEach(btn => btn.remove());
+    let tableContextMenu = null;
+    let selectedTableCell = null;
+
+    function createTableContextMenu() {
+        tableContextMenu = document.createElement('div');
+        tableContextMenu.className = 'table-context-menu';
+
+        const moveLeftBtn = document.createElement('button');
+        moveLeftBtn.textContent = '⬅️';
+        moveLeftBtn.title = 'Mover izquierda';
+        moveLeftBtn.addEventListener('click', () => alignTable('left'));
+
+        const moveRightBtn = document.createElement('button');
+        moveRightBtn.textContent = '➡️';
+        moveRightBtn.title = 'Mover derecha';
+        moveRightBtn.addEventListener('click', () => alignTable('right'));
+
+        const addRowBtn = document.createElement('button');
+        addRowBtn.textContent = '+fila';
+        addRowBtn.title = 'Agregar fila';
+        addRowBtn.addEventListener('click', insertRowBelow);
+
+        const delRowBtn = document.createElement('button');
+        delRowBtn.textContent = '-fila';
+        delRowBtn.title = 'Eliminar fila';
+        delRowBtn.addEventListener('click', deleteCurrentRow);
+
+        const addColBtn = document.createElement('button');
+        addColBtn.textContent = '+col';
+        addColBtn.title = 'Agregar columna';
+        addColBtn.addEventListener('click', insertColRight);
+
+        const delColBtn = document.createElement('button');
+        delColBtn.textContent = '-col';
+        delColBtn.title = 'Eliminar columna';
+        delColBtn.addEventListener('click', deleteCurrentCol);
+
+        tableContextMenu.append(moveLeftBtn, moveRightBtn, addRowBtn, delRowBtn, addColBtn, delColBtn);
+        document.body.appendChild(tableContextMenu);
     }
 
-    /**
-     * Display controls to insert or delete rows and columns based on the
-     * hovered cell.  Controls are appended to the document body and
-     * absolutely positioned relative to the cell.
-     * @param {HTMLTableElement} table
-     * @param {HTMLTableCellElement} cell
-     */
-    function showRowColControls(table, cell) {
-        removeTableControls();
-        const rowIndex = cell.parentElement.rowIndex;
-        const colIndex = cell.cellIndex;
-        const cellRect = cell.getBoundingClientRect();
-        // Insert row button (+) below the cell
-        const insertRowBtn = document.createElement('button');
-        insertRowBtn.textContent = '+';
-        insertRowBtn.title = 'Insertar fila debajo';
-        insertRowBtn.className = 'table-insert-row-btn toolbar-btn';
-        insertRowBtn.style.position = 'absolute';
-        insertRowBtn.style.left = `${cellRect.left + cellRect.width / 2 - 8 + window.scrollX}px`;
-        insertRowBtn.style.top = `${cellRect.bottom - 8 + window.scrollY}px`;
-        insertRowBtn.addEventListener('click', () => {
-            const newRow = table.insertRow(rowIndex + 1);
-            for (let i = 0; i < table.rows[0].cells.length; i++) {
-                const newCell = newRow.insertCell();
-                newCell.contentEditable = true;
-                newCell.style.border = '1px solid var(--border-color)';
-                newCell.style.padding = '4px';
+    function showTableContextMenu(table) {
+        if (!tableContextMenu) createTableContextMenu();
+        tableContextMenu.style.display = 'flex';
+        positionTableContextMenu(table);
+    }
+
+    function hideTableContextMenu() {
+        if (tableContextMenu) tableContextMenu.style.display = 'none';
+        selectedTableCell = null;
+    }
+
+    function positionTableContextMenu(table) {
+        if (!tableContextMenu || tableContextMenu.style.display === 'none') return;
+        const rect = table.getBoundingClientRect();
+        const menuRect = tableContextMenu.getBoundingClientRect();
+        let top = rect.top + window.scrollY - menuRect.height - 8;
+        if (top < 0) top = rect.bottom + window.scrollY + 8;
+        tableContextMenu.style.left = `${rect.left + window.scrollX}px`;
+        tableContextMenu.style.top = `${top}px`;
+    }
+
+    function insertRowBelow() {
+        if (!selectedTableCell) return;
+        const table = selectedTableCell.closest('table');
+        const rowIndex = selectedTableCell.parentElement.rowIndex;
+        const newRow = table.insertRow(rowIndex + 1);
+        for (let i = 0; i < table.rows[0].cells.length; i++) {
+            const newCell = newRow.insertCell();
+            newCell.contentEditable = true;
+            newCell.style.border = '1px solid var(--border-color)';
+            newCell.style.padding = '4px';
+        }
+        initTableResize(table);
+        recordHistory();
+        positionTableContextMenu(table);
+    }
+
+    function deleteCurrentRow() {
+        if (!selectedTableCell) return;
+        const table = selectedTableCell.closest('table');
+        const rowIndex = selectedTableCell.parentElement.rowIndex;
+        table.deleteRow(rowIndex);
+        initTableResize(table);
+        recordHistory();
+        hideTableContextMenu();
+    }
+
+    function insertColRight() {
+        if (!selectedTableCell) return;
+        const table = selectedTableCell.closest('table');
+        const colIndex = selectedTableCell.cellIndex;
+        Array.from(table.rows).forEach(row => {
+            const newCell = row.insertCell(colIndex + 1);
+            newCell.contentEditable = true;
+            newCell.style.border = '1px solid var(--border-color)';
+            newCell.style.padding = '4px';
+        });
+        initTableResize(table);
+        recordHistory();
+        positionTableContextMenu(table);
+    }
+
+    function deleteCurrentCol() {
+        if (!selectedTableCell) return;
+        const table = selectedTableCell.closest('table');
+        const colIndex = selectedTableCell.cellIndex;
+        Array.from(table.rows).forEach(row => {
+            if (row.cells.length > colIndex) row.deleteCell(colIndex);
+        });
+        initTableResize(table);
+        recordHistory();
+        hideTableContextMenu();
+    }
+
+    function alignTable(direction) {
+        const table = selectedTableCell ? selectedTableCell.closest('table') : selectedTableForMove;
+        if (!table) return;
+        table.classList.remove('table-float-left', 'table-float-right');
+        if (direction === 'left') {
+            table.classList.add('table-float-left');
+        } else if (direction === 'right') {
+            table.classList.add('table-float-right');
+        }
+        recordHistory();
+        positionTableContextMenu(table);
+    }
+
+    function moveSelectionHorizontal(direction) {
+        if (selectedImageForResize) {
+            alignImage(direction);
+        } else if (selectedTableCell || selectedTableForMove) {
+            alignTable(direction);
+        }
+    }
+
+    document.addEventListener('click', (e) => {
+        if (tableContextMenu && tableContextMenu.style.display !== 'none') {
+            if (!tableContextMenu.contains(e.target) && !e.target.closest('table')) {
+                hideTableContextMenu();
             }
-            // After inserting, re-add resizers and controls
-            initTableResize(table);
-            removeTableControls();
-        });
-        document.body.appendChild(insertRowBtn);
-        // Insert column button (+) to the right of the cell
-        const insertColBtn = document.createElement('button');
-        insertColBtn.textContent = '+';
-        insertColBtn.title = 'Insertar columna a la derecha';
-        insertColBtn.className = 'table-insert-col-btn toolbar-btn';
-        insertColBtn.style.position = 'absolute';
-        insertColBtn.style.left = `${cellRect.right - 8 + window.scrollX}px`;
-        insertColBtn.style.top = `${cellRect.top + cellRect.height / 2 - 8 + window.scrollY}px`;
-        insertColBtn.addEventListener('click', () => {
-            Array.from(table.rows).forEach(row => {
-                const newCell = row.insertCell(colIndex + 1);
-                newCell.contentEditable = true;
-                newCell.style.border = '1px solid var(--border-color)';
-                newCell.style.padding = '4px';
-            });
-            initTableResize(table);
-            removeTableControls();
-        });
-        document.body.appendChild(insertColBtn);
-        // Delete row button (×) above the cell
-        const deleteRowBtn = document.createElement('button');
-        deleteRowBtn.textContent = '×';
-        deleteRowBtn.title = 'Eliminar fila';
-        deleteRowBtn.className = 'table-delete-row-btn toolbar-btn';
-        deleteRowBtn.style.position = 'absolute';
-        deleteRowBtn.style.left = `${cellRect.left + cellRect.width / 2 - 8 + window.scrollX}px`;
-        deleteRowBtn.style.top = `${cellRect.top - 16 + window.scrollY}px`;
-        deleteRowBtn.addEventListener('click', () => {
-            table.deleteRow(rowIndex);
-            removeTableControls();
-        });
-        document.body.appendChild(deleteRowBtn);
-        // Delete column button (×) to the left of the cell
-        const deleteColBtn = document.createElement('button');
-        deleteColBtn.textContent = '×';
-        deleteColBtn.title = 'Eliminar columna';
-        deleteColBtn.className = 'table-delete-col-btn toolbar-btn';
-        deleteColBtn.style.position = 'absolute';
-        deleteColBtn.style.left = `${cellRect.left - 16 + window.scrollX}px`;
-        deleteColBtn.style.top = `${cellRect.top + cellRect.height / 2 - 8 + window.scrollY}px`;
-        deleteColBtn.addEventListener('click', () => {
-            Array.from(table.rows).forEach(row => {
-                if (row.cells.length > colIndex) {
-                    row.deleteCell(colIndex);
-                }
-            });
-            initTableResize(table);
-            removeTableControls();
-        });
-        document.body.appendChild(deleteColBtn);
-    }
+        }
+    });
+
+    window.addEventListener('scroll', () => {
+        if (selectedTableCell) positionTableContextMenu(selectedTableCell.closest('table'));
+    });
+
+    window.addEventListener('resize', () => {
+        if (selectedTableCell) positionTableContextMenu(selectedTableCell.closest('table'));
+    });
 
     // Zoom state for image lightbox
     let currentZoom = 1;
@@ -3609,48 +3673,31 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(createSeparator());
 
         // Image controls
-        // Floating image insertion: prompt the user for a URL and orientation,
-        // then insert the image as a floating figure (left or right) so that
-        // text wraps around it.  After insertion, enable drag to reposition
-        // the figure within the editor.
-        // Imagen flotante: en lugar de solicitar una URL, este botón aplica
-        // el estilo de imagen flotante "cuadrado" a la imagen seleccionada.
-        // Si la imagen aún no está envuelta en un figure, se envuelve y se
-        // alinea a la izquierda por defecto. En siguientes clics se alterna
-        // entre izquierda y derecha para facilitar el flujo de texto.
-        const floatImageBtn = document.createElement('button');
-        floatImageBtn.className = 'toolbar-btn';
-        floatImageBtn.title = 'Aplicar estilo de imagen cuadrada';
-        floatImageBtn.innerHTML = '🖼️';
-        let lastFloatAlign = 'left';
-        floatImageBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            // Determine next alignment (toggle left/right)
-            lastFloatAlign = lastFloatAlign === 'left' ? 'right' : 'left';
-            wrapSelectedImage(lastFloatAlign);
-            notesEditor.focus();
+        const insertImageBtn = createButton('Insertar imagen', '📷', null, null, () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            const sel = window.getSelection();
+            const savedRange = sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+            input.addEventListener('change', () => {
+                const file = input.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        if (savedRange) {
+                            const sel = window.getSelection();
+                            sel.removeAllRanges();
+                            sel.addRange(savedRange);
+                        }
+                        document.execCommand('insertImage', false, evt.target.result);
+                        notesEditor.focus();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            input.click();
         });
-        editorToolbar.appendChild(floatImageBtn);
-
-        const sideBySideBtn = createButton('Alinear imágenes en fila', '🖼️🖼️', null, null, wrapSelectedImagesSideBySide);
-        editorToolbar.appendChild(sideBySideBtn);
-
-        const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
-        editorToolbar.appendChild(createButton('Crear Galería de Imágenes', gallerySVG, null, null, openGalleryLinkEditor));
-
-        const resizePlusBtn = createButton('Aumentar tamaño de imagen (+10%)', '➕', null, null, () => resizeSelectedImage(1.1));
-        editorToolbar.appendChild(resizePlusBtn);
-
-        const resizeMinusBtn = createButton('Disminuir tamaño de imagen (-10%)', '➖', null, null, () => resizeSelectedImage(0.9));
-        editorToolbar.appendChild(resizeMinusBtn);
-
-        const moveLeftBtn = createButton('Mover imagen/tabla a la izquierda', '⬅️', null, null, () => moveSelectedElement(-10));
-        editorToolbar.appendChild(moveLeftBtn);
-
-        const moveRightBtn = createButton('Mover imagen/tabla a la derecha', '➡️', null, null, () => moveSelectedElement(10));
-        editorToolbar.appendChild(moveRightBtn);
-
-        // Eliminamos el botón de inserción de tablas y el separador asociado
+        editorToolbar.appendChild(insertImageBtn);
 
         // Print/Save
         const printBtn = createButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
@@ -3683,6 +3730,9 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             true
         ));
+
+        editorToolbar.appendChild(createButton('Mover izquierda', '⬅️', null, null, () => moveSelectionHorizontal('left')));
+        editorToolbar.appendChild(createButton('Mover derecha', '➡️', null, null, () => moveSelectionHorizontal('right')));
     }
 
     function rgbToHex(rgb) {
@@ -3775,32 +3825,316 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
-    function resizeSelectedImage(multiplier) {
-        if (selectedImageForResize) {
-            const currentWidth = selectedImageForResize.style.width
-                ? parseFloat(selectedImageForResize.style.width)
-                : selectedImageForResize.offsetWidth;
-            const newWidth = currentWidth * multiplier;
-            selectedImageForResize.style.width = `${newWidth}px`;
-            selectedImageForResize.style.height = 'auto'; // Keep aspect ratio
-        } else {
-            showAlert("Por favor, selecciona una imagen primero para cambiar su tamaño.");
-        }
+    function getImageContainer(img) {
+        return img.closest('figure') || img;
     }
 
-    function moveSelectedElement(deltaX) {
-        let elem = selectedImageForResize || selectedTableForMove;
-        if (elem && elem.tagName === 'IMG') {
-            const fig = elem.closest('figure.float-image');
-            if (fig) elem = fig;
+    // --- Floating image menu ---
+    let imageContextMenu = null;
+
+    function ensureImageFigure(img) {
+        let fig = img.closest('figure');
+        if (!fig) {
+            fig = document.createElement('figure');
+            img.parentNode.insertBefore(fig, img);
+            fig.appendChild(img);
         }
-        if (!elem) {
-            showAlert("Selecciona una imagen o tabla para moverla.");
+        fig.contentEditable = 'false';
+        return fig;
+    }
+
+    let imageForCaption = null;
+    function openCaptionModal(img) {
+        imageForCaption = img;
+        hideImageResizer();
+        const fig = ensureImageFigure(img);
+        const cap = fig.querySelector('figcaption.image-caption');
+        captionInput.value = cap ? cap.textContent : '';
+        captionModal.classList.add('visible');
+        captionInput.focus();
+    }
+    function closeCaptionModal() {
+        captionModal.classList.remove('visible');
+        if (selectedImageForResize) positionImageResizer(selectedImageForResize);
+        imageForCaption = null;
+    }
+    saveCaptionBtn.addEventListener('click', () => {
+        if (!imageForCaption) return;
+        const fig = ensureImageFigure(imageForCaption);
+        let cap = fig.querySelector('figcaption.image-caption');
+        if (!cap) {
+            cap = document.createElement('figcaption');
+            cap.className = 'image-caption';
+            cap.contentEditable = 'true';
+            fig.appendChild(cap);
+        }
+        cap.textContent = captionInput.value;
+        closeCaptionModal();
+        positionImageResizer(imageForCaption);
+        recordHistory();
+    });
+    cancelCaptionBtn.addEventListener('click', closeCaptionModal);
+    captionModal.addEventListener('click', (e) => { if (e.target === captionModal) closeCaptionModal(); });
+    captionModal.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCaptionModal(); });
+
+    function alignImage(direction) {
+        const img = selectedImageForResize;
+        if (!img) return;
+        const fig = ensureImageFigure(img);
+        fig.classList.remove('float-left', 'float-right', 'float-image');
+        img.classList.remove('break-image');
+        if (direction === 'left' || direction === 'right') {
+            fig.classList.add('float-image', `float-${direction}`);
+        } else if (direction === 'center') {
+            img.classList.add('break-image');
+        }
+        positionImageResizer(img);
+        recordHistory();
+    }
+
+    function moveImageVertical(direction) {
+        const img = selectedImageForResize;
+        if (!img) return;
+        const fig = ensureImageFigure(img);
+        const parent = fig.parentNode;
+        if (!parent) return;
+        if (direction === 'up') {
+            const prev = fig.previousElementSibling;
+            if (prev) parent.insertBefore(fig, prev);
+        } else if (direction === 'down') {
+            const next = fig.nextElementSibling;
+            if (next) parent.insertBefore(fig, next.nextSibling);
+        }
+        positionImageResizer(img);
+        recordHistory();
+    }
+
+    function createImageContextMenu() {
+        imageContextMenu = document.createElement('div');
+        imageContextMenu.className = 'image-context-menu';
+
+        const captionBtn = document.createElement('button');
+        captionBtn.textContent = 'ALT';
+        captionBtn.title = 'Agregar título';
+        captionBtn.addEventListener('click', () => {
+            if (selectedImageForResize) openCaptionModal(selectedImageForResize);
+        });
+
+        const inlineBtn = document.createElement('button');
+        inlineBtn.textContent = '↔️';
+        inlineBtn.title = 'Imagen en línea';
+        inlineBtn.addEventListener('click', () => applyImageLayout('inline'));
+
+        const wrapBtn = document.createElement('button');
+        wrapBtn.textContent = '📰';
+        wrapBtn.title = 'Rodear texto';
+        wrapBtn.addEventListener('click', () => applyImageLayout('wrapText'));
+
+        const breakBtn = document.createElement('button');
+        breakBtn.textContent = '⛶';
+        breakBtn.title = 'Imagen en bloque';
+        breakBtn.addEventListener('click', () => applyImageLayout('breakText'));
+
+        const leftBtn = document.createElement('button');
+        leftBtn.textContent = '⬅️';
+        leftBtn.title = 'Alinear a la izquierda';
+        leftBtn.addEventListener('click', () => alignImage('left'));
+
+        const centerBtn = document.createElement('button');
+        centerBtn.textContent = '⏺';
+        centerBtn.title = 'Centrar';
+        centerBtn.addEventListener('click', () => alignImage('center'));
+
+        const rightBtn = document.createElement('button');
+        rightBtn.textContent = '➡️';
+        rightBtn.title = 'Alinear a la derecha';
+        rightBtn.addEventListener('click', () => alignImage('right'));
+
+        const decreaseBtn = document.createElement('button');
+        decreaseBtn.textContent = '−';
+        decreaseBtn.title = 'Reducir 10%';
+        decreaseBtn.addEventListener('click', () => changeSelectedImageSize(-10));
+
+        const increaseBtn = document.createElement('button');
+        increaseBtn.textContent = '+';
+        increaseBtn.title = 'Aumentar 10%';
+        increaseBtn.addEventListener('click', () => changeSelectedImageSize(10));
+
+        const upBtn = document.createElement('button');
+        upBtn.textContent = '⬆️';
+        upBtn.title = 'Mover arriba';
+        upBtn.addEventListener('click', () => moveImageVertical('up'));
+
+        const downBtn = document.createElement('button');
+        downBtn.textContent = '⬇️';
+        downBtn.title = 'Mover abajo';
+        downBtn.addEventListener('click', () => moveImageVertical('down'));
+
+        imageContextMenu.append(captionBtn, inlineBtn, wrapBtn, breakBtn, leftBtn, centerBtn, rightBtn, decreaseBtn, increaseBtn, upBtn, downBtn);
+        document.body.appendChild(imageContextMenu);
+    }
+
+    function showImageContextMenu(img) {
+        if (!imageContextMenu) createImageContextMenu();
+        imageContextMenu.style.display = 'flex';
+        positionImageContextMenu(img);
+    }
+
+    function hideImageContextMenu() {
+        if (imageContextMenu) imageContextMenu.style.display = 'none';
+    }
+
+    function positionImageContextMenu(img) {
+        if (!imageContextMenu || imageContextMenu.style.display === 'none') return;
+        const rect = getImageContainer(img).getBoundingClientRect();
+        const menuRect = imageContextMenu.getBoundingClientRect();
+        let top = rect.top + window.scrollY - menuRect.height - 8;
+        if (top < 0) top = rect.bottom + window.scrollY + 8;
+        imageContextMenu.style.left = `${rect.left + window.scrollX}px`;
+        imageContextMenu.style.top = `${top}px`;
+    }
+
+    function changeSelectedImageSize(delta) {
+        if (!selectedImageForResize) {
+            showAlert("Por favor, selecciona una imagen primero para cambiar su tamaño.");
             return;
         }
-        const current = parseFloat(elem.style.marginLeft) || 0;
-        elem.style.marginLeft = `${current + deltaX}px`;
+        const container = getImageContainer(selectedImageForResize);
+        container.style.maxWidth = 'none';
+        container.style.maxHeight = 'none';
+        let parentWidth = container.parentElement ? container.parentElement.clientWidth : container.offsetWidth;
+        if (parentWidth === 0) parentWidth = container.offsetWidth;
+        let currentPercent;
+        if (container.style.width.endsWith('%')) {
+            currentPercent = parseFloat(container.style.width);
+        } else {
+            currentPercent = (container.offsetWidth / parentWidth) * 100;
+        }
+        let newPercent = Math.max(10, Math.min(200, currentPercent + delta));
+        container.style.width = newPercent + '%';
+        container.style.height = 'auto';
+        if (container !== selectedImageForResize) {
+            selectedImageForResize.style.width = '100%';
+            selectedImageForResize.style.height = '100%';
+        }
+        positionImageResizer(selectedImageForResize);
+        recordHistory();
     }
+
+    function applyImageLayout(type) {
+        if (!selectedImageForResize) {
+            showAlert("Selecciona una imagen para cambiar su disposición.");
+            return;
+        }
+        const img = selectedImageForResize;
+        const fig = img.closest('figure');
+        if (fig) {
+            fig.classList.remove('float-image', 'float-left', 'float-right');
+            if (type === 'inline') fig.replaceWith(img);
+        }
+        img.classList.remove('break-image');
+        img.style.float = '';
+        img.style.display = '';
+        img.style.margin = '';
+        if (type === 'wrapText') {
+            wrapSelectedImage('left');
+        } else if (type === 'breakText') {
+            img.classList.add('break-image');
+        }
+        positionImageResizer(selectedImageForResize);
+        recordHistory();
+    }
+
+    let imageResizeOverlay = null;
+    let currentImageHandle = null;
+    let startX = 0, startY = 0, startWidth = 0, startHeight = 0, aspectRatio = 1;
+
+    function createImageResizer() {
+        imageResizeOverlay = document.createElement('div');
+        imageResizeOverlay.className = 'image-resize-overlay';
+        ['nw','ne','sw','se','e','s'].forEach(dir => {
+            const h = document.createElement('div');
+            h.className = `image-resize-handle ${dir}`;
+            h.dataset.handle = dir;
+            h.addEventListener('mousedown', startImageResize);
+            imageResizeOverlay.appendChild(h);
+        });
+        document.body.appendChild(imageResizeOverlay);
+    }
+
+    function positionImageResizer(img) {
+        if (!img) return;
+        if (!imageResizeOverlay) createImageResizer();
+        const rect = getImageContainer(img).getBoundingClientRect();
+        imageResizeOverlay.style.display = 'block';
+        imageResizeOverlay.style.left = `${rect.left + window.scrollX}px`;
+        imageResizeOverlay.style.top = `${rect.top + window.scrollY}px`;
+        imageResizeOverlay.style.width = `${rect.width}px`;
+        imageResizeOverlay.style.height = `${rect.height}px`;
+        positionImageContextMenu(img);
+    }
+
+    function hideImageResizer() {
+        if (imageResizeOverlay) imageResizeOverlay.style.display = 'none';
+        hideImageContextMenu();
+    }
+
+    function startImageResize(e) {
+        if (!selectedImageForResize) return;
+        e.preventDefault();
+        e.stopPropagation();
+        currentImageHandle = e.target.dataset.handle;
+        const container = getImageContainer(selectedImageForResize);
+        container.style.maxWidth = 'none';
+        container.style.maxHeight = 'none';
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = container.offsetWidth;
+        startHeight = container.offsetHeight;
+        aspectRatio = startWidth / startHeight;
+        document.addEventListener('mousemove', onImageResize);
+        document.addEventListener('mouseup', stopImageResize);
+    }
+
+    function onImageResize(e) {
+        if (!selectedImageForResize) return;
+        let dx = e.clientX - startX;
+        let dy = e.clientY - startY;
+        if (currentImageHandle && (currentImageHandle.includes('w'))) dx = -dx;
+        if (currentImageHandle && (currentImageHandle.includes('n'))) dy = -dy;
+        const container = getImageContainer(selectedImageForResize);
+        let newWidth = startWidth;
+        let newHeight = startHeight;
+        if (currentImageHandle.includes('e') || currentImageHandle.includes('w')) {
+            newWidth = startWidth + dx;
+        }
+        if (currentImageHandle.includes('s') || currentImageHandle.includes('n')) {
+            newHeight = startHeight + dy;
+        }
+        if (!e.shiftKey && ['nw','ne','sw','se'].includes(currentImageHandle)) {
+            newHeight = newWidth / aspectRatio;
+        }
+        container.style.width = `${Math.max(10, newWidth)}px`;
+        container.style.height = `${Math.max(10, newHeight)}px`;
+        if (container !== selectedImageForResize) {
+            selectedImageForResize.style.width = '100%';
+            selectedImageForResize.style.height = '100%';
+        }
+        positionImageResizer(selectedImageForResize);
+    }
+
+    function stopImageResize() {
+        document.removeEventListener('mousemove', onImageResize);
+        document.removeEventListener('mouseup', stopImageResize);
+        recordHistory();
+    }
+
+    window.addEventListener('scroll', () => {
+        if (selectedImageForResize) positionImageResizer(selectedImageForResize);
+    }, true);
+    window.addEventListener('resize', () => {
+        if (selectedImageForResize) positionImageResizer(selectedImageForResize);
+    });
 
     function updateAllTotals() {
         let grandLectura = 0;
@@ -4998,106 +5332,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function openGalleryLinkEditor() {
-        const selection = window.getSelection();
-        if (!selection.rangeCount) return;
-        
-        activeGalleryRange = selection.getRangeAt(0).cloneRange();
-        const existingLink = activeGalleryRange.startContainer.parentElement.closest('.gallery-link');
-        
-        imageGalleryInputs.innerHTML = '';
-        
-        if (existingLink && existingLink.dataset.images) {
-            try {
-                const images = JSON.parse(existingLink.dataset.images);
-                images.forEach(img => addGalleryImageUrlInput(img.url, img.caption));
-            } catch (e) {
-                console.error("Error parsing gallery data:", e);
-                addGalleryImageUrlInput();
-            }
-        } else {
-            addGalleryImageUrlInput();
-        }
-        showModal(imageGalleryLinkModal);
-    }
-    
-    function addGalleryImageUrlInput(url = '', caption = '') {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'gallery-url-input flex flex-col gap-2 mb-2 p-2 border border-border-color rounded';
-    
-        const mainLine = document.createElement('div');
-        mainLine.className = 'flex items-center gap-2';
-    
-        const urlInput = document.createElement('input');
-        urlInput.type = 'url';
-        urlInput.placeholder = 'URL de la imagen...';
-        urlInput.className = 'flex-grow p-2 border border-border-color rounded-lg bg-secondary focus:ring-2 focus:ring-sky-400 url-field';
-        urlInput.value = url;
-        mainLine.appendChild(urlInput);
-    
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'toolbar-btn text-red-500 hover:bg-red-100 dark:hover:bg-red-900 flex-shrink-0';
-        deleteBtn.innerHTML = '🗑️';
-        deleteBtn.addEventListener('click', () => wrapper.remove());
-        mainLine.appendChild(deleteBtn);
-    
-        wrapper.appendChild(mainLine);
-    
-        const captionInput = document.createElement('input');
-        captionInput.type = 'text';
-        captionInput.placeholder = 'Descripción (opcional)...';
-        captionInput.className = 'w-full p-2 border border-border-color rounded-lg bg-secondary text-sm caption-field';
-        captionInput.value = caption;
-        wrapper.appendChild(captionInput);
-    
-        imageGalleryInputs.appendChild(wrapper);
-    }
-
-    function handleGalleryLinkSave() {
-        const imageElements = imageGalleryInputs.querySelectorAll('.gallery-url-input');
-        const images = Array.from(imageElements).map(el => {
-            const url = el.querySelector('.url-field').value;
-            const caption = el.querySelector('.caption-field').value;
-            return { url, caption };
-        }).filter(item => item.url);
-
-        if (images.length === 0) {
-            showAlert("Por favor, añade al menos una URL de imagen válida.");
-            return;
-        }
-
-        if (activeGalleryRange) {
-            const selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(activeGalleryRange);
-        
-            const existingLink = activeGalleryRange.startContainer.parentElement.closest('.gallery-link');
-            if (existingLink) {
-                existingLink.dataset.images = JSON.stringify(images);
-            } else {
-                 // Remove formatting on the selected range before wrapping it
-                 document.execCommand('removeFormat');
-                 const span = document.createElement('span');
-                 span.className = 'gallery-link';
-                 span.dataset.images = JSON.stringify(images);
-                 span.appendChild(activeGalleryRange.extractContents());
-                 activeGalleryRange.insertNode(span);
-                 // Insert a non-breaking space after the span to break out of the hyperlink context
-                 const spacer = document.createTextNode('\u00A0');
-                 span.parentNode.insertBefore(spacer, span.nextSibling);
-                 // After inserting the gallery span and spacer, collapse the selection so formatting does not persist
-                 const newRange = document.createRange();
-                 newRange.setStartAfter(spacer);
-                 newRange.collapse(true);
-                 const sel = window.getSelection();
-                 sel.removeAllRanges();
-                 sel.addRange(newRange);
-            }
-            hideModal(imageGalleryLinkModal);
-            activeGalleryRange = null;
-        }
-    }
-    
     function openImageLightbox(imagesData, startIndex = 0) {
         try {
             if (typeof imagesData === 'string') {
@@ -5799,9 +6033,12 @@ document.addEventListener('DOMContentLoaded', function () {
                  document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
                  e.target.classList.add('selected-for-resize');
                  selectedImageForResize = e.target;
+                 positionImageResizer(e.target);
+                 showImageContextMenu(e.target);
              } else {
                  document.querySelectorAll('#notes-editor img').forEach(img => img.classList.remove('selected-for-resize'));
                  selectedImageForResize = null;
+                 hideImageResizer();
              }
 
              // Handle table selection
@@ -5810,9 +6047,13 @@ document.addEventListener('DOMContentLoaded', function () {
                  notesEditor.querySelectorAll('table').forEach(t => t.classList.remove('selected-for-move'));
                  tbl.classList.add('selected-for-move');
                  selectedTableForMove = tbl;
+                 const cell = e.target.closest('td, th') || tbl.querySelector('td, th');
+                 if (cell) selectedTableCell = cell;
+                 showTableContextMenu(tbl);
              } else {
                  notesEditor.querySelectorAll('table').forEach(t => t.classList.remove('selected-for-move'));
                  selectedTableForMove = null;
+                 hideTableContextMenu();
              }
 
              // Handle gallery link clicks
@@ -6049,14 +6290,6 @@ document.addEventListener('DOMContentLoaded', function () {
             editingQuickNote = false;
         });
         
-        // Image Gallery Modal Listeners
-        addGalleryImageUrlBtn.addEventListener('click', () => addGalleryImageUrlInput());
-        cancelGalleryLinkBtn.addEventListener('click', () => {
-            hideModal(imageGalleryLinkModal);
-            activeGalleryRange = null;
-        });
-        saveGalleryLinkBtn.addEventListener('click', handleGalleryLinkSave);
-
         // Lightbox Listeners
         closeLightboxBtn.addEventListener('click', () => hideModal(imageLightboxModal));
         prevLightboxBtn.addEventListener('click', () => {
@@ -6254,7 +6487,10 @@ document.addEventListener('DOMContentLoaded', function () {
         populateIconPicker();
         loadState();
         setupEventListeners();
-        document.querySelectorAll('table').forEach(initTableResize);
+        document.querySelectorAll('table').forEach(t => {
+            initTableResize(t);
+            enableTableEditing(t);
+        });
         applyTheme(document.documentElement.dataset.theme || 'default');
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();
