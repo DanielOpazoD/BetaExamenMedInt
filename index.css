@@ -1108,9 +1108,14 @@ table.resizable-table.selected .table-resize-handle {
   /* Restore button visibility */
   #restore-note-btn.hidden { display: none; }
 
-  body {
+body {
     padding-top: 32px;
-  }
+}
+
+.ck-content img {
+  max-width: 100%;
+  height: auto;
+}
 
 .extra-cursor {
   border-left: 1px solid var(--text-primary);
