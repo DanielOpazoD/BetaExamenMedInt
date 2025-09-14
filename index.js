@@ -3699,9 +3699,9 @@ document.addEventListener('DOMContentLoaded', function () {
         noteStyleCustom.classList.add('hidden');
         if (callout) {
             noteBgColorInput.value = rgbToHex(callout.style.backgroundColor || '#ffffff');
-            noteBorderColorInput.value = rgbToHex(callout.style.borderColor || '#000000');
+            noteBorderColorInput.value = rgbToHex(callout.style.borderLeftColor || '#000000');
             noteRadiusInput.value = parseInt(callout.style.borderRadius) || 8;
-            noteBorderWidthInput.value = parseInt(callout.style.borderWidth) || 2;
+            noteBorderWidthInput.value = parseInt(callout.style.borderLeftWidth) || 4;
             notePaddingInput.value = parseInt(callout.style.padding) || 8;
             noteMarginInput.value = parseInt(callout.style.marginTop) || 8;
             noteShadowInput.checked = callout.classList.contains('note-shadow');
@@ -3753,8 +3753,11 @@ document.addEventListener('DOMContentLoaded', function () {
         currentCallout.classList.remove(...PREDEF_CLASSES);
         if (opts.presetClass) currentCallout.classList.add(opts.presetClass);
         currentCallout.style.backgroundColor = opts.backgroundColor;
-        currentCallout.style.borderColor = opts.borderColor;
-        currentCallout.style.borderWidth = opts.borderWidth + 'px';
+        currentCallout.style.setProperty('--border-color', opts.borderColor);
+        currentCallout.style.border = 'none';
+        currentCallout.style.borderLeftWidth = opts.borderWidth + 'px';
+        currentCallout.style.borderLeftStyle = 'solid';
+        currentCallout.style.borderLeftColor = opts.borderColor;
         currentCallout.style.borderRadius = opts.borderRadius + 'px';
         currentCallout.style.padding = opts.padding + 'px';
         currentCallout.style.margin = opts.margin + 'px 0';
@@ -6004,7 +6007,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     backgroundColor: btn.dataset.bg,
                     borderColor: btn.dataset.border,
                     borderRadius: 8,
-                    borderWidth: 2,
+                    borderWidth: 4,
                     padding: 8,
                     margin: 8,
                     shadow: false,
