@@ -628,9 +628,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const cancelNoteStyleBtn = getElem('cancel-note-style-btn');
 
     const NOTE_PRESETS = [
-        { name: 'Verde', class: 'note-green', bg: '#d1fae5', border: '#10b981', text: '#065f46' },
-        { name: 'Azul', class: 'note-blue', bg: '#dbeafe', border: '#3b82f6', text: '#1e3a8a' },
-        { name: 'Gris', class: 'note-gray', bg: '#f3f4f6', border: '#6b7280', text: '#374151' }
+        { name: 'Nota Azul Suave', class: 'note-blue-left', bg: '#f7fcff', border: '#b3e5fc', text: '#0c4a6e', borderWidth: 0 },
+        { name: 'Nota Verde Pastel', class: 'note-green-card', bg: '#fbfffb', border: '#c8e6c9', text: '#1b5e20', borderWidth: 1 },
+        { name: 'Nota Lila Punteada', class: 'note-lilac-dotted', bg: '#fcfbff', border: '#d1c4e9', text: '#4a148c', borderWidth: 2 },
+        { name: 'Nota Durazno', class: 'note-peach-dashed', bg: '#fffaf7', border: '#ffccbc', text: '#bf360c', borderWidth: 2 },
+        { name: 'Nota Banda Superior', class: 'note-cyan-top', bg: '#f8ffff', border: '#b2ebf2', text: '#006064', borderWidth: 0 },
+        { name: 'Nota Rosa Doble', class: 'note-pink-double-left', bg: '#fff8fb', border: '#f8bbd0', text: '#880e4f', borderWidth: 0 },
+        { name: 'Nota Esquina Acentuada', class: 'note-yellow-corner', bg: '#fffffb', border: '#fff9c4', text: '#665c00', borderWidth: 1, accent: '#fff59d' },
+        { name: 'Nota Borde Degradado', class: 'note-gradient', bg: '#ffffff', border: '#ede7f6', text: '#4a148c', borderWidth: 1, gradientStart: '#b3e5fc', gradientEnd: '#d1c4e9', padding: 14 },
+        { name: 'Nota Menta Inferior', class: 'note-mint-bottom', bg: '#fbfffb', border: '#c8e6c9', text: '#1b5e20', borderWidth: 0 },
+        { name: 'Nota Violeta Ultraligera', class: 'note-violet-soft', bg: '#fdfcff', border: '#e6e0f8', text: '#4a148c', borderWidth: 1, shadow: false },
+        { name: 'Nota Gris', class: 'note-gray-neutral', bg: '#f9f9f9', border: '#e0e0e0', text: '#424242', borderWidth: 1 }
     ];
 
     function renderNotePresetButtons() {
@@ -644,6 +652,14 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.dataset.bg = preset.bg;
             btn.dataset.border = preset.border;
             btn.dataset.text = preset.text;
+            btn.dataset.radius = preset.radius ?? 8;
+            btn.dataset.borderWidth = preset.borderWidth ?? 2;
+            btn.dataset.padding = preset.padding ?? 12;
+            btn.dataset.margin = preset.margin ?? 20;
+            btn.dataset.shadow = preset.shadow ? 'true' : 'false';
+            if (preset.accent) btn.dataset.accent = preset.accent;
+            if (preset.gradientStart) btn.dataset.gradientStart = preset.gradientStart;
+            if (preset.gradientEnd) btn.dataset.gradientEnd = preset.gradientEnd;
             btn.dataset.presetClass = preset.class;
             grid.appendChild(btn);
         });
@@ -3753,8 +3769,8 @@ document.addEventListener('DOMContentLoaded', function () {
             noteTextColorInput.value = rgbToHex(callout.style.color || '#000000');
             noteRadiusInput.value = parseInt(callout.style.borderRadius) || 8;
             noteBorderWidthInput.value = parseInt(callout.style.borderWidth) || 2;
-            notePaddingInput.value = parseInt(callout.style.padding) || 8;
-            noteMarginInput.value = parseInt(callout.style.marginTop) || 8;
+            notePaddingInput.value = parseInt(callout.style.padding) || 12;
+            noteMarginInput.value = parseInt(callout.style.marginTop) || 20;
             noteShadowInput.checked = callout.classList.contains('note-shadow');
         }
     }
@@ -3810,6 +3826,21 @@ document.addEventListener('DOMContentLoaded', function () {
         currentCallout.style.borderRadius = opts.borderRadius + 'px';
         currentCallout.style.padding = opts.padding + 'px';
         currentCallout.style.margin = opts.margin + 'px 0';
+        if (opts.accentColor) {
+            currentCallout.style.setProperty('--accent-color', opts.accentColor);
+        } else {
+            currentCallout.style.removeProperty('--accent-color');
+        }
+        if (opts.gradientStart) {
+            currentCallout.style.setProperty('--gradient-start', opts.gradientStart);
+        } else {
+            currentCallout.style.removeProperty('--gradient-start');
+        }
+        if (opts.gradientEnd) {
+            currentCallout.style.setProperty('--gradient-end', opts.gradientEnd);
+        } else {
+            currentCallout.style.removeProperty('--gradient-end');
+        }
         if (opts.textColor) {
             currentCallout.style.color = opts.textColor;
         }
@@ -6049,7 +6080,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 borderWidth: parseInt(noteBorderWidthInput.value) || 0,
                 padding: parseInt(notePaddingInput.value) || 0,
                 margin: parseInt(noteMarginInput.value) || 0,
-                shadow: noteShadowInput.checked
+                shadow: noteShadowInput.checked,
+                accentColor: noteBorderColorInput.value,
+                gradientStart: noteBorderColorInput.value,
+                gradientEnd: noteBorderColorInput.value
             };
             applyNoteStyle(opts);
         });
@@ -6061,12 +6095,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 backgroundColor: btn.dataset.bg,
                 borderColor: btn.dataset.border,
                 textColor: btn.dataset.text,
-                borderRadius: 8,
-                borderWidth: 2,
-                padding: 8,
-                margin: 8,
-                shadow: false,
-                presetClass: btn.dataset.presetClass || null
+                borderRadius: parseInt(btn.dataset.radius) || 8,
+                borderWidth: parseInt(btn.dataset.borderWidth) || 2,
+                padding: parseInt(btn.dataset.padding) || 12,
+                margin: parseInt(btn.dataset.margin) || 20,
+                shadow: btn.dataset.shadow === 'true',
+                presetClass: btn.dataset.presetClass || null,
+                accentColor: btn.dataset.accent || null,
+                gradientStart: btn.dataset.gradientStart || null,
+                gradientEnd: btn.dataset.gradientEnd || null
             };
             applyNoteStyle(opts);
         });

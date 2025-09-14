@@ -866,8 +866,8 @@ table.resizable-table.selected .table-resize-handle {
 .note-callout {
     border-radius: 8px;
     border: 2px solid var(--border-color);
-    padding: 8px;
-    margin: 8px 0;
+    padding: 10px 12px;
+    margin: 20px 0;
 }
 .note-callout-content {
     outline: none;
@@ -876,6 +876,88 @@ table.resizable-table.selected .table-resize-handle {
 .note-callout ol {
     margin: 0;
     padding-left: 1.25rem;
+}
+
+/* Pastel note style presets */
+.note-blue-left {
+    border: none;
+    border-left: 6px solid #b3e5fc;
+    background: #f7fcff;
+}
+
+.note-green-card {
+    border: 1px solid #c8e6c9;
+    background: #fbfffb;
+}
+
+.note-lilac-dotted {
+    border: 2px dotted #d1c4e9;
+    background: #fcfbff;
+}
+
+.note-peach-dashed {
+    border: 2px dashed #ffccbc;
+    background: #fffaf7;
+}
+
+.note-cyan-top {
+    border: none;
+    border-top: 6px solid #b2ebf2;
+    background: #f8ffff;
+}
+
+.note-pink-double-left {
+    border: none;
+    border-left: 8px double #f8bbd0;
+    background: #fff8fb;
+}
+
+.note-yellow-corner {
+    position: relative;
+    border: 1px solid #fff9c4;
+    background: #fffffb;
+}
+.note-yellow-corner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-top: 6px solid var(--accent-color, #fff59d);
+    border-left: 6px solid var(--accent-color, #fff59d);
+    border-radius: 8px 0 0 0;
+    pointer-events: none;
+}
+
+.note-gradient {
+    position: relative;
+    border: 1px solid #ede7f6;
+    background: #ffffff;
+    overflow: hidden;
+}
+.note-gradient::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    background: linear-gradient(180deg, var(--gradient-start, #b3e5fc), var(--gradient-end, #d1c4e9));
+}
+
+.note-mint-bottom {
+    border: none;
+    border-bottom: 6px solid #c8e6c9;
+    background: #fbfffb;
+}
+
+.note-violet-soft {
+    border: 1px solid #e6e0f8;
+    background: #fdfcff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.03);
+}
+
+.note-gray-neutral {
+    border: 1px solid #e0e0e0;
+    background: #f9f9f9;
 }
 
 /* Indentation levels applied via classes instead of inline spaces */
