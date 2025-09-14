@@ -668,6 +668,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
     renderNotePresetButtons();
 
+    const NOTE_COLOR_PALETTE = ['#ffffff', '#fff9c4', '#bbdefb', '#c8e6c9', '#d1c4e9', '#ffccbc', '#f8bbd0', '#e0e0e0'];
+
+    function buildNoteColorPalette(containerId, input) {
+        const container = getElem(containerId);
+        if (!container) return;
+        NOTE_COLOR_PALETTE.forEach(color => {
+            const sw = document.createElement('button');
+            sw.className = 'color-swatch';
+            sw.style.backgroundColor = color;
+            sw.addEventListener('click', (e) => {
+                e.preventDefault();
+                input.value = color;
+            });
+            container.appendChild(sw);
+        });
+    }
+
+    buildNoteColorPalette('note-bg-palette', noteBgColorInput);
+    buildNoteColorPalette('note-border-palette', noteBorderColorInput);
+    buildNoteColorPalette('note-text-palette', noteTextColorInput);
+
     /*
      * Build the simplified toolbar for sub-note editing.  This toolbar intentionally omits
      * certain controls available in the main note editor, such as line height, image
@@ -3163,7 +3184,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { label: 'Morado', class: 'table-theme-purple' },
             { label: 'Turquesa', class: 'table-theme-teal' }
         ];
-        const showTableMenu = (table, cell, x, y) => {
+        const showTableMenu = (table, cell) => {
             currentTable = table;
             tableMenu.innerHTML = '';
 
@@ -3261,16 +3282,20 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             tableMenu.style.display = 'block';
-            tableMenu.style.top = `${y}px`;
-            tableMenu.style.left = `${x}px`;
             tableMenu.style.zIndex = 10001;
+            const tableRect = table.getBoundingClientRect();
+            const menuRect = tableMenu.getBoundingClientRect();
+            const top = window.scrollY + tableRect.top - menuRect.height - 8;
+            const left = window.scrollX + tableRect.left + (tableRect.width - menuRect.width) / 2;
+            tableMenu.style.top = `${top}px`;
+            tableMenu.style.left = `${left}px`;
         };
         notesEditor.addEventListener('click', (e) => {
             if (tableEditMode) return;
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
             if (table && notesEditor.contains(table)) {
-                showTableMenu(table, cell, e.pageX, e.pageY);
+                showTableMenu(table, cell);
                 e.stopPropagation();
             }
         });
@@ -3818,12 +3843,20 @@ document.addEventListener('DOMContentLoaded', function () {
         sanitizeCalloutContent(inner);
         currentCallout.contentEditable = 'false';
         currentCallout.classList.remove(...PREDEF_CLASSES);
-        if (opts.presetClass) currentCallout.classList.add(opts.presetClass);
         currentCallout.classList.add('note-resizable');
-        currentCallout.style.backgroundColor = opts.backgroundColor;
-        currentCallout.style.borderColor = opts.borderColor;
-        currentCallout.style.borderWidth = opts.borderWidth + 'px';
-        currentCallout.style.borderRadius = opts.borderRadius + 'px';
+        if (opts.presetClass) {
+            // Apply predefined style via CSS class without overriding its borders
+            currentCallout.classList.add(opts.presetClass);
+            currentCallout.style.backgroundColor = '';
+            currentCallout.style.borderColor = '';
+            currentCallout.style.borderWidth = '';
+            currentCallout.style.borderRadius = '';
+        } else {
+            currentCallout.style.backgroundColor = opts.backgroundColor;
+            currentCallout.style.borderColor = opts.borderColor;
+            currentCallout.style.borderWidth = opts.borderWidth + 'px';
+            currentCallout.style.borderRadius = opts.borderRadius + 'px';
+        }
         currentCallout.style.padding = opts.padding + 'px';
         currentCallout.style.margin = opts.margin + 'px 0';
         if (opts.accentColor) {

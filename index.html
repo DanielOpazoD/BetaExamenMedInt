@@ -610,9 +610,27 @@
                 <!-- Botones de estilos predefinidos generados por script -->
             </div>
             <div id="note-style-custom" class="hidden space-y-2">
-                <label class="flex items-center justify-between">Fondo <input type="color" id="note-bg-color" value="#ffffff" class="border"></label>
-                <label class="flex items-center justify-between">Borde <input type="color" id="note-border-color" value="#000000" class="border"></label>
-                <label class="flex items-center justify-between">Texto <input type="color" id="note-text-color" value="#000000" class="border"></label>
+                <div>
+                    <div class="mb-1">Fondo</div>
+                    <div class="flex items-center gap-2">
+                        <div id="note-bg-palette" class="color-palette-group"></div>
+                        <input type="color" id="note-bg-color" value="#ffffff" class="border">
+                    </div>
+                </div>
+                <div>
+                    <div class="mb-1">Borde</div>
+                    <div class="flex items-center gap-2">
+                        <div id="note-border-palette" class="color-palette-group"></div>
+                        <input type="color" id="note-border-color" value="#000000" class="border">
+                    </div>
+                </div>
+                <div>
+                    <div class="mb-1">Texto</div>
+                    <div class="flex items-center gap-2">
+                        <div id="note-text-palette" class="color-palette-group"></div>
+                        <input type="color" id="note-text-color" value="#000000" class="border">
+                    </div>
+                </div>
                 <label class="flex items-center justify-between">Radio <input type="number" id="note-radius" value="8" class="w-16 border"></label>
                 <label class="flex items-center justify-between">Espesor <input type="number" id="note-border-width" value="2" class="w-16 border"></label>
                 <label class="flex items-center justify-between">Padding <input type="number" id="note-padding" value="12" class="w-16 border"></label>
