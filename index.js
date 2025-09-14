@@ -2088,6 +2088,41 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function sanitizeCalloutContent(container) {
+        if (!container) return;
+        container.querySelectorAll('font').forEach(el => {
+            const frag = document.createDocumentFragment();
+            while (el.firstChild) frag.appendChild(el.firstChild);
+            el.replaceWith(frag);
+        });
+        container.querySelectorAll('[style]').forEach(el => el.removeAttribute('style'));
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+        let text;
+        while ((text = walker.nextNode())) {
+            text.nodeValue = text.nodeValue.replace(/\u00a0/g, ' ');
+        }
+        const lines = [];
+        let current = [];
+        Array.from(container.childNodes).forEach(node => {
+            if (node.nodeName === 'BR') {
+                lines.push(current);
+                current = [];
+                node.remove();
+            } else {
+                current.push(node);
+            }
+        });
+        lines.push(current);
+        if (lines.length > 1) {
+            container.innerHTML = '';
+            lines.forEach(nodes => {
+                const p = document.createElement('p');
+                nodes.forEach(n => p.appendChild(n));
+                if (p.textContent.trim()) container.appendChild(p);
+            });
+        }
+    }
+
     function setupEditorToolbar() {
         editorToolbar.innerHTML = ''; // Clear existing toolbar
 
@@ -2121,41 +2156,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 notesEditor.focus();
             });
             return btn;
-        };
-
-        const sanitizeCalloutContent = (container) => {
-            if (!container) return;
-            container.querySelectorAll('font').forEach(el => {
-                const frag = document.createDocumentFragment();
-                while (el.firstChild) frag.appendChild(el.firstChild);
-                el.replaceWith(frag);
-            });
-            container.querySelectorAll('[style]').forEach(el => el.removeAttribute('style'));
-            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
-            let text;
-            while ((text = walker.nextNode())) {
-                text.nodeValue = text.nodeValue.replace(/\u00a0/g, ' ');
-            }
-            const lines = [];
-            let current = [];
-            Array.from(container.childNodes).forEach(node => {
-                if (node.nodeName === 'BR') {
-                    lines.push(current);
-                    current = [];
-                    node.remove();
-                } else {
-                    current.push(node);
-                }
-            });
-            lines.push(current);
-            if (lines.length > 1) {
-                container.innerHTML = '';
-                lines.forEach(nodes => {
-                    const p = document.createElement('p');
-                    nodes.forEach(n => p.appendChild(n));
-                    if (p.textContent.trim()) container.appendChild(p);
-                });
-            }
         };
 
         const blockSelector = 'p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details, table';
