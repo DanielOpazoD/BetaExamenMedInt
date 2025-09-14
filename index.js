@@ -3666,9 +3666,9 @@ document.addEventListener('DOMContentLoaded', function () {
         noteStyleCustom.classList.add('hidden');
         if (callout) {
             noteBgColorInput.value = rgbToHex(callout.style.backgroundColor || '#ffffff');
-            noteBorderColorInput.value = rgbToHex(callout.style.borderColor || '#000000');
+            noteBorderColorInput.value = rgbToHex(callout.style.borderLeftColor || '#000000');
             noteRadiusInput.value = parseInt(callout.style.borderRadius) || 8;
-            noteBorderWidthInput.value = parseInt(callout.style.borderWidth) || 2;
+            noteBorderWidthInput.value = parseInt(callout.style.borderLeftWidth) || 2;
             notePaddingInput.value = parseInt(callout.style.padding) || 8;
             noteMarginInput.value = parseInt(callout.style.marginTop) || 8;
             noteShadowInput.checked = callout.classList.contains('note-shadow');
@@ -3720,8 +3720,12 @@ document.addEventListener('DOMContentLoaded', function () {
         currentCallout.classList.remove(...PREDEF_CLASSES);
         if (opts.presetClass) currentCallout.classList.add(opts.presetClass);
         currentCallout.style.backgroundColor = opts.backgroundColor;
-        currentCallout.style.borderColor = opts.borderColor;
-        currentCallout.style.borderWidth = opts.borderWidth + 'px';
+        currentCallout.style.borderTop = 'none';
+        currentCallout.style.borderRight = 'none';
+        currentCallout.style.borderBottom = 'none';
+        currentCallout.style.borderLeftColor = opts.borderColor;
+        currentCallout.style.borderLeftWidth = opts.borderWidth + 'px';
+        currentCallout.style.borderLeftStyle = 'solid';
         currentCallout.style.borderRadius = opts.borderRadius + 'px';
         currentCallout.style.padding = opts.padding + 'px';
         currentCallout.style.margin = opts.margin + 'px 0';
@@ -5943,10 +5947,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     backgroundColor: btn.dataset.bg,
                     borderColor: btn.dataset.border,
                     borderRadius: 8,
-                    borderWidth: 2,
+                    borderWidth: 4,
                     padding: 8,
                     margin: 8,
-                    shadow: false,
+                    shadow: btn.classList.contains('note-gray'),
                     presetClass: btn.classList.contains('note-blue') ? 'note-blue' :
                                  btn.classList.contains('note-green') ? 'note-green' :
                                  btn.classList.contains('note-yellow') ? 'note-yellow' :
