@@ -2925,6 +2925,31 @@ document.addEventListener('DOMContentLoaded', function () {
         
         const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
         editorToolbar.appendChild(lineHighlightPalette);
+        const createNotePalette = (input, colors) => {
+            const group = document.createElement('div');
+            group.className = 'color-palette-group';
+            colors.forEach(color => {
+                const swatch = document.createElement('button');
+                swatch.className = 'color-swatch';
+                if (color === 'transparent') {
+                    swatch.style.backgroundImage = 'linear-gradient(to top left, transparent calc(50% - 1px), red, transparent calc(50% + 1px))';
+                    swatch.style.backgroundColor = 'var(--bg-secondary)';
+                    swatch.title = 'Sin color';
+                } else {
+                    swatch.style.backgroundColor = color;
+                    swatch.title = color;
+                }
+                swatch.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    input.value = color === 'transparent' ? '#FFFFFF' : color;
+                });
+                group.appendChild(swatch);
+            });
+            return group;
+        };
+        noteBgColorInput.parentElement.after(createNotePalette(noteBgColorInput, highlightColors.concat(extraHighlightColors)));
+        noteBorderColorInput.parentElement.after(createNotePalette(noteBorderColorInput, textColors.concat(extraTextColors)));
+        noteTextColorInput.parentElement.after(createNotePalette(noteTextColorInput, textColors.concat(extraTextColors)));
         editorToolbar.appendChild(createPresetStyleDropdown());
 
         // Popup to change existing preset styles
@@ -3495,66 +3520,74 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(viewHtmlBtn);
 
-        const enableLeftResize = (el) => {
-            const threshold = 5;
+        const enableBoxResize = (el) => {
+            const handleSE = document.createElement('div');
+            handleSE.className = 'note-resize-handle se';
+            const handleSW = document.createElement('div');
+            handleSW.className = 'note-resize-handle sw';
+            el.appendChild(handleSE);
+            el.appendChild(handleSW);
+
             let resizing = false;
             let startX = 0;
+            let startY = 0;
             let startWidth = 0;
+            let startHeight = 0;
             let startMargin = 0;
+            let activeHandle = null;
 
-            const onHover = (e) => {
-                if (resizing) return;
-                const rect = el.getBoundingClientRect();
-                if (e.clientX - rect.left <= threshold) {
-                    el.style.cursor = 'ew-resize';
-                } else {
-                    el.style.cursor = '';
-                }
-            };
-
-            const onMouseDown = (e) => {
-                const rect = el.getBoundingClientRect();
-                if (e.clientX - rect.left <= threshold) {
-                    resizing = true;
-                    startX = e.clientX;
-                    startWidth = el.offsetWidth;
-                    startMargin = parseFloat(getComputedStyle(el).marginLeft) || 0;
-                    document.addEventListener('mousemove', onDrag);
-                    document.addEventListener('mouseup', onStop);
-                    e.preventDefault();
-                }
+            const onMouseDown = (handle) => (e) => {
+                resizing = true;
+                activeHandle = handle;
+                startX = e.clientX;
+                startY = e.clientY;
+                startWidth = el.offsetWidth;
+                startHeight = el.offsetHeight;
+                startMargin = parseFloat(getComputedStyle(el).marginLeft) || 0;
+                document.addEventListener('mousemove', onDrag);
+                document.addEventListener('mouseup', onStop);
+                e.preventDefault();
             };
 
             const onDrag = (e) => {
                 if (!resizing) return;
                 const dx = e.clientX - startX;
-                const newWidth = Math.max(30, startWidth - dx);
-                el.style.width = newWidth + 'px';
-                el.style.marginLeft = startMargin + dx + 'px';
+                const dy = e.clientY - startY;
+                if (activeHandle === handleSE) {
+                    const newWidth = Math.max(30, startWidth + dx);
+                    const newHeight = Math.max(20, startHeight + dy);
+                    el.style.width = newWidth + 'px';
+                    el.style.height = newHeight + 'px';
+                } else if (activeHandle === handleSW) {
+                    const newWidth = Math.max(30, startWidth - dx);
+                    const newHeight = Math.max(20, startHeight + dy);
+                    el.style.width = newWidth + 'px';
+                    el.style.height = newHeight + 'px';
+                    el.style.marginLeft = startMargin + dx + 'px';
+                }
             };
 
             const onStop = () => {
                 if (!resizing) return;
                 resizing = false;
-                el.style.cursor = '';
+                activeHandle = null;
                 document.removeEventListener('mousemove', onDrag);
                 document.removeEventListener('mouseup', onStop);
             };
 
-            el.addEventListener('mousemove', onHover);
-            el.addEventListener('mousedown', onMouseDown);
-            el._leftResizeHandlers = { onHover, onMouseDown, onDrag, onStop };
+            handleSE.addEventListener('mousedown', onMouseDown(handleSE));
+            handleSW.addEventListener('mousedown', onMouseDown(handleSW));
+            el._boxResizeHandlers = { handleSE, handleSW, onDrag, onStop };
         };
 
-        const disableLeftResize = (el) => {
-            const h = el._leftResizeHandlers;
+        const disableBoxResize = (el) => {
+            const h = el._boxResizeHandlers;
             if (!h) return;
-            el.removeEventListener('mousemove', h.onHover);
-            el.removeEventListener('mousedown', h.onMouseDown);
+            h.handleSE.remove();
+            h.handleSW.remove();
             document.removeEventListener('mousemove', h.onDrag);
             document.removeEventListener('mouseup', h.onStop);
-            el.style.cursor = '';
-            delete el._leftResizeHandlers;
+            delete el._boxResizeHandlers;
         };
 
         const resizeCalloutBtn = createButton('Redimensionar nota', '↔️', null, null, () => {
@@ -3569,11 +3602,13 @@ document.addEventListener('DOMContentLoaded', function () {
             block.classList.toggle('note-resizable');
             if (block.classList.contains('note-resizable')) {
                 block.style.width = block.offsetWidth + 'px';
-                enableLeftResize(block);
+                block.style.height = block.offsetHeight + 'px';
+                enableBoxResize(block);
             } else {
                 block.style.width = '';
+                block.style.height = '';
                 block.style.marginLeft = '';
-                disableLeftResize(block);
+                disableBoxResize(block);
             }
         });
         editorToolbar.appendChild(resizeCalloutBtn);
@@ -3749,8 +3784,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const selection = window.getSelection();
         selection.removeAllRanges();
         selection.addRange(range);
-        inner.focus();
-        notesEditor.focus();
+        inner.focus({ preventScroll: true });
+        notesEditor.focus({ preventScroll: true });
         closeNoteStyleModal();
     }
 

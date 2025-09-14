@@ -959,11 +959,20 @@ table.resizable-table.selected .table-resize-handle {
 .table-theme-teal th { background:#e0f2f1; color:#004d40; }
 .table-theme-teal td { background:#ffffff; }
 .note-resizable {
-    resize: horizontal;
     overflow: auto;
     display: inline-block;
     max-width: 100%;
+    position: relative;
 }
+.note-resize-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: var(--btn-primary-bg);
+    border: 1px solid #666;
+}
+.note-resize-handle.se { right: -5px; bottom: -5px; cursor: nwse-resize; }
+.note-resize-handle.sw { left: -5px; bottom: -5px; cursor: nesw-resize; }
 .note-blue-left { border:1px solid #b3e5fc; border-left-width:6px; background:#f7fcff; }
 .note-green-card { border:1px solid #c8e6c9; background:#fbfffb; }
 .note-lila-dotted { border:2px dotted #d1c4e9; background:#fcfbff; }
