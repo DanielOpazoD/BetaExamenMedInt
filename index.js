@@ -624,6 +624,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const notePaddingInput = getElem('note-padding');
     const noteMarginInput = getElem('note-margin');
     const noteShadowInput = getElem('note-shadow');
+    const noteBgPalette = getElem('note-bg-palette');
+    const noteBorderPalette = getElem('note-border-palette');
+    const noteTextPalette = getElem('note-text-palette');
     const applyNoteStyleBtn = getElem('apply-note-style-btn');
     const cancelNoteStyleBtn = getElem('cancel-note-style-btn');
 
@@ -2530,6 +2533,64 @@ document.addEventListener('DOMContentLoaded', function () {
             return group;
         };
 
+        const createSimplePalette = (action, mainColors, extraColors) => {
+            const group = document.createElement('div');
+            group.className = 'color-palette-group';
+            mainColors.forEach(color => {
+                const swatch = document.createElement('button');
+                swatch.className = 'color-swatch toolbar-btn';
+                if (color === 'transparent') {
+                    swatch.style.backgroundImage = 'linear-gradient(to top left, transparent calc(50% - 1px), red, transparent calc(50% + 1px))';
+                    swatch.style.backgroundColor = 'var(--bg-secondary)';
+                    swatch.title = 'Sin color';
+                } else {
+                    swatch.style.backgroundColor = color;
+                    swatch.title = color;
+                }
+                swatch.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    action(color);
+                });
+                group.appendChild(swatch);
+            });
+            const otherBtn = document.createElement('button');
+            otherBtn.className = 'other-colors-btn toolbar-btn';
+            otherBtn.innerHTML = '🎨';
+            otherBtn.title = 'Más colores';
+            group.appendChild(otherBtn);
+            const submenu = document.createElement('div');
+            submenu.className = 'color-submenu';
+            extraColors.forEach(color => {
+                const swatch = document.createElement('button');
+                swatch.className = 'color-swatch';
+                if (color === 'transparent') {
+                    swatch.style.backgroundImage = 'linear-gradient(to top left, transparent calc(50% - 1px), red, transparent calc(50% + 1px))';
+                    swatch.style.backgroundColor = 'var(--bg-secondary)';
+                    swatch.title = 'Sin color';
+                } else {
+                    swatch.style.backgroundColor = color;
+                    swatch.title = color;
+                }
+                swatch.addEventListener('mousedown', (e) => e.preventDefault());
+                swatch.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    action(color);
+                    submenu.classList.remove('visible');
+                });
+                submenu.appendChild(swatch);
+            });
+            group.appendChild(submenu);
+            otherBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                    if (d !== submenu) d.classList.remove('visible');
+                });
+                submenu.classList.toggle('visible');
+            });
+            return group;
+        };
+
         const createSymbolDropdown = (symbols, title, icon, editHandler, isChar = false) => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
@@ -2872,6 +2933,19 @@ document.addEventListener('DOMContentLoaded', function () {
         const extraTextColors = ['#FF0000', '#0000FF', '#008000', '#FFA500', '#FFFF00', '#800080', '#FFC0CB', '#00FFFF', '#00008B', '#8B0000', '#FF8C00', '#FFD700', '#ADFF2F', '#4B0082', '#48D1CC', '#191970', '#A52A2A', '#F0E68C', '#ADD8E6', '#DDA0DD', '#90EE90', '#FA8072'];
         const highlightColors = ['#FAFAD2']; // Pastel yellow
         const extraHighlightColors = ['transparent', '#FFFFFF', '#FFFF00', '#ADD8E6', '#F0FFF0', '#FFF0F5', '#F5FFFA', '#F0F8FF', '#E6E6FA', '#FFF5EE', '#FAEBD7', '#FFE4E1', '#FFFFE0', '#D3FFD3', '#B0E0E6', '#FFB6C1', '#F5DEB3', '#C8A2C8', '#FFDEAD', '#E0FFFF', '#FDF5E6', '#FFFACD', '#F8F8FF', '#D3D3D3', '#A9A9A9', '#696969', '#C4A484', '#A0522D', '#8B4513'];
+
+        const allNoteColors = Array.from(new Set([...textColors, ...extraTextColors, ...highlightColors, ...extraHighlightColors]));
+        const noteMainColors = allNoteColors.slice(0, 5);
+        const noteExtraColors = allNoteColors.slice(5);
+        if (noteBgPalette) {
+            noteBgPalette.appendChild(createSimplePalette(c => noteBgColorInput.value = c, noteMainColors, noteExtraColors));
+        }
+        if (noteBorderPalette) {
+            noteBorderPalette.appendChild(createSimplePalette(c => noteBorderColorInput.value = c, noteMainColors, noteExtraColors));
+        }
+        if (noteTextPalette) {
+            noteTextPalette.appendChild(createSimplePalette(c => noteTextColorInput.value = c, noteMainColors, noteExtraColors));
+        }
         
         const applyForeColor = (color) => document.execCommand('foreColor', false, color);
         const applyHiliteColor = (color) => document.execCommand('hiliteColor', false, color);
@@ -3496,16 +3570,23 @@ document.addEventListener('DOMContentLoaded', function () {
         editorToolbar.appendChild(viewHtmlBtn);
 
         const enableLeftResize = (el) => {
-            const threshold = 5;
+            const threshold = 10;
             let resizing = false;
+            let mode = '';
             let startX = 0;
+            let startY = 0;
             let startWidth = 0;
+            let startHeight = 0;
             let startMargin = 0;
 
             const onHover = (e) => {
                 if (resizing) return;
                 const rect = el.getBoundingClientRect();
-                if (e.clientX - rect.left <= threshold) {
+                const nearLeft = e.clientX - rect.left <= threshold;
+                const nearBottom = rect.bottom - e.clientY <= threshold;
+                if (nearLeft && nearBottom) {
+                    el.style.cursor = 'sw-resize';
+                } else if (nearLeft) {
                     el.style.cursor = 'ew-resize';
                 } else {
                     el.style.cursor = '';
@@ -3514,10 +3595,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const onMouseDown = (e) => {
                 const rect = el.getBoundingClientRect();
-                if (e.clientX - rect.left <= threshold) {
+                const nearLeft = e.clientX - rect.left <= threshold;
+                const nearBottom = rect.bottom - e.clientY <= threshold;
+                if (nearLeft) {
                     resizing = true;
+                    mode = nearBottom ? 'corner' : 'left';
                     startX = e.clientX;
+                    startY = e.clientY;
                     startWidth = el.offsetWidth;
+                    startHeight = el.offsetHeight;
                     startMargin = parseFloat(getComputedStyle(el).marginLeft) || 0;
                     document.addEventListener('mousemove', onDrag);
                     document.addEventListener('mouseup', onStop);
@@ -3531,6 +3617,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 const newWidth = Math.max(30, startWidth - dx);
                 el.style.width = newWidth + 'px';
                 el.style.marginLeft = startMargin + dx + 'px';
+                if (mode === 'corner') {
+                    const dy = e.clientY - startY;
+                    const newHeight = Math.max(30, startHeight + dy);
+                    el.style.height = newHeight + 'px';
+                }
             };
 
             const onStop = () => {
@@ -3569,9 +3660,11 @@ document.addEventListener('DOMContentLoaded', function () {
             block.classList.toggle('note-resizable');
             if (block.classList.contains('note-resizable')) {
                 block.style.width = block.offsetWidth + 'px';
+                block.style.height = block.offsetHeight + 'px';
                 enableLeftResize(block);
             } else {
                 block.style.width = '';
+                block.style.height = '';
                 block.style.marginLeft = '';
                 disableLeftResize(block);
             }
@@ -3749,8 +3842,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const selection = window.getSelection();
         selection.removeAllRanges();
         selection.addRange(range);
-        inner.focus();
-        notesEditor.focus();
+        const scrollX = window.scrollX;
+        const scrollY = window.scrollY;
+        inner.focus({ preventScroll: true });
+        notesEditor.focus({ preventScroll: true });
+        window.scrollTo(scrollX, scrollY);
         closeNoteStyleModal();
     }
 
@@ -5765,6 +5861,26 @@ document.addEventListener('DOMContentLoaded', function () {
              } else {
                  notesEditor.querySelectorAll('table').forEach(t => t.classList.remove('selected-for-move'));
                  selectedTableForMove = null;
+             }
+
+             // Handle note callout selection
+             const callout = e.target.closest('.note-callout');
+             notesEditor.querySelectorAll('.note-callout.note-resizable').forEach(c => {
+                 if (c !== callout) {
+                     c.classList.remove('note-resizable');
+                     c.style.width = '';
+                     c.style.height = '';
+                     c.style.marginLeft = '';
+                     disableLeftResize(c);
+                 }
+             });
+             if (callout) {
+                 if (!callout.classList.contains('note-resizable')) {
+                     callout.classList.add('note-resizable');
+                     callout.style.width = callout.offsetWidth + 'px';
+                     callout.style.height = callout.offsetHeight + 'px';
+                     enableLeftResize(callout);
+                 }
              }
 
              // Handle gallery link clicks
