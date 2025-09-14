@@ -914,7 +914,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fontSNPlaceholder.disabled = true;
         fontSNPlaceholder.selected = true;
         selectSNFont.appendChild(fontSNPlaceholder);
-        const fontsSN = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
+        const fontsSN = ['San Francisco', 'Arial', 'Calibri', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
         fontsSN.forEach(f => {
             const opt = document.createElement('option');
             opt.value = f;
@@ -2632,7 +2632,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fontPlaceholder.disabled = true;
         fontPlaceholder.selected = true;
         selectFont.appendChild(fontPlaceholder);
-        const fonts = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
+        const fonts = ['San Francisco', 'Arial', 'Calibri', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
         fonts.forEach(f => {
             const opt = document.createElement('option');
             opt.value = f;
@@ -2701,6 +2701,38 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         editorToolbar.appendChild(selectSize);
+
+        const adjustFontSize = (factor) => {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            const range = selection.getRangeAt(0);
+            const nodes = new Set();
+            const walker = document.createTreeWalker(
+                range.commonAncestorContainer,
+                NodeFilter.SHOW_ELEMENT,
+                {
+                    acceptNode(node) {
+                        return range.intersectsNode(node) && notesEditor.contains(node)
+                            ? NodeFilter.FILTER_ACCEPT
+                            : NodeFilter.FILTER_REJECT;
+                    }
+                }
+            );
+            while (walker.nextNode()) {
+                nodes.add(walker.currentNode);
+            }
+            const elements = Array.from(nodes).filter(el => !nodes.has(el.parentElement) && el !== notesEditor);
+            elements.forEach(el => {
+                const size = parseFloat(getComputedStyle(el).fontSize);
+                if (!isNaN(size)) {
+                    el.style.fontSize = (size * factor) + 'px';
+                }
+            });
+            notesEditor.focus();
+        };
+
+        editorToolbar.appendChild(createButton('Disminuir tamaño', '-', null, null, () => adjustFontSize(0.9)));
+        editorToolbar.appendChild(createButton('Aumentar tamaño', '+', null, null, () => adjustFontSize(1.1)));
 
         // Line height selector
         const selectLineHeight = document.createElement('select');
@@ -3121,7 +3153,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { label: 'Morado', class: 'table-theme-purple' },
             { label: 'Turquesa', class: 'table-theme-teal' }
         ];
-        const showTableMenu = (table, cell, x, y) => {
+        const showTableMenu = (table, cell) => {
             currentTable = table;
             tableMenu.innerHTML = '';
 
@@ -3219,8 +3251,15 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             tableMenu.style.display = 'block';
-            tableMenu.style.top = `${y}px`;
-            tableMenu.style.left = `${x}px`;
+            tableMenu.style.left = '0';
+            tableMenu.style.top = '0';
+            const menuRect = tableMenu.getBoundingClientRect();
+            const rect = table.getBoundingClientRect();
+            let top = rect.top + window.scrollY - menuRect.height - 8;
+            if (top < 0) top = rect.bottom + window.scrollY + 8;
+            const left = rect.left + window.scrollX + (rect.width - menuRect.width) / 2;
+            tableMenu.style.top = `${top}px`;
+            tableMenu.style.left = `${left}px`;
             tableMenu.style.zIndex = 10001;
         };
         notesEditor.addEventListener('click', (e) => {
@@ -3228,7 +3267,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
             if (table && notesEditor.contains(table)) {
-                showTableMenu(table, cell, e.pageX, e.pageY);
+                showTableMenu(table, cell);
                 e.stopPropagation();
             }
         });
@@ -3550,17 +3589,6 @@ document.addEventListener('DOMContentLoaded', function () {
             el.style.cursor = '';
             delete el._leftResizeHandlers;
         };
-
-        const calloutBtn = createButton('Nota', '💬', null, null, () => {
-            const selection = window.getSelection();
-            if (selection && selection.rangeCount > 0) {
-                savedEditorSelection = selection.getRangeAt(0).cloneRange();
-            } else {
-                savedEditorSelection = null;
-            }
-            openNoteStyleModal();
-        });
-        editorToolbar.appendChild(calloutBtn);
 
         const resizeCalloutBtn = createButton('Redimensionar nota', '↔️', null, null, () => {
             const selection = window.getSelection();
