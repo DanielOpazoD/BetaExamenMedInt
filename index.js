@@ -627,6 +627,82 @@ document.addEventListener('DOMContentLoaded', function () {
     const applyNoteStyleBtn = getElem('apply-note-style-btn');
     const cancelNoteStyleBtn = getElem('cancel-note-style-btn');
 
+    let savedNoteScrollY = 0;
+
+    function createNoteColorPalette(input, colors) {
+        const palette = document.createElement('div');
+        palette.className = 'note-color-palette';
+        colors.forEach(color => {
+            const swatch = document.createElement('button');
+            swatch.className = 'color-swatch';
+            if (color === 'transparent') {
+                swatch.style.backgroundImage = 'linear-gradient(to top left, transparent calc(50% - 1px), red, transparent calc(50% + 1px))';
+                swatch.style.backgroundColor = 'var(--bg-secondary)';
+            } else {
+                swatch.style.backgroundColor = color;
+            }
+            swatch.addEventListener('click', (e) => {
+                e.preventDefault();
+                input.value = color;
+            });
+            palette.appendChild(swatch);
+        });
+        input.insertAdjacentElement('afterend', palette);
+    }
+
+    const paletteTextColors = ['#000000', '#FF0000', '#0000FF', '#008000', '#FFA500', '#FFFF00', '#800080', '#FFC0CB', '#00FFFF', '#00008B', '#8B0000', '#FF8C00', '#FFD700', '#ADFF2F', '#4B0082', '#48D1CC', '#191970', '#A52A2A', '#F0E68C', '#ADD8E6', '#DDA0DD', '#90EE90', '#FA8072'];
+    const paletteBgColors = ['#FAFAD2', 'transparent', '#FFFFFF', '#FFFF00', '#ADD8E6', '#F0FFF0', '#FFF0F5', '#F5FFFA', '#F0F8FF', '#E6E6FA', '#FFF5EE', '#FAEBD7', '#FFE4E1', '#FFFFE0', '#D3FFD3', '#B0E0E6', '#FFB6C1', '#F5DEB3', '#C8A2C8', '#FFDEAD', '#E0FFFF', '#FDF5E6', '#FFFACD', '#F8F8FF', '#D3D3D3', '#A9A9A9', '#696969', '#C4A484', '#A0522D', '#8B4513'];
+
+    createNoteColorPalette(noteBgColorInput, paletteBgColors);
+    createNoteColorPalette(noteBorderColorInput, paletteBgColors);
+    createNoteColorPalette(noteTextColorInput, paletteTextColors);
+
+    let activeResizableCallout = null;
+
+    function addCalloutResizeHandles(callout) {
+        removeCalloutResizeHandles(callout);
+        const br = document.createElement('div');
+        br.className = 'note-resize-handle br';
+        const bl = document.createElement('div');
+        bl.className = 'note-resize-handle bl';
+        callout.appendChild(br);
+        callout.appendChild(bl);
+
+        const start = (e, corner) => {
+            e.preventDefault();
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startWidth = callout.offsetWidth;
+            const startHeight = callout.offsetHeight;
+            const startMargin = parseFloat(getComputedStyle(callout).marginLeft) || 0;
+            function onMove(evt) {
+                const dx = evt.clientX - startX;
+                const dy = evt.clientY - startY;
+                if (corner === 'br') {
+                    callout.style.width = startWidth + dx + 'px';
+                } else {
+                    callout.style.width = Math.max(30, startWidth - dx) + 'px';
+                    callout.style.marginLeft = startMargin + dx + 'px';
+                }
+                callout.style.height = startHeight + dy + 'px';
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        };
+
+        br.addEventListener('mousedown', e => start(e, 'br'));
+        bl.addEventListener('mousedown', e => start(e, 'bl'));
+    }
+
+    function removeCalloutResizeHandles(callout) {
+        if (!callout) return;
+        callout.querySelectorAll('.note-resize-handle').forEach(h => h.remove());
+    }
+
     /*
      * Build the simplified toolbar for sub-note editing.  This toolbar intentionally omits
      * certain controls available in the main note editor, such as line height, image
@@ -3667,6 +3743,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function openNoteStyleModal(callout = null) {
+        savedNoteScrollY = window.scrollY;
         currentCallout = callout;
         noteStyleModal.classList.add('visible');
         noteStyleTabPre.classList.add('border-b-2', 'border-blue-500');
@@ -3688,6 +3765,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function closeNoteStyleModal() {
         noteStyleModal.classList.remove('visible');
         currentCallout = null;
+        window.scrollTo(0, savedNoteScrollY);
     }
 
     function applyNoteStyle(opts) {
@@ -5768,17 +5846,29 @@ document.addEventListener('DOMContentLoaded', function () {
              }
 
              // Handle gallery link clicks
-             const galleryLink = e.target.closest('.gallery-link');
-             if (galleryLink) {
-                 e.preventDefault();
-                 // Persist the link so that caption edits and image updates can be saved back
-                 activeGalleryLinkForLightbox = galleryLink;
-                 openImageLightbox(galleryLink.dataset.images);
-                 return;
-             }
+            const galleryLink = e.target.closest('.gallery-link');
+            if (galleryLink) {
+                e.preventDefault();
+                // Persist the link so that caption edits and image updates can be saved back
+                activeGalleryLinkForLightbox = galleryLink;
+                openImageLightbox(galleryLink.dataset.images);
+                return;
+            }
 
-             // Handle inline note icon clicks
-             const inlineIcon = e.target.closest('.inline-note');
+            const callout = e.target.closest('.note-callout');
+            if (callout) {
+                if (activeResizableCallout !== callout) {
+                    removeCalloutResizeHandles(activeResizableCallout);
+                    addCalloutResizeHandles(callout);
+                    activeResizableCallout = callout;
+                }
+            } else {
+                removeCalloutResizeHandles(activeResizableCallout);
+                activeResizableCallout = null;
+            }
+
+            // Handle inline note icon clicks
+            const inlineIcon = e.target.closest('.inline-note');
              if (inlineIcon) {
                  e.preventDefault();
                  hideInlineNoteTooltip(inlineIcon);
