@@ -640,34 +640,33 @@ document.addEventListener('DOMContentLoaded', function () {
         // Local state for sub-note toolbar color selections
         let savedSubnoteSelection = null;
 
-        // Collapse the current selection so formatting doesn't persist beyond the selected range
-        const collapseSelectionSN = () => {
+        // Run a callback while preserving the current text selection
+        const withSubnoteSelection = (fn) => {
             const sel = window.getSelection();
-            if (sel && sel.rangeCount > 0) {
-                const range = sel.getRangeAt(0);
-                const collapsed = range.cloneRange();
-                collapsed.collapse(false);
+            const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+            fn();
+            if (range) {
                 sel.removeAllRanges();
-                sel.addRange(collapsed);
+                sel.addRange(range);
             }
         };
 
         // Helper to create a toolbar button for sub-note editor
-        const createSNButton = (title, content, command, value = null, action = null) => {
+        const createSNButton = (title, content, command, value = null, action = null, extraClass = '') => {
             const btn = document.createElement('button');
-            btn.className = 'toolbar-btn';
+            btn.className = 'toolbar-btn' + (extraClass ? ` ${extraClass}` : '');
             btn.title = title;
             btn.innerHTML = content;
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (command) {
-                    document.execCommand(command, false, value);
-                    collapseSelectionSN();
-                }
-                if (action) {
-                    action();
-                    collapseSelectionSN();
-                }
+                withSubnoteSelection(() => {
+                    if (command) {
+                        document.execCommand(command, false, value);
+                    }
+                    if (action) {
+                        action();
+                    }
+                });
                 subNoteEditor.focus();
             });
             return btn;
@@ -696,8 +695,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 swatch.addEventListener('click', (e) => {
                     e.preventDefault();
-                    action(color);
-                    collapseSelectionSN();
+                    withSubnoteSelection(() => action(color));
                     subNoteEditor.focus();
                 });
                 group.appendChild(swatch);
@@ -728,8 +726,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         selection.removeAllRanges();
                         selection.addRange(savedSubnoteSelection);
                     }
-                    action(color);
-                    collapseSelectionSN();
+                    withSubnoteSelection(() => action(color));
                     submenu.classList.remove('visible');
                     savedSubnoteSelection = null;
                     subNoteEditor.focus();
@@ -753,8 +750,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     selection.removeAllRanges();
                     selection.addRange(savedSubnoteSelection);
                 }
-                action(e.target.value);
-                collapseSelectionSN();
+                withSubnoteSelection(() => action(e.target.value));
                 savedSubnoteSelection = null;
                 subNoteEditor.focus();
             });
@@ -908,13 +904,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectSNFont = document.createElement('select');
         selectSNFont.className = 'toolbar-select';
         selectSNFont.title = 'Fuente';
+        selectSNFont.style.width = '60px';
         const fontSNPlaceholder = document.createElement('option');
         fontSNPlaceholder.value = "";
         fontSNPlaceholder.textContent = 'Fuente';
         fontSNPlaceholder.disabled = true;
         fontSNPlaceholder.selected = true;
         selectSNFont.appendChild(fontSNPlaceholder);
-        const fontsSN = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
+        const fontsSN = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana', 'Calibri'];
         fontsSN.forEach(f => {
             const opt = document.createElement('option');
             opt.value = f;
@@ -924,7 +921,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         selectSNFont.addEventListener('change', () => {
             if (selectSNFont.value) {
-                document.execCommand('fontName', false, selectSNFont.value);
+                withSubnoteSelection(() => document.execCommand('fontName', false, selectSNFont.value));
                 selectSNFont.selectedIndex = 0;
                 subNoteEditor.focus();
             }
@@ -935,6 +932,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectSNSize = document.createElement('select');
         selectSNSize.className = 'toolbar-select';
         selectSNSize.title = 'Tamaño de letra';
+        selectSNSize.style.width = '60px';
         const sizePlaceholder = document.createElement('option');
         sizePlaceholder.value = "";
         sizePlaceholder.textContent = 'Ajustar tamaño';
@@ -950,7 +948,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         selectSNSize.addEventListener('change', () => {
             if (selectSNSize.value) {
-                document.execCommand('fontSize', false, selectSNSize.value);
+                withSubnoteSelection(() => document.execCommand('fontSize', false, selectSNSize.value));
                 selectSNSize.selectedIndex = 0;
                 subNoteEditor.focus();
             }
@@ -961,6 +959,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectSNLineHeight = document.createElement('select');
         selectSNLineHeight.className = 'toolbar-select';
         selectSNLineHeight.title = 'Interlineado';
+        selectSNLineHeight.style.width = '60px';
         const lhPlaceholder = document.createElement('option');
         lhPlaceholder.value = "";
         lhPlaceholder.textContent = 'Interlineado';
@@ -977,14 +976,16 @@ document.addEventListener('DOMContentLoaded', function () {
         selectSNLineHeight.addEventListener('change', () => {
             const value = selectSNLineHeight.value;
             if (value !== null) {
-                const elements = getSelectedBlocksSN();
-                if (elements.length > 0) {
-                    elements.forEach(block => {
-                        if (block && subNoteEditor.contains(block)) {
-                            block.style.lineHeight = value;
-                        }
-                    });
-                }
+                withSubnoteSelection(() => {
+                    const elements = getSelectedBlocksSN();
+                    if (elements.length > 0) {
+                        elements.forEach(block => {
+                            if (block && subNoteEditor.contains(block)) {
+                                block.style.lineHeight = value;
+                            }
+                        });
+                    }
+                });
                 selectSNLineHeight.selectedIndex = 0;
                 subNoteEditor.focus();
             }
@@ -1006,8 +1007,8 @@ document.addEventListener('DOMContentLoaded', function () {
             subNoteEditor.focus();
         };
 
-        subNoteToolbar.appendChild(createSNButton('Reducir interlineado', '-', null, null, () => adjustSNLineHeight(-0.2)));
-        subNoteToolbar.appendChild(createSNButton('Aumentar interlineado', '+', null, null, () => adjustSNLineHeight(0.2)));
+        subNoteToolbar.appendChild(createSNButton('Reducir interlineado', '-', null, null, () => adjustSNLineHeight(-0.2), 'compact-btn'));
+        subNoteToolbar.appendChild(createSNButton('Aumentar interlineado', '+', null, null, () => adjustSNLineHeight(0.2), 'compact-btn'));
         subNoteToolbar.appendChild(createSNSeparator());
         // Color palettes (text, highlight, line highlight)
         const textColors = ['#000000'];
@@ -1197,14 +1198,6 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             true
         ));
-        // Image from URL
-        subNoteToolbar.appendChild(createSNButton('Insertar Imagen desde URL', '🖼️', null, null, () => {
-            const url = prompt('Ingresa la URL de la imagen:');
-            if (url) {
-                subNoteEditor.focus();
-                document.execCommand('insertImage', false, url);
-            }
-        }));
         // Gallery link insertion
         const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
         subNoteToolbar.appendChild(createSNButton('Crear Galería de Imágenes', gallerySVG, null, null, () => {
@@ -1329,7 +1322,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentLightboxIndex = 0;
     let currentNoteRow = null;
     let activeSubnoteLink = null;
-    let currentInlineNoteIcon = 'ℹ️';
     let editingQuickNote = false;
     let savedEditorSelection = null;
     let savedSelectedHtml = '';
@@ -2098,37 +2090,33 @@ document.addEventListener('DOMContentLoaded', function () {
     function setupEditorToolbar() {
         editorToolbar.innerHTML = ''; // Clear existing toolbar
 
-        // Utility to collapse the current selection so formatting doesn't persist beyond the selected range
-        const collapseSelection = (editor) => {
+        // Run a callback while preserving the current text selection
+        const withEditorSelection = (fn) => {
             const sel = window.getSelection();
-            if (sel && sel.rangeCount > 0) {
-                const range = sel.getRangeAt(0);
-                // Collapse to the end of the current range
-                const collapsed = range.cloneRange();
-                collapsed.collapse(false);
+            const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+            fn();
+            if (range) {
                 sel.removeAllRanges();
-                sel.addRange(collapsed);
+                sel.addRange(range);
             }
         };
 
-        const createButton = (title, content, command, value = null, action = null) => {
+        const createButton = (title, content, command, value = null, action = null, extraClass = '') => {
             const btn = document.createElement('button');
-            btn.className = 'toolbar-btn';
+            btn.className = 'toolbar-btn' + (extraClass ? ` ${extraClass}` : '');
             btn.title = title;
             btn.innerHTML = content;
             btn.addEventListener('mousedown', e => e.preventDefault());
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (command) {
-                    document.execCommand(command, false, value);
-                    // Collapse the selection after applying the command
-                    collapseSelection(notesEditor);
-                }
-                if (action) {
-                    action();
-                    // Collapse again after custom actions
-                    collapseSelection(notesEditor);
-                }
+                withEditorSelection(() => {
+                    if (command) {
+                        document.execCommand(command, false, value);
+                    }
+                    if (action) {
+                        action();
+                    }
+                });
                 notesEditor.focus();
             });
             return btn;
@@ -2440,7 +2428,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 swatch.addEventListener('click', (e) => {
                     e.preventDefault();
-                    action(color);
+                    withEditorSelection(() => action(color));
+                    notesEditor.focus();
                 });
                 group.appendChild(swatch);
             });
@@ -2465,23 +2454,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     swatch.title = color;
                 }
                 swatch.addEventListener('mousedown', (e) => e.preventDefault());
-            swatch.addEventListener('click', (e) => {
+                swatch.addEventListener('click', (e) => {
                     e.preventDefault();
                     if (savedEditorSelection) {
                         const selection = window.getSelection();
                         selection.removeAllRanges();
                         selection.addRange(savedEditorSelection);
                     }
-                    action(color);
-                    // Collapse the selection so the color is applied only once
-                    const sel = window.getSelection();
-                    if (sel && sel.rangeCount > 0) {
-                        const range = sel.getRangeAt(0);
-                        const collapsed = range.cloneRange();
-                        collapsed.collapse(false);
-                        sel.removeAllRanges();
-                        sel.addRange(collapsed);
-                    }
+                    withEditorSelection(() => action(color));
                     submenu.classList.remove('visible');
                     savedEditorSelection = null;
                     notesEditor.focus();
@@ -2508,16 +2488,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     selection.removeAllRanges();
                     selection.addRange(savedEditorSelection);
                 }
-                action(e.target.value);
-                // Collapse selection after custom color apply
-                const sel = window.getSelection();
-                if (sel && sel.rangeCount > 0) {
-                    const range = sel.getRangeAt(0);
-                    const collapsed = range.cloneRange();
-                    collapsed.collapse(false);
-                    sel.removeAllRanges();
-                    sel.addRange(collapsed);
-                }
+                withEditorSelection(() => action(e.target.value));
                 savedEditorSelection = null;
                 notesEditor.focus();
             });
@@ -2626,13 +2597,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectFont = document.createElement('select');
         selectFont.className = 'toolbar-select';
         selectFont.title = 'Fuente';
+        selectFont.style.width = '60px';
         const fontPlaceholder = document.createElement('option');
         fontPlaceholder.value = "";
         fontPlaceholder.textContent = 'Fuente';
         fontPlaceholder.disabled = true;
         fontPlaceholder.selected = true;
         selectFont.appendChild(fontPlaceholder);
-        const fonts = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
+        const fonts = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana', 'Calibri'];
         fonts.forEach(f => {
             const opt = document.createElement('option');
             opt.value = f;
@@ -2642,7 +2614,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         selectFont.addEventListener('change', () => {
             if (selectFont.value) {
-                document.execCommand('fontName', false, selectFont.value);
+                withEditorSelection(() => document.execCommand('fontName', false, selectFont.value));
                 selectFont.selectedIndex = 0;
                 notesEditor.focus();
             }
@@ -2653,6 +2625,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectZoom = document.createElement('select');
         selectZoom.className = 'toolbar-select';
         selectZoom.title = 'Zoom';
+        selectZoom.style.width = '60px';
         const zoomPlaceholder = document.createElement('option');
         zoomPlaceholder.value = "";
         zoomPlaceholder.textContent = 'Zoom';
@@ -2678,6 +2651,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectSize = document.createElement('select');
         selectSize.className = 'toolbar-select';
         selectSize.title = 'Tamaño de letra';
+        selectSize.style.width = '60px';
         
         const placeholderOption = document.createElement('option');
         placeholderOption.value = "";
@@ -2695,17 +2669,35 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         selectSize.addEventListener('change', () => {
             if (selectSize.value) {
-                document.execCommand('fontSize', false, selectSize.value);
+                withEditorSelection(() => document.execCommand('fontSize', false, selectSize.value));
                 selectSize.selectedIndex = 0; // Reset to placeholder
                 notesEditor.focus();
             }
         });
         editorToolbar.appendChild(selectSize);
 
+        const adjustFontSize = (factor) => {
+            const blocks = getSelectedBlockElements();
+            blocks.forEach(block => {
+                if (block && notesEditor.contains(block)) {
+                    const elems = [block, ...block.querySelectorAll('*')];
+                    const sizes = elems.map(el => parseFloat(window.getComputedStyle(el).fontSize));
+                    elems.forEach((el, i) => {
+                        el.style.fontSize = (sizes[i] * factor).toFixed(1) + 'px';
+                    });
+                }
+            });
+            notesEditor.focus();
+        };
+
+        editorToolbar.appendChild(createButton('Disminuir tamaño de fuente', '-', null, null, () => adjustFontSize(0.9), 'compact-btn'));
+        editorToolbar.appendChild(createButton('Aumentar tamaño de fuente', '+', null, null, () => adjustFontSize(1.1), 'compact-btn'));
+
         // Line height selector
         const selectLineHeight = document.createElement('select');
         selectLineHeight.className = 'toolbar-select';
         selectLineHeight.title = 'Interlineado';
+        selectLineHeight.style.width = '60px';
 
         const lineHeightPlaceholder = document.createElement('option');
         lineHeightPlaceholder.value = "";
@@ -2732,14 +2724,16 @@ document.addEventListener('DOMContentLoaded', function () {
         selectLineHeight.addEventListener('change', () => {
             const value = selectLineHeight.value;
             if (value !== null) {
-                const elements = getSelectedBlockElements();
-                if (elements.length > 0) {
-                    elements.forEach(block => {
-                        if (block && notesEditor.contains(block)) {
-                            block.style.lineHeight = value;
-                        }
-                    });
-                }
+                withEditorSelection(() => {
+                    const elements = getSelectedBlockElements();
+                    if (elements.length > 0) {
+                        elements.forEach(block => {
+                            if (block && notesEditor.contains(block)) {
+                                block.style.lineHeight = value;
+                            }
+                        });
+                    }
+                });
                 selectLineHeight.selectedIndex = 0; // Reset to placeholder
                 notesEditor.focus();
             }
@@ -2843,8 +2837,8 @@ document.addEventListener('DOMContentLoaded', function () {
             return dropdown;
         };
 
-        editorToolbar.appendChild(createButton('Reducir interlineado', '-', null, null, () => adjustLineHeight(-0.2)));
-        editorToolbar.appendChild(createButton('Aumentar interlineado', '+', null, null, () => adjustLineHeight(0.2)));
+        editorToolbar.appendChild(createButton('Reducir interlineado', '-', null, null, () => adjustLineHeight(-0.2), 'compact-btn'));
+        editorToolbar.appendChild(createButton('Aumentar interlineado', '+', null, null, () => adjustLineHeight(0.2), 'compact-btn'));
 
 
         editorToolbar.appendChild(createSeparator());
@@ -3121,7 +3115,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { label: 'Morado', class: 'table-theme-purple' },
             { label: 'Turquesa', class: 'table-theme-teal' }
         ];
-        const showTableMenu = (table, cell, x, y) => {
+        const showTableMenu = (table, cell) => {
             currentTable = table;
             tableMenu.innerHTML = '';
 
@@ -3219,8 +3213,11 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             tableMenu.style.display = 'block';
-            tableMenu.style.top = `${y}px`;
-            tableMenu.style.left = `${x}px`;
+            const rect = table.getBoundingClientRect();
+            const menuHeight = tableMenu.offsetHeight;
+            const top = rect.top + window.scrollY - menuHeight - 8;
+            tableMenu.style.top = `${top < 0 ? 0 : top}px`;
+            tableMenu.style.left = `${rect.left + window.scrollX}px`;
             tableMenu.style.zIndex = 10001;
         };
         notesEditor.addEventListener('click', (e) => {
@@ -3228,7 +3225,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
             if (table && notesEditor.contains(table)) {
-                showTableMenu(table, cell, e.pageX, e.pageY);
+                showTableMenu(table, cell);
                 e.stopPropagation();
             }
         });
@@ -3551,17 +3548,6 @@ document.addEventListener('DOMContentLoaded', function () {
             delete el._leftResizeHandlers;
         };
 
-        const calloutBtn = createButton('Nota', '💬', null, null, () => {
-            const selection = window.getSelection();
-            if (selection && selection.rangeCount > 0) {
-                savedEditorSelection = selection.getRangeAt(0).cloneRange();
-            } else {
-                savedEditorSelection = null;
-            }
-            openNoteStyleModal();
-        });
-        editorToolbar.appendChild(calloutBtn);
-
         const resizeCalloutBtn = createButton('Redimensionar nota', '↔️', null, null, () => {
             const selection = window.getSelection();
             const node = selection && selection.focusNode;
@@ -3586,25 +3572,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const subnoteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
         // El botón ahora crea una sub-nota en lugar de un Post-it
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
-
-        const inlineNoteBtn = createButton('Insertar nota en línea', currentInlineNoteIcon, null, null, insertInlineNoteIcon);
-        editorToolbar.appendChild(inlineNoteBtn);
-
-        // Selector de iconos predefinidos para las notas en línea
-        const inlineIconSelect = document.createElement('select');
-        inlineIconSelect.className = 'toolbar-select';
-        ['ℹ️','❓','💡','🔖','⁎','🧩','🗒️'].forEach(icon => {
-            const opt = document.createElement('option');
-            opt.value = icon;
-            opt.textContent = icon;
-            inlineIconSelect.appendChild(opt);
-        });
-        inlineIconSelect.value = currentInlineNoteIcon;
-        inlineIconSelect.addEventListener('change', () => {
-            currentInlineNoteIcon = inlineIconSelect.value;
-            inlineNoteBtn.textContent = currentInlineNoteIcon;
-        });
-        editorToolbar.appendChild(inlineIconSelect);
 
         editorToolbar.appendChild(createSeparator());
 
@@ -4880,34 +4847,6 @@ document.addEventListener('DOMContentLoaded', function () {
         selection.addRange(newRange);
         notesEditor.focus();
         // Save a placeholder subnote entry
-        if (currentNotesArray[activeNoteIndex]) {
-            if (!currentNotesArray[activeNoteIndex].postits) {
-                currentNotesArray[activeNoteIndex].postits = {};
-            }
-            currentNotesArray[activeNoteIndex].postits[uniqueId] = { title: '', content: '' };
-            saveCurrentNote();
-        }
-    }
-
-    function insertInlineNoteIcon() {
-        const selection = window.getSelection();
-        if (!selection.rangeCount) return;
-        const range = selection.getRangeAt(0);
-        const uniqueId = `inline-note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const icon = document.createElement('span');
-        icon.className = 'inline-note';
-        icon.dataset.subnoteId = uniqueId;
-        icon.textContent = currentInlineNoteIcon;
-        icon.contentEditable = 'false';
-        range.insertNode(icon);
-        const spacer = document.createTextNode('\u00A0');
-        icon.parentNode.insertBefore(spacer, icon.nextSibling);
-        const newRange = document.createRange();
-        newRange.setStartAfter(spacer);
-        newRange.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(newRange);
-        notesEditor.focus();
         if (currentNotesArray[activeNoteIndex]) {
             if (!currentNotesArray[activeNoteIndex].postits) {
                 currentNotesArray[activeNoteIndex].postits = {};

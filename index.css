@@ -165,7 +165,7 @@
             gap: 1px;
         }
         .editor-toolbar .toolbar-select {
-            max-width: 90px;
+            max-width: 60px;
             font-size: 0.75rem;
         }
         #notes-editor { border: 1px solid var(--border-color); padding: 12px; flex-grow: 1; overflow-y: auto; border-bottom-left-radius: 0.5rem; border-bottom-right-radius: 0.5rem; line-height: 1.6; background-color: var(--bg-secondary); }
@@ -305,6 +305,7 @@
         .toolbar-btn:hover { background-color: var(--bg-tertiary); }
         .toolbar-btn.active { background-color: var(--bg-tertiary); }
         .toolbar-btn.active:hover { background-color: var(--bg-tertiary); }
+        .toolbar-btn.compact { min-width: 22px; padding: 0 2px; }
         .toolbar-select {
             font-size: 12px;
             background-color: var(--bg-secondary);
