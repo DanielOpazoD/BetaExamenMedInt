@@ -3,28 +3,8 @@
  * Provides insertion (button, drag&drop, paste), resizing via handles
  * with aspect ratio preservation, layout modes and a floating control panel.
  */
-export function setupImageTools(editor, toolbar) {
+export function setupImageTools(editor) {
   // --- Insertion helpers --------------------------------------------------
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = 'image/*';
-  fileInput.multiple = true;
-  fileInput.className = 'hidden';
-  toolbar.appendChild(fileInput);
-
-  const insertBtn = document.createElement('button');
-  insertBtn.className = 'toolbar-btn';
-  insertBtn.title = 'Insertar imagen';
-  insertBtn.textContent = '🖼️';
-  insertBtn.addEventListener('click', () => fileInput.click());
-  toolbar.appendChild(insertBtn);
-
-  fileInput.addEventListener('change', e => {
-    const files = Array.from(e.target.files || []);
-    if (files.length) insertFiles(files);
-    fileInput.value = '';
-  });
-
   editor.addEventListener('dragover', e => {
     if (Array.from(e.dataTransfer.items || []).some(i => i.type.startsWith('image/'))) {
       e.preventDefault();

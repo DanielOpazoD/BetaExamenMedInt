@@ -914,7 +914,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fontSNPlaceholder.disabled = true;
         fontSNPlaceholder.selected = true;
         selectSNFont.appendChild(fontSNPlaceholder);
-        const fontsSN = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
+        const fontsSN = ['San Francisco', 'Arial', 'Calibri', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
         fontsSN.forEach(f => {
             const opt = document.createElement('option');
             opt.value = f;
@@ -956,6 +956,22 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         subNoteToolbar.appendChild(selectSNSize);
+
+        const adjustSNFontSize = (factor) => {
+            const blocks = getSelectedBlocksSN();
+            blocks.forEach(block => {
+                if (block && subNoteEditor.contains(block)) {
+                    const computed = window.getComputedStyle(block);
+                    let size = parseFloat(computed.fontSize);
+                    if (isNaN(size)) size = 16;
+                    size = Math.max(1, size * factor);
+                    block.style.fontSize = size.toFixed(1) + 'px';
+                }
+            });
+            subNoteEditor.focus();
+        };
+        subNoteToolbar.appendChild(createSNButton('Disminuir tamaño', '-', null, null, () => adjustSNFontSize(0.9)));
+        subNoteToolbar.appendChild(createSNButton('Aumentar tamaño', '+', null, null, () => adjustSNFontSize(1.1)));
 
         // Line height selector
         const selectSNLineHeight = document.createElement('select');
@@ -2632,7 +2648,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fontPlaceholder.disabled = true;
         fontPlaceholder.selected = true;
         selectFont.appendChild(fontPlaceholder);
-        const fonts = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
+        const fonts = ['San Francisco', 'Arial', 'Calibri', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
         fonts.forEach(f => {
             const opt = document.createElement('option');
             opt.value = f;
@@ -2701,6 +2717,22 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         editorToolbar.appendChild(selectSize);
+
+        const adjustFontSize = (factor) => {
+            const blocks = getSelectedBlockElements();
+            blocks.forEach(block => {
+                if (block && notesEditor.contains(block)) {
+                    const computed = window.getComputedStyle(block);
+                    let size = parseFloat(computed.fontSize);
+                    if (isNaN(size)) size = 16;
+                    size = Math.max(1, size * factor);
+                    block.style.fontSize = size.toFixed(1) + 'px';
+                }
+            });
+            notesEditor.focus();
+        };
+        editorToolbar.appendChild(createButton('Disminuir tamaño de letra', '-', null, null, () => adjustFontSize(0.9)));
+        editorToolbar.appendChild(createButton('Aumentar tamaño de letra', '+', null, null, () => adjustFontSize(1.1)));
 
         // Line height selector
         const selectLineHeight = document.createElement('select');
@@ -3121,7 +3153,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { label: 'Morado', class: 'table-theme-purple' },
             { label: 'Turquesa', class: 'table-theme-teal' }
         ];
-        const showTableMenu = (table, cell, x, y) => {
+        const showTableMenu = (table, cell) => {
             currentTable = table;
             tableMenu.innerHTML = '';
 
@@ -3219,8 +3251,12 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             tableMenu.style.display = 'block';
-            tableMenu.style.top = `${y}px`;
-            tableMenu.style.left = `${x}px`;
+            const rect = table.getBoundingClientRect();
+            const menuRect = tableMenu.getBoundingClientRect();
+            const top = rect.top + window.scrollY - menuRect.height - 8;
+            const left = rect.left + window.scrollX + (rect.width - menuRect.width) / 2;
+            tableMenu.style.top = `${Math.max(0, top)}px`;
+            tableMenu.style.left = `${Math.max(0, left)}px`;
             tableMenu.style.zIndex = 10001;
         };
         notesEditor.addEventListener('click', (e) => {
@@ -3228,7 +3264,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
             if (table && notesEditor.contains(table)) {
-                showTableMenu(table, cell, e.pageX, e.pageY);
+                showTableMenu(table, cell);
                 e.stopPropagation();
             }
         });
@@ -3551,16 +3587,6 @@ document.addEventListener('DOMContentLoaded', function () {
             delete el._leftResizeHandlers;
         };
 
-        const calloutBtn = createButton('Nota', '💬', null, null, () => {
-            const selection = window.getSelection();
-            if (selection && selection.rangeCount > 0) {
-                savedEditorSelection = selection.getRangeAt(0).cloneRange();
-            } else {
-                savedEditorSelection = null;
-            }
-            openNoteStyleModal();
-        });
-        editorToolbar.appendChild(calloutBtn);
 
         const resizeCalloutBtn = createButton('Redimensionar nota', '↔️', null, null, () => {
             const selection = window.getSelection();
@@ -6250,7 +6276,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function init() {
         initializeCells();
         setupEditorToolbar();
-        setupImageTools(notesEditor, editorToolbar);
+        setupImageTools(notesEditor);
         populateIconPicker();
         loadState();
         setupEventListeners();
