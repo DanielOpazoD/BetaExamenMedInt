@@ -3577,7 +3577,31 @@ document.addEventListener('DOMContentLoaded', function () {
             delete el._leftResizeHandlers;
         };
 
-        const calloutBtn = createButton('Nota', '💬', null, null, () => {
+        const defaultPreset = NOTE_PRESETS[0];
+        const insertCallout = () => {
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) {
+                savedEditorSelection = selection.getRangeAt(0).cloneRange();
+            } else {
+                savedEditorSelection = null;
+            }
+            currentCallout = null;
+            applyNoteStyle({
+                presetClass: defaultPreset.class,
+                backgroundColor: defaultPreset.bg,
+                borderColor: defaultPreset.border,
+                textColor: defaultPreset.text,
+                borderRadius: 8,
+                borderWidth: 2,
+                padding: 8,
+                margin: 8,
+                shadow: false
+            });
+        };
+        const calloutBtn = createButton('Nota', '💬', null, null, insertCallout);
+        editorToolbar.appendChild(calloutBtn);
+
+        const noteStyleBtn = createButton('Estilo de nota', '🎨', null, null, () => {
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0) {
                 savedEditorSelection = selection.getRangeAt(0).cloneRange();
@@ -3586,7 +3610,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             openNoteStyleModal();
         });
-        editorToolbar.appendChild(calloutBtn);
+        editorToolbar.appendChild(noteStyleBtn);
 
         const resizeCalloutBtn = createButton('Redimensionar nota', '↔️', null, null, () => {
             const selection = window.getSelection();
