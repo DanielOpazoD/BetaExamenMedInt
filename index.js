@@ -618,6 +618,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const noteStyleCustom = getElem('note-style-custom');
     const noteBgColorInput = getElem('note-bg-color');
     const noteBorderColorInput = getElem('note-border-color');
+    const noteTextColorInput = getElem('note-text-color');
     const noteRadiusInput = getElem('note-radius');
     const noteBorderWidthInput = getElem('note-border-width');
     const notePaddingInput = getElem('note-padding');
@@ -625,6 +626,31 @@ document.addEventListener('DOMContentLoaded', function () {
     const noteShadowInput = getElem('note-shadow');
     const applyNoteStyleBtn = getElem('apply-note-style-btn');
     const cancelNoteStyleBtn = getElem('cancel-note-style-btn');
+
+    const NOTE_PRESETS = [
+        { name: 'Verde', class: 'note-green', bg: '#d1fae5', border: '#10b981', text: '#065f46' },
+        { name: 'Azul', class: 'note-blue', bg: '#dbeafe', border: '#3b82f6', text: '#1e3a8a' },
+        { name: 'Gris', class: 'note-gray', bg: '#f3f4f6', border: '#6b7280', text: '#374151' }
+    ];
+
+    function renderNotePresetButtons() {
+        noteStylePre.innerHTML = '';
+        const grid = document.createElement('div');
+        grid.className = 'grid grid-cols-2 gap-2';
+        NOTE_PRESETS.forEach(preset => {
+            const btn = document.createElement('button');
+            btn.className = `predef-note-btn note-callout ${preset.class}`;
+            btn.textContent = preset.name;
+            btn.dataset.bg = preset.bg;
+            btn.dataset.border = preset.border;
+            btn.dataset.text = preset.text;
+            btn.dataset.presetClass = preset.class;
+            grid.appendChild(btn);
+        });
+        noteStylePre.appendChild(grid);
+    }
+
+    renderNotePresetButtons();
 
     /*
      * Build the simplified toolbar for sub-note editing.  This toolbar intentionally omits
@@ -3700,6 +3726,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (callout) {
             noteBgColorInput.value = rgbToHex(callout.style.backgroundColor || '#ffffff');
             noteBorderColorInput.value = rgbToHex(callout.style.borderColor || '#000000');
+            noteTextColorInput.value = rgbToHex(callout.style.color || '#000000');
             noteRadiusInput.value = parseInt(callout.style.borderRadius) || 8;
             noteBorderWidthInput.value = parseInt(callout.style.borderWidth) || 2;
             notePaddingInput.value = parseInt(callout.style.padding) || 8;
@@ -3714,10 +3741,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function applyNoteStyle(opts) {
-        const PREDEF_CLASSES = ['note-blue','note-green','note-yellow','note-red','note-purple','note-gray'];
+        const PREDEF_CLASSES = NOTE_PRESETS.map(p => p.class);
         if (!currentCallout) {
             const callout = document.createElement('div');
-            callout.className = 'note-callout';
+            callout.className = 'note-callout note-resizable';
             callout.setAttribute('role','note');
             callout.setAttribute('aria-label','Nota');
             if (savedEditorSelection && !savedEditorSelection.collapsed) {
@@ -3752,12 +3779,16 @@ document.addEventListener('DOMContentLoaded', function () {
         currentCallout.contentEditable = 'false';
         currentCallout.classList.remove(...PREDEF_CLASSES);
         if (opts.presetClass) currentCallout.classList.add(opts.presetClass);
+        currentCallout.classList.add('note-resizable');
         currentCallout.style.backgroundColor = opts.backgroundColor;
         currentCallout.style.borderColor = opts.borderColor;
         currentCallout.style.borderWidth = opts.borderWidth + 'px';
         currentCallout.style.borderRadius = opts.borderRadius + 'px';
         currentCallout.style.padding = opts.padding + 'px';
         currentCallout.style.margin = opts.margin + 'px 0';
+        if (opts.textColor) {
+            currentCallout.style.color = opts.textColor;
+        }
         if (opts.shadow) {
             currentCallout.classList.add('note-shadow');
         } else {
@@ -5989,6 +6020,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const opts = {
                 backgroundColor: noteBgColorInput.value,
                 borderColor: noteBorderColorInput.value,
+                textColor: noteTextColorInput.value,
                 borderRadius: parseInt(noteRadiusInput.value) || 0,
                 borderWidth: parseInt(noteBorderWidthInput.value) || 0,
                 padding: parseInt(notePaddingInput.value) || 0,
@@ -5997,26 +6029,22 @@ document.addEventListener('DOMContentLoaded', function () {
             };
             applyNoteStyle(opts);
         });
-        noteStyleModal.querySelectorAll('.predef-note-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const opts = {
-                    backgroundColor: btn.dataset.bg,
-                    borderColor: btn.dataset.border,
-                    borderRadius: 8,
-                    borderWidth: 2,
-                    padding: 8,
-                    margin: 8,
-                    shadow: false,
-                    presetClass: btn.classList.contains('note-blue') ? 'note-blue' :
-                                 btn.classList.contains('note-green') ? 'note-green' :
-                                 btn.classList.contains('note-yellow') ? 'note-yellow' :
-                                 btn.classList.contains('note-red') ? 'note-red' :
-                                 btn.classList.contains('note-purple') ? 'note-purple' :
-                                 btn.classList.contains('note-gray') ? 'note-gray' : null
-                };
-                applyNoteStyle(opts);
-            });
+        noteStylePre.addEventListener('click', (e) => {
+            const btn = e.target.closest('.predef-note-btn');
+            if (!btn) return;
+            e.preventDefault();
+            const opts = {
+                backgroundColor: btn.dataset.bg,
+                borderColor: btn.dataset.border,
+                textColor: btn.dataset.text,
+                borderRadius: 8,
+                borderWidth: 2,
+                padding: 8,
+                margin: 8,
+                shadow: false,
+                presetClass: btn.dataset.presetClass || null
+            };
+            applyNoteStyle(opts);
         });
 
         // --- Quick Note Modal Listeners ---
