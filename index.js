@@ -618,6 +618,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const noteStyleCustom = getElem('note-style-custom');
     const noteBgColorInput = getElem('note-bg-color');
     const noteBorderColorInput = getElem('note-border-color');
+    const noteAccentColorInput = getElem('note-accent-color');
+    const noteTextColorInput = getElem('note-text-color');
     const noteRadiusInput = getElem('note-radius');
     const noteBorderWidthInput = getElem('note-border-width');
     const notePaddingInput = getElem('note-padding');
@@ -625,6 +627,42 @@ document.addEventListener('DOMContentLoaded', function () {
     const noteShadowInput = getElem('note-shadow');
     const applyNoteStyleBtn = getElem('apply-note-style-btn');
     const cancelNoteStyleBtn = getElem('cancel-note-style-btn');
+
+    const NOTE_PRESETS = [
+        { name: 'Azul suave', class: 'note-blue-left', bg: '#f7fcff', border: '#b3e5fc', accent: '#b3e5fc', text: '#0d47a1', borderWidth: 6 },
+        { name: 'Verde pastel', class: 'note-green-card', bg: '#fbfffb', border: '#c8e6c9', accent: '#c8e6c9', text: '#1b5e20', borderWidth: 1 },
+        { name: 'Lila punteada', class: 'note-lila-dotted', bg: '#fcfbff', border: '#d1c4e9', accent: '#d1c4e9', text: '#512da8', borderWidth: 2 },
+        { name: 'Durazno', class: 'note-durazno-dashed', bg: '#fffaf7', border: '#ffccbc', accent: '#ffccbc', text: '#e65100', borderWidth: 2 },
+        { name: 'Banda cian', class: 'note-cian-top', bg: '#f8ffff', border: '#b2ebf2', accent: '#b2ebf2', text: '#006064', borderWidth: 6 },
+        { name: 'Rosa doble', class: 'note-rosado-double', bg: '#fff8fb', border: '#f8bbd0', accent: '#f8bbd0', text: '#ad1457', borderWidth: 8 },
+        { name: 'Esquina amarilla', class: 'note-amarillo-corner', bg: '#fffffb', border: '#fff9c4', accent: '#fff59d', text: '#7a6e00', borderWidth: 1 },
+        { name: 'Degradado', class: 'note-gradient', bg: '#ffffff', border: '#b3e5fc', accent: '#d1c4e9', text: '#4a148c', borderWidth: 1 },
+        { name: 'Menta inferior', class: 'note-menta-bottom', bg: '#fbfffb', border: '#c8e6c9', accent: '#c8e6c9', text: '#1b5e20', borderWidth: 6 },
+        { name: 'Violeta sombra', class: 'note-violeta-shadow', bg: '#fdfcff', border: '#e6e0f8', accent: '#e6e0f8', text: '#4a148c', borderWidth: 1, shadow: true },
+        { name: 'Gris', class: 'note-gray-neutral', bg: '#f9f9f9', border: '#e0e0e0', accent: '#e0e0e0', text: '#424242', borderWidth: 1 }
+    ];
+
+    function renderNotePresetButtons() {
+        noteStylePre.innerHTML = '';
+        const grid = document.createElement('div');
+        grid.className = 'grid grid-cols-2 gap-2';
+        NOTE_PRESETS.forEach(preset => {
+            const btn = document.createElement('button');
+            btn.className = `predef-note-btn note-callout ${preset.class}`;
+            btn.textContent = preset.name;
+            btn.dataset.bg = preset.bg;
+            btn.dataset.border = preset.border;
+            btn.dataset.accent = preset.accent || preset.border;
+            btn.dataset.text = preset.text;
+            btn.dataset.borderWidth = preset.borderWidth || 1;
+            if (preset.shadow) btn.dataset.shadow = 'true';
+            btn.dataset.presetClass = preset.class;
+            grid.appendChild(btn);
+        });
+        noteStylePre.appendChild(grid);
+    }
+
+    renderNotePresetButtons();
 
     /*
      * Build the simplified toolbar for sub-note editing.  This toolbar intentionally omits
@@ -3551,7 +3589,32 @@ document.addEventListener('DOMContentLoaded', function () {
             delete el._leftResizeHandlers;
         };
 
-        const calloutBtn = createButton('Nota', '💬', null, null, () => {
+        const defaultPreset = NOTE_PRESETS[0];
+        const insertCallout = () => {
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) {
+                savedEditorSelection = selection.getRangeAt(0).cloneRange();
+            } else {
+                savedEditorSelection = null;
+            }
+            currentCallout = null;
+            applyNoteStyle({
+                presetClass: defaultPreset.class,
+                backgroundColor: defaultPreset.bg,
+                borderColor: defaultPreset.border,
+                accentColor: defaultPreset.accent || defaultPreset.border,
+                textColor: defaultPreset.text,
+                borderRadius: 8,
+                borderWidth: defaultPreset.borderWidth || 1,
+                padding: 10,
+                margin: 20,
+                shadow: defaultPreset.shadow || false
+            });
+        };
+        const calloutBtn = createButton('Nota', '💬', null, null, insertCallout);
+        editorToolbar.appendChild(calloutBtn);
+
+        const noteStyleBtn = createButton('Estilo de nota', '🎨', null, null, () => {
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0) {
                 savedEditorSelection = selection.getRangeAt(0).cloneRange();
@@ -3560,7 +3623,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             openNoteStyleModal();
         });
-        editorToolbar.appendChild(calloutBtn);
+        editorToolbar.appendChild(noteStyleBtn);
 
         const resizeCalloutBtn = createButton('Redimensionar nota', '↔️', null, null, () => {
             const selection = window.getSelection();
@@ -3698,12 +3761,15 @@ document.addEventListener('DOMContentLoaded', function () {
         noteStylePre.classList.remove('hidden');
         noteStyleCustom.classList.add('hidden');
         if (callout) {
-            noteBgColorInput.value = rgbToHex(callout.style.backgroundColor || '#ffffff');
-            noteBorderColorInput.value = rgbToHex(callout.style.borderColor || '#000000');
+            const cs = getComputedStyle(callout);
+            noteBgColorInput.value = rgbToHex((cs.getPropertyValue('--background-color') || cs.backgroundColor || '#ffffff').trim());
+            noteBorderColorInput.value = rgbToHex((cs.getPropertyValue('--border-color') || '#000000').trim());
+            noteAccentColorInput.value = rgbToHex((cs.getPropertyValue('--accent-color') || noteBorderColorInput.value).trim());
+            noteTextColorInput.value = rgbToHex((cs.getPropertyValue('--text-color') || '#000000').trim());
             noteRadiusInput.value = parseInt(callout.style.borderRadius) || 8;
-            noteBorderWidthInput.value = parseInt(callout.style.borderWidth) || 2;
-            notePaddingInput.value = parseInt(callout.style.padding) || 8;
-            noteMarginInput.value = parseInt(callout.style.marginTop) || 8;
+            noteBorderWidthInput.value = parseInt(callout.style.borderWidth) || 1;
+            notePaddingInput.value = parseInt(callout.style.padding) || 10;
+            noteMarginInput.value = parseInt(callout.style.marginTop) || 20;
             noteShadowInput.checked = callout.classList.contains('note-shadow');
         }
     }
@@ -3714,10 +3780,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function applyNoteStyle(opts) {
-        const PREDEF_CLASSES = ['note-blue','note-green','note-yellow','note-red','note-purple','note-gray'];
+        const PREDEF_CLASSES = NOTE_PRESETS.map(p => p.class);
         if (!currentCallout) {
             const callout = document.createElement('div');
-            callout.className = 'note-callout';
+            callout.className = 'note-callout note-resizable';
             callout.setAttribute('role','note');
             callout.setAttribute('aria-label','Nota');
             if (savedEditorSelection && !savedEditorSelection.collapsed) {
@@ -3752,8 +3818,14 @@ document.addEventListener('DOMContentLoaded', function () {
         currentCallout.contentEditable = 'false';
         currentCallout.classList.remove(...PREDEF_CLASSES);
         if (opts.presetClass) currentCallout.classList.add(opts.presetClass);
-        currentCallout.style.backgroundColor = opts.backgroundColor;
-        currentCallout.style.borderColor = opts.borderColor;
+        currentCallout.classList.add('note-resizable');
+        currentCallout.style.color = '';
+        currentCallout.style.backgroundColor = '';
+        currentCallout.style.borderColor = '';
+        currentCallout.style.setProperty('--background-color', opts.backgroundColor);
+        currentCallout.style.setProperty('--border-color', opts.borderColor);
+        currentCallout.style.setProperty('--accent-color', opts.accentColor || opts.borderColor);
+        if (opts.textColor) currentCallout.style.setProperty('--text-color', opts.textColor);
         currentCallout.style.borderWidth = opts.borderWidth + 'px';
         currentCallout.style.borderRadius = opts.borderRadius + 'px';
         currentCallout.style.padding = opts.padding + 'px';
@@ -5989,6 +6061,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const opts = {
                 backgroundColor: noteBgColorInput.value,
                 borderColor: noteBorderColorInput.value,
+                accentColor: noteAccentColorInput.value,
+                textColor: noteTextColorInput.value,
                 borderRadius: parseInt(noteRadiusInput.value) || 0,
                 borderWidth: parseInt(noteBorderWidthInput.value) || 0,
                 padding: parseInt(notePaddingInput.value) || 0,
@@ -5997,26 +6071,23 @@ document.addEventListener('DOMContentLoaded', function () {
             };
             applyNoteStyle(opts);
         });
-        noteStyleModal.querySelectorAll('.predef-note-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const opts = {
-                    backgroundColor: btn.dataset.bg,
-                    borderColor: btn.dataset.border,
-                    borderRadius: 8,
-                    borderWidth: 2,
-                    padding: 8,
-                    margin: 8,
-                    shadow: false,
-                    presetClass: btn.classList.contains('note-blue') ? 'note-blue' :
-                                 btn.classList.contains('note-green') ? 'note-green' :
-                                 btn.classList.contains('note-yellow') ? 'note-yellow' :
-                                 btn.classList.contains('note-red') ? 'note-red' :
-                                 btn.classList.contains('note-purple') ? 'note-purple' :
-                                 btn.classList.contains('note-gray') ? 'note-gray' : null
-                };
-                applyNoteStyle(opts);
-            });
+        noteStylePre.addEventListener('click', (e) => {
+            const btn = e.target.closest('.predef-note-btn');
+            if (!btn) return;
+            e.preventDefault();
+            const opts = {
+                backgroundColor: btn.dataset.bg,
+                borderColor: btn.dataset.border,
+                accentColor: btn.dataset.accent || btn.dataset.border,
+                textColor: btn.dataset.text,
+                borderRadius: 8,
+                borderWidth: parseInt(btn.dataset.borderWidth) || 0,
+                padding: 10,
+                margin: 20,
+                shadow: btn.dataset.shadow === 'true',
+                presetClass: btn.dataset.presetClass || null
+            };
+            applyNoteStyle(opts);
         });
 
         // --- Quick Note Modal Listeners ---
