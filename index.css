@@ -864,17 +864,21 @@ table.resizable-table.selected .table-resize-handle {
         }
 
 /* Note callout styles */
-.note-callout {
+.note-callout,
+.note {
     border-radius: 8px;
     border: 2px solid var(--border-color);
     padding: 8px;
     margin: 8px 0;
 }
-.note-callout-content {
+.note-callout-content,
+.note-content {
     outline: none;
 }
 .note-callout ul,
-.note-callout ol {
+.note-callout ol,
+.note-content ul,
+.note-content ol {
     margin: 0;
     padding-left: 1.25rem;
 }
