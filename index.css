@@ -957,13 +957,103 @@ table.resizable-table.selected .table-resize-handle {
     display: inline-block;
     max-width: 100%;
 }
-.note-blue { background-color: #dbeafe; border-color: #3b82f6; }
-.note-green { background-color: #d1fae5; border-color: #10b981; }
-.note-yellow { background-color: #fef9c3; border-color: #eab308; }
-.note-red { background-color: #fee2e2; border-color: #ef4444; }
-.note-purple { background-color: #ede9fe; border-color: #8b5cf6; }
-.note-gray { background-color: #f3f4f6; border-color: #6b7280; }
-.note-shadow { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.note-shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+
+/* Pastel note presets */
+.note-azul-suave {
+    background:#f7fcff;
+    --border-color:#b3e5fc;
+    border-width:0;
+    border-left:6px solid var(--border-color);
+    color:#000;
+}
+.note-verde-pastel {
+    background:#fbfffb;
+    --border-color:#c8e6c9;
+    border:1px solid var(--border-color);
+    color:#000;
+}
+.note-lila-punteada {
+    background:#fcfbff;
+    --border-color:#d1c4e9;
+    border:2px dotted var(--border-color);
+    color:#000;
+}
+.note-durazno {
+    background:#fffaf7;
+    --border-color:#ffccbc;
+    border:2px dashed var(--border-color);
+    color:#000;
+}
+.note-banda-superior {
+    background:#f8ffff;
+    --border-color:#b2ebf2;
+    border-width:0;
+    border-top:6px solid var(--border-color);
+    color:#000;
+}
+.note-rosa-doble {
+    background:#fff8fb;
+    --border-color:#f8bbd0;
+    border-width:0;
+    border-left:8px double var(--border-color);
+    color:#000;
+}
+.note-esquina-amarilla {
+    background:#fffffb;
+    --border-color:#fff9c4;
+    border:1px solid var(--border-color);
+    position:relative;
+    color:#000;
+    --accent-color:#fff59d;
+}
+.note-esquina-amarilla::before {
+    content:'';
+    position:absolute;
+    inset:0;
+    border-top:6px solid var(--accent-color);
+    border-left:6px solid var(--accent-color);
+    border-radius:8px 0 0 0;
+    pointer-events:none;
+}
+.note-borde-degradado {
+    background:#ffffff;
+    --border-color:#ede7f6;
+    border:1px solid var(--border-color);
+    position:relative;
+    overflow:hidden;
+    color:#000;
+    --grad-color1:#b3e5fc;
+    --grad-color2:#d1c4e9;
+}
+.note-borde-degradado::before {
+    content:'';
+    position:absolute;
+    left:0;
+    top:0;
+    bottom:0;
+    width:6px;
+    background:linear-gradient(180deg,var(--grad-color1),var(--grad-color2));
+}
+.note-menta-inferior {
+    background:#fbfffb;
+    --border-color:#c8e6c9;
+    border-width:0;
+    border-bottom:6px solid var(--border-color);
+    color:#000;
+}
+.note-violeta-sombra {
+    background:#fdfcff;
+    --border-color:#e6e0f8;
+    border:1px solid var(--border-color);
+    color:#000;
+}
+.note-gris-neutral {
+    background:#f9f9f9;
+    --border-color:#e0e0e0;
+    border:1px solid var(--border-color);
+    color:#000;
+}
 .predef-note-btn { margin:0; cursor:pointer; }
 
 /* Ensure HTML code modal appears above other dialogs */
