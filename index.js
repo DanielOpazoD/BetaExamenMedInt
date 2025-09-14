@@ -914,7 +914,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fontSNPlaceholder.disabled = true;
         fontSNPlaceholder.selected = true;
         selectSNFont.appendChild(fontSNPlaceholder);
-        const fontsSN = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
+        const fontsSN = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana', 'Calibri'];
         fontsSN.forEach(f => {
             const opt = document.createElement('option');
             opt.value = f;
@@ -1197,14 +1197,6 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             true
         ));
-        // Image from URL
-        subNoteToolbar.appendChild(createSNButton('Insertar Imagen desde URL', '🖼️', null, null, () => {
-            const url = prompt('Ingresa la URL de la imagen:');
-            if (url) {
-                subNoteEditor.focus();
-                document.execCommand('insertImage', false, url);
-            }
-        }));
         // Gallery link insertion
         const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
         subNoteToolbar.appendChild(createSNButton('Crear Galería de Imágenes', gallerySVG, null, null, () => {
@@ -1329,7 +1321,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentLightboxIndex = 0;
     let currentNoteRow = null;
     let activeSubnoteLink = null;
-    let currentInlineNoteIcon = 'ℹ️';
     let editingQuickNote = false;
     let savedEditorSelection = null;
     let savedSelectedHtml = '';
@@ -2632,7 +2623,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fontPlaceholder.disabled = true;
         fontPlaceholder.selected = true;
         selectFont.appendChild(fontPlaceholder);
-        const fonts = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'];
+        const fonts = ['San Francisco', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana', 'Calibri'];
         fonts.forEach(f => {
             const opt = document.createElement('option');
             opt.value = f;
@@ -2701,6 +2692,21 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         editorToolbar.appendChild(selectSize);
+
+        const adjustFontSize = (factor) => {
+            const blocks = getSelectedBlockElements();
+            blocks.forEach(block => {
+                if (block && notesEditor.contains(block)) {
+                    const computed = window.getComputedStyle(block);
+                    const size = parseFloat(computed.fontSize);
+                    block.style.fontSize = (size * factor).toFixed(1) + 'px';
+                }
+            });
+            notesEditor.focus();
+        };
+
+        editorToolbar.appendChild(createButton('Disminuir tamaño de fuente', '-', null, null, () => adjustFontSize(0.9)));
+        editorToolbar.appendChild(createButton('Aumentar tamaño de fuente', '+', null, null, () => adjustFontSize(1.1)));
 
         // Line height selector
         const selectLineHeight = document.createElement('select');
@@ -3121,7 +3127,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { label: 'Morado', class: 'table-theme-purple' },
             { label: 'Turquesa', class: 'table-theme-teal' }
         ];
-        const showTableMenu = (table, cell, x, y) => {
+        const showTableMenu = (table, cell) => {
             currentTable = table;
             tableMenu.innerHTML = '';
 
@@ -3219,8 +3225,11 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             tableMenu.style.display = 'block';
-            tableMenu.style.top = `${y}px`;
-            tableMenu.style.left = `${x}px`;
+            const rect = table.getBoundingClientRect();
+            const menuHeight = tableMenu.offsetHeight;
+            const top = rect.top + window.scrollY - menuHeight - 8;
+            tableMenu.style.top = `${top < 0 ? 0 : top}px`;
+            tableMenu.style.left = `${rect.left + window.scrollX}px`;
             tableMenu.style.zIndex = 10001;
         };
         notesEditor.addEventListener('click', (e) => {
@@ -3228,7 +3237,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
             if (table && notesEditor.contains(table)) {
-                showTableMenu(table, cell, e.pageX, e.pageY);
+                showTableMenu(table, cell);
                 e.stopPropagation();
             }
         });
@@ -3551,17 +3560,6 @@ document.addEventListener('DOMContentLoaded', function () {
             delete el._leftResizeHandlers;
         };
 
-        const calloutBtn = createButton('Nota', '💬', null, null, () => {
-            const selection = window.getSelection();
-            if (selection && selection.rangeCount > 0) {
-                savedEditorSelection = selection.getRangeAt(0).cloneRange();
-            } else {
-                savedEditorSelection = null;
-            }
-            openNoteStyleModal();
-        });
-        editorToolbar.appendChild(calloutBtn);
-
         const resizeCalloutBtn = createButton('Redimensionar nota', '↔️', null, null, () => {
             const selection = window.getSelection();
             const node = selection && selection.focusNode;
@@ -3586,25 +3584,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const subnoteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
         // El botón ahora crea una sub-nota en lugar de un Post-it
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
-
-        const inlineNoteBtn = createButton('Insertar nota en línea', currentInlineNoteIcon, null, null, insertInlineNoteIcon);
-        editorToolbar.appendChild(inlineNoteBtn);
-
-        // Selector de iconos predefinidos para las notas en línea
-        const inlineIconSelect = document.createElement('select');
-        inlineIconSelect.className = 'toolbar-select';
-        ['ℹ️','❓','💡','🔖','⁎','🧩','🗒️'].forEach(icon => {
-            const opt = document.createElement('option');
-            opt.value = icon;
-            opt.textContent = icon;
-            inlineIconSelect.appendChild(opt);
-        });
-        inlineIconSelect.value = currentInlineNoteIcon;
-        inlineIconSelect.addEventListener('change', () => {
-            currentInlineNoteIcon = inlineIconSelect.value;
-            inlineNoteBtn.textContent = currentInlineNoteIcon;
-        });
-        editorToolbar.appendChild(inlineIconSelect);
 
         editorToolbar.appendChild(createSeparator());
 
@@ -4880,34 +4859,6 @@ document.addEventListener('DOMContentLoaded', function () {
         selection.addRange(newRange);
         notesEditor.focus();
         // Save a placeholder subnote entry
-        if (currentNotesArray[activeNoteIndex]) {
-            if (!currentNotesArray[activeNoteIndex].postits) {
-                currentNotesArray[activeNoteIndex].postits = {};
-            }
-            currentNotesArray[activeNoteIndex].postits[uniqueId] = { title: '', content: '' };
-            saveCurrentNote();
-        }
-    }
-
-    function insertInlineNoteIcon() {
-        const selection = window.getSelection();
-        if (!selection.rangeCount) return;
-        const range = selection.getRangeAt(0);
-        const uniqueId = `inline-note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const icon = document.createElement('span');
-        icon.className = 'inline-note';
-        icon.dataset.subnoteId = uniqueId;
-        icon.textContent = currentInlineNoteIcon;
-        icon.contentEditable = 'false';
-        range.insertNode(icon);
-        const spacer = document.createTextNode('\u00A0');
-        icon.parentNode.insertBefore(spacer, icon.nextSibling);
-        const newRange = document.createRange();
-        newRange.setStartAfter(spacer);
-        newRange.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(newRange);
-        notesEditor.focus();
         if (currentNotesArray[activeNoteIndex]) {
             if (!currentNotesArray[activeNoteIndex].postits) {
                 currentNotesArray[activeNoteIndex].postits = {};
