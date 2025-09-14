@@ -640,15 +640,14 @@ document.addEventListener('DOMContentLoaded', function () {
         // Local state for sub-note toolbar color selections
         let savedSubnoteSelection = null;
 
-        // Collapse the current selection so formatting doesn't persist beyond the selected range
-        const collapseSelectionSN = () => {
+        // Run a callback while preserving the current text selection
+        const withSubnoteSelection = (fn) => {
             const sel = window.getSelection();
-            if (sel && sel.rangeCount > 0) {
-                const range = sel.getRangeAt(0);
-                const collapsed = range.cloneRange();
-                collapsed.collapse(false);
+            const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+            fn();
+            if (range) {
                 sel.removeAllRanges();
-                sel.addRange(collapsed);
+                sel.addRange(range);
             }
         };
 
@@ -660,14 +659,14 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.innerHTML = content;
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (command) {
-                    document.execCommand(command, false, value);
-                    collapseSelectionSN();
-                }
-                if (action) {
-                    action();
-                    collapseSelectionSN();
-                }
+                withSubnoteSelection(() => {
+                    if (command) {
+                        document.execCommand(command, false, value);
+                    }
+                    if (action) {
+                        action();
+                    }
+                });
                 subNoteEditor.focus();
             });
             return btn;
@@ -696,8 +695,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 swatch.addEventListener('click', (e) => {
                     e.preventDefault();
-                    action(color);
-                    collapseSelectionSN();
+                    withSubnoteSelection(() => action(color));
                     subNoteEditor.focus();
                 });
                 group.appendChild(swatch);
@@ -728,8 +726,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         selection.removeAllRanges();
                         selection.addRange(savedSubnoteSelection);
                     }
-                    action(color);
-                    collapseSelectionSN();
+                    withSubnoteSelection(() => action(color));
                     submenu.classList.remove('visible');
                     savedSubnoteSelection = null;
                     subNoteEditor.focus();
@@ -753,8 +750,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     selection.removeAllRanges();
                     selection.addRange(savedSubnoteSelection);
                 }
-                action(e.target.value);
-                collapseSelectionSN();
+                withSubnoteSelection(() => action(e.target.value));
                 savedSubnoteSelection = null;
                 subNoteEditor.focus();
             });
@@ -925,7 +921,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         selectSNFont.addEventListener('change', () => {
             if (selectSNFont.value) {
-                document.execCommand('fontName', false, selectSNFont.value);
+                withSubnoteSelection(() => document.execCommand('fontName', false, selectSNFont.value));
                 selectSNFont.selectedIndex = 0;
                 subNoteEditor.focus();
             }
@@ -952,7 +948,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         selectSNSize.addEventListener('change', () => {
             if (selectSNSize.value) {
-                document.execCommand('fontSize', false, selectSNSize.value);
+                withSubnoteSelection(() => document.execCommand('fontSize', false, selectSNSize.value));
                 selectSNSize.selectedIndex = 0;
                 subNoteEditor.focus();
             }
@@ -980,14 +976,16 @@ document.addEventListener('DOMContentLoaded', function () {
         selectSNLineHeight.addEventListener('change', () => {
             const value = selectSNLineHeight.value;
             if (value !== null) {
-                const elements = getSelectedBlocksSN();
-                if (elements.length > 0) {
-                    elements.forEach(block => {
-                        if (block && subNoteEditor.contains(block)) {
-                            block.style.lineHeight = value;
-                        }
-                    });
-                }
+                withSubnoteSelection(() => {
+                    const elements = getSelectedBlocksSN();
+                    if (elements.length > 0) {
+                        elements.forEach(block => {
+                            if (block && subNoteEditor.contains(block)) {
+                                block.style.lineHeight = value;
+                            }
+                        });
+                    }
+                });
                 selectSNLineHeight.selectedIndex = 0;
                 subNoteEditor.focus();
             }
@@ -2092,16 +2090,14 @@ document.addEventListener('DOMContentLoaded', function () {
     function setupEditorToolbar() {
         editorToolbar.innerHTML = ''; // Clear existing toolbar
 
-        // Utility to collapse the current selection so formatting doesn't persist beyond the selected range
-        const collapseSelection = (editor) => {
+        // Run a callback while preserving the current text selection
+        const withEditorSelection = (fn) => {
             const sel = window.getSelection();
-            if (sel && sel.rangeCount > 0) {
-                const range = sel.getRangeAt(0);
-                // Collapse to the end of the current range
-                const collapsed = range.cloneRange();
-                collapsed.collapse(false);
+            const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+            fn();
+            if (range) {
                 sel.removeAllRanges();
-                sel.addRange(collapsed);
+                sel.addRange(range);
             }
         };
 
@@ -2113,16 +2109,14 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.addEventListener('mousedown', e => e.preventDefault());
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (command) {
-                    document.execCommand(command, false, value);
-                    // Collapse the selection after applying the command
-                    collapseSelection(notesEditor);
-                }
-                if (action) {
-                    action();
-                    // Collapse again after custom actions
-                    collapseSelection(notesEditor);
-                }
+                withEditorSelection(() => {
+                    if (command) {
+                        document.execCommand(command, false, value);
+                    }
+                    if (action) {
+                        action();
+                    }
+                });
                 notesEditor.focus();
             });
             return btn;
@@ -2434,7 +2428,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 swatch.addEventListener('click', (e) => {
                     e.preventDefault();
-                    action(color);
+                    withEditorSelection(() => action(color));
+                    notesEditor.focus();
                 });
                 group.appendChild(swatch);
             });
@@ -2459,23 +2454,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     swatch.title = color;
                 }
                 swatch.addEventListener('mousedown', (e) => e.preventDefault());
-            swatch.addEventListener('click', (e) => {
+                swatch.addEventListener('click', (e) => {
                     e.preventDefault();
                     if (savedEditorSelection) {
                         const selection = window.getSelection();
                         selection.removeAllRanges();
                         selection.addRange(savedEditorSelection);
                     }
-                    action(color);
-                    // Collapse the selection so the color is applied only once
-                    const sel = window.getSelection();
-                    if (sel && sel.rangeCount > 0) {
-                        const range = sel.getRangeAt(0);
-                        const collapsed = range.cloneRange();
-                        collapsed.collapse(false);
-                        sel.removeAllRanges();
-                        sel.addRange(collapsed);
-                    }
+                    withEditorSelection(() => action(color));
                     submenu.classList.remove('visible');
                     savedEditorSelection = null;
                     notesEditor.focus();
@@ -2502,16 +2488,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     selection.removeAllRanges();
                     selection.addRange(savedEditorSelection);
                 }
-                action(e.target.value);
-                // Collapse selection after custom color apply
-                const sel = window.getSelection();
-                if (sel && sel.rangeCount > 0) {
-                    const range = sel.getRangeAt(0);
-                    const collapsed = range.cloneRange();
-                    collapsed.collapse(false);
-                    sel.removeAllRanges();
-                    sel.addRange(collapsed);
-                }
+                withEditorSelection(() => action(e.target.value));
                 savedEditorSelection = null;
                 notesEditor.focus();
             });
@@ -2637,7 +2614,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         selectFont.addEventListener('change', () => {
             if (selectFont.value) {
-                document.execCommand('fontName', false, selectFont.value);
+                withEditorSelection(() => document.execCommand('fontName', false, selectFont.value));
                 selectFont.selectedIndex = 0;
                 notesEditor.focus();
             }
@@ -2692,7 +2669,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         selectSize.addEventListener('change', () => {
             if (selectSize.value) {
-                document.execCommand('fontSize', false, selectSize.value);
+                withEditorSelection(() => document.execCommand('fontSize', false, selectSize.value));
                 selectSize.selectedIndex = 0; // Reset to placeholder
                 notesEditor.focus();
             }
@@ -2747,14 +2724,16 @@ document.addEventListener('DOMContentLoaded', function () {
         selectLineHeight.addEventListener('change', () => {
             const value = selectLineHeight.value;
             if (value !== null) {
-                const elements = getSelectedBlockElements();
-                if (elements.length > 0) {
-                    elements.forEach(block => {
-                        if (block && notesEditor.contains(block)) {
-                            block.style.lineHeight = value;
-                        }
-                    });
-                }
+                withEditorSelection(() => {
+                    const elements = getSelectedBlockElements();
+                    if (elements.length > 0) {
+                        elements.forEach(block => {
+                            if (block && notesEditor.contains(block)) {
+                                block.style.lineHeight = value;
+                            }
+                        });
+                    }
+                });
                 selectLineHeight.selectedIndex = 0; // Reset to placeholder
                 notesEditor.focus();
             }
