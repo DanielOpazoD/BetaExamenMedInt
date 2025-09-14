@@ -653,9 +653,9 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         // Helper to create a toolbar button for sub-note editor
-        const createSNButton = (title, content, command, value = null, action = null) => {
+        const createSNButton = (title, content, command, value = null, action = null, extraClass = '') => {
             const btn = document.createElement('button');
-            btn.className = 'toolbar-btn';
+            btn.className = 'toolbar-btn' + (extraClass ? ` ${extraClass}` : '');
             btn.title = title;
             btn.innerHTML = content;
             btn.addEventListener('click', (e) => {
@@ -908,6 +908,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectSNFont = document.createElement('select');
         selectSNFont.className = 'toolbar-select';
         selectSNFont.title = 'Fuente';
+        selectSNFont.style.width = '60px';
         const fontSNPlaceholder = document.createElement('option');
         fontSNPlaceholder.value = "";
         fontSNPlaceholder.textContent = 'Fuente';
@@ -935,6 +936,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectSNSize = document.createElement('select');
         selectSNSize.className = 'toolbar-select';
         selectSNSize.title = 'Tamaño de letra';
+        selectSNSize.style.width = '60px';
         const sizePlaceholder = document.createElement('option');
         sizePlaceholder.value = "";
         sizePlaceholder.textContent = 'Ajustar tamaño';
@@ -961,6 +963,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectSNLineHeight = document.createElement('select');
         selectSNLineHeight.className = 'toolbar-select';
         selectSNLineHeight.title = 'Interlineado';
+        selectSNLineHeight.style.width = '60px';
         const lhPlaceholder = document.createElement('option');
         lhPlaceholder.value = "";
         lhPlaceholder.textContent = 'Interlineado';
@@ -1006,8 +1009,8 @@ document.addEventListener('DOMContentLoaded', function () {
             subNoteEditor.focus();
         };
 
-        subNoteToolbar.appendChild(createSNButton('Reducir interlineado', '-', null, null, () => adjustSNLineHeight(-0.2)));
-        subNoteToolbar.appendChild(createSNButton('Aumentar interlineado', '+', null, null, () => adjustSNLineHeight(0.2)));
+        subNoteToolbar.appendChild(createSNButton('Reducir interlineado', '-', null, null, () => adjustSNLineHeight(-0.2), 'compact-btn'));
+        subNoteToolbar.appendChild(createSNButton('Aumentar interlineado', '+', null, null, () => adjustSNLineHeight(0.2), 'compact-btn'));
         subNoteToolbar.appendChild(createSNSeparator());
         // Color palettes (text, highlight, line highlight)
         const textColors = ['#000000'];
@@ -2102,9 +2105,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
 
-        const createButton = (title, content, command, value = null, action = null) => {
+        const createButton = (title, content, command, value = null, action = null, extraClass = '') => {
             const btn = document.createElement('button');
-            btn.className = 'toolbar-btn';
+            btn.className = 'toolbar-btn' + (extraClass ? ` ${extraClass}` : '');
             btn.title = title;
             btn.innerHTML = content;
             btn.addEventListener('mousedown', e => e.preventDefault());
@@ -2617,6 +2620,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectFont = document.createElement('select');
         selectFont.className = 'toolbar-select';
         selectFont.title = 'Fuente';
+        selectFont.style.width = '60px';
         const fontPlaceholder = document.createElement('option');
         fontPlaceholder.value = "";
         fontPlaceholder.textContent = 'Fuente';
@@ -2644,6 +2648,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectZoom = document.createElement('select');
         selectZoom.className = 'toolbar-select';
         selectZoom.title = 'Zoom';
+        selectZoom.style.width = '60px';
         const zoomPlaceholder = document.createElement('option');
         zoomPlaceholder.value = "";
         zoomPlaceholder.textContent = 'Zoom';
@@ -2669,6 +2674,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectSize = document.createElement('select');
         selectSize.className = 'toolbar-select';
         selectSize.title = 'Tamaño de letra';
+        selectSize.style.width = '60px';
         
         const placeholderOption = document.createElement('option');
         placeholderOption.value = "";
@@ -2697,21 +2703,24 @@ document.addEventListener('DOMContentLoaded', function () {
             const blocks = getSelectedBlockElements();
             blocks.forEach(block => {
                 if (block && notesEditor.contains(block)) {
-                    const computed = window.getComputedStyle(block);
-                    const size = parseFloat(computed.fontSize);
-                    block.style.fontSize = (size * factor).toFixed(1) + 'px';
+                    const elems = [block, ...block.querySelectorAll('*')];
+                    const sizes = elems.map(el => parseFloat(window.getComputedStyle(el).fontSize));
+                    elems.forEach((el, i) => {
+                        el.style.fontSize = (sizes[i] * factor).toFixed(1) + 'px';
+                    });
                 }
             });
             notesEditor.focus();
         };
 
-        editorToolbar.appendChild(createButton('Disminuir tamaño de fuente', '-', null, null, () => adjustFontSize(0.9)));
-        editorToolbar.appendChild(createButton('Aumentar tamaño de fuente', '+', null, null, () => adjustFontSize(1.1)));
+        editorToolbar.appendChild(createButton('Disminuir tamaño de fuente', '-', null, null, () => adjustFontSize(0.9), 'compact-btn'));
+        editorToolbar.appendChild(createButton('Aumentar tamaño de fuente', '+', null, null, () => adjustFontSize(1.1), 'compact-btn'));
 
         // Line height selector
         const selectLineHeight = document.createElement('select');
         selectLineHeight.className = 'toolbar-select';
         selectLineHeight.title = 'Interlineado';
+        selectLineHeight.style.width = '60px';
 
         const lineHeightPlaceholder = document.createElement('option');
         lineHeightPlaceholder.value = "";
@@ -2849,8 +2858,8 @@ document.addEventListener('DOMContentLoaded', function () {
             return dropdown;
         };
 
-        editorToolbar.appendChild(createButton('Reducir interlineado', '-', null, null, () => adjustLineHeight(-0.2)));
-        editorToolbar.appendChild(createButton('Aumentar interlineado', '+', null, null, () => adjustLineHeight(0.2)));
+        editorToolbar.appendChild(createButton('Reducir interlineado', '-', null, null, () => adjustLineHeight(-0.2), 'compact-btn'));
+        editorToolbar.appendChild(createButton('Aumentar interlineado', '+', null, null, () => adjustLineHeight(0.2), 'compact-btn'));
 
 
         editorToolbar.appendChild(createSeparator());
