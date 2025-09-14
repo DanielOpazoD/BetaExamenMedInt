@@ -628,6 +628,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const cancelNoteStyleBtn = getElem('cancel-note-style-btn');
 
     let savedNoteScrollY = 0;
+    let savedNoteScrollTop = 0;
 
     function createNoteColorPalette(input, colors) {
         const palette = document.createElement('div');
@@ -2206,11 +2207,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const withEditorSelection = (fn) => {
             const sel = window.getSelection();
             const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+            const scrollY = window.scrollY;
+            const modalScroll = notesModalContent.scrollTop;
             fn();
             if (range) {
                 sel.removeAllRanges();
                 sel.addRange(range);
             }
+            window.scrollTo(0, scrollY);
+            notesModalContent.scrollTop = modalScroll;
         };
 
         const createButton = (title, content, command, value = null, action = null, extraClass = '') => {
@@ -3744,6 +3749,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function openNoteStyleModal(callout = null) {
         savedNoteScrollY = window.scrollY;
+        savedNoteScrollTop = notesModalContent.scrollTop;
         currentCallout = callout;
         noteStyleModal.classList.add('visible');
         noteStyleTabPre.classList.add('border-b-2', 'border-blue-500');
@@ -3766,6 +3772,7 @@ document.addEventListener('DOMContentLoaded', function () {
         noteStyleModal.classList.remove('visible');
         currentCallout = null;
         window.scrollTo(0, savedNoteScrollY);
+        notesModalContent.scrollTop = savedNoteScrollTop;
     }
 
     function applyNoteStyle(opts) {
