@@ -858,6 +858,19 @@ table.resizable-table.selected .table-resize-handle {
                 page-break-inside: avoid;
                 break-inside: avoid;
             }
+            /* Hide table resize handles and allow tables to reflow when printing */
+            .table-resize-handle {
+                display: none !important;
+            }
+            table.resizable-table,
+            table.resizable-table td,
+            table.resizable-table th {
+                width: auto !important;
+                height: auto !important;
+                max-width: 100% !important;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
+            }
             #print-index {
                 page-break-after: always;
             }
