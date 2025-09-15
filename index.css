@@ -873,6 +873,7 @@ table.resizable-table.selected .table-resize-handle {
     background: #fff;
     border-radius: 8px;
     border: 1px solid transparent;
+    position: relative;
 }
 .note-callout h4{margin:0 0 6px 0; font-size:14px}
 .note-callout .muted{opacity:.85}
@@ -883,6 +884,39 @@ table.resizable-table.selected .table-resize-handle {
 .note-callout ol {
     margin: 0;
     padding-left: 1.25rem;
+}
+
+.note-resize-handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: var(--border-color, #ccc);
+    border-radius: 50%;
+    bottom: -6px;
+}
+.note-resize-handle.br { right: -6px; cursor: nwse-resize; }
+.note-resize-handle.bl { left: -6px; cursor: nesw-resize; }
+
+.note-callout-tools {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: flex;
+    gap: 4px;
+}
+
+.note-callout-btn {
+    min-width: 20px;
+    min-height: 20px;
+    padding: 0;
+    font-size: 12px;
+}
+
+.note-color-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
 }
 
 /* Indentation levels applied via classes instead of inline spaces */
