@@ -669,6 +669,33 @@ document.addEventListener('DOMContentLoaded', function () {
         callout.appendChild(br);
         callout.appendChild(bl);
 
+        const tools = document.createElement('div');
+        tools.className = 'note-callout-tools';
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'note-callout-btn toolbar-btn copy';
+        copyBtn.title = 'Copiar HTML';
+        copyBtn.textContent = '📋';
+        copyBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            navigator.clipboard?.writeText(callout.outerHTML || '');
+        });
+        const delBtn = document.createElement('button');
+        delBtn.className = 'note-callout-btn toolbar-btn delete';
+        delBtn.title = 'Eliminar nota';
+        delBtn.textContent = '🗑';
+        delBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            callout.remove();
+            if (activeResizableCallout === callout) {
+                activeResizableCallout = null;
+            }
+        });
+        tools.appendChild(copyBtn);
+        tools.appendChild(delBtn);
+        callout.appendChild(tools);
+
         const start = (e, corner) => {
             e.preventDefault();
             const startX = e.clientX;
@@ -702,6 +729,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function removeCalloutResizeHandles(callout) {
         if (!callout) return;
         callout.querySelectorAll('.note-resize-handle').forEach(h => h.remove());
+        callout.querySelectorAll('.note-callout-tools').forEach(t => t.remove());
     }
 
     /*
@@ -722,11 +750,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const withSubnoteSelection = (fn) => {
             const sel = window.getSelection();
             const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+            const scrollY = window.scrollY;
+            const modalScroll = notesModalContent.scrollTop;
             fn();
             if (range) {
                 sel.removeAllRanges();
                 sel.addRange(range);
             }
+            window.scrollTo(0, scrollY);
+            notesModalContent.scrollTop = modalScroll;
         };
 
         // Helper to create a toolbar button for sub-note editor
