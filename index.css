@@ -865,9 +865,9 @@ table.resizable-table.selected .table-resize-handle {
 
 /* Note callout styles */
 .note-callout {
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    font-size: 13px;
-    line-height: 1.1;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
     padding: 10px 12px;
     margin: 20px 0;
     background: #fff;
