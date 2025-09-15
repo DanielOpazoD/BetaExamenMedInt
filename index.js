@@ -756,9 +756,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (range) {
                 sel.removeAllRanges();
                 sel.addRange(range);
+                const active = document.activeElement;
+                active?.focus?.({ preventScroll: true });
             }
-            window.scrollTo(0, scrollY);
-            notesModalContent.scrollTop = modalScroll;
+            requestAnimationFrame(() => {
+                window.scrollTo(0, scrollY);
+                notesModalContent.scrollTop = modalScroll;
+            });
         };
 
         // Helper to create a toolbar button for sub-note editor
@@ -3803,8 +3807,10 @@ document.addEventListener('DOMContentLoaded', function () {
     function closeNoteStyleModal() {
         noteStyleModal.classList.remove('visible');
         currentCallout = null;
-        window.scrollTo(0, savedNoteScrollY);
-        notesModalContent.scrollTop = savedNoteScrollTop;
+        requestAnimationFrame(() => {
+            window.scrollTo(0, savedNoteScrollY);
+            notesModalContent.scrollTop = savedNoteScrollTop;
+        });
     }
 
     function applyNoteStyle(opts) {
@@ -3866,8 +3872,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const selection = window.getSelection();
         selection.removeAllRanges();
         selection.addRange(range);
-        inner.focus();
-        notesEditor.focus();
+        inner.focus({ preventScroll: true });
+        notesEditor.focus({ preventScroll: true });
         closeNoteStyleModal();
     }
 
