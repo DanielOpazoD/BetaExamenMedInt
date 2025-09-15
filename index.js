@@ -150,6 +150,12 @@ document.addEventListener('DOMContentLoaded', function () {
             notesEditor.innerHTML = historyStack[historyIndex];
         }
     };
+
+    function resetHistory(content = notesEditor.innerHTML) {
+        historyStack.length = 0;
+        historyStack.push(content);
+        historyIndex = 0;
+    }
     notesEditor.addEventListener('input', recordHistory);
     notesEditor.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -680,6 +686,24 @@ document.addEventListener('DOMContentLoaded', function () {
             e.stopPropagation();
             navigator.clipboard?.writeText(callout.outerHTML || '');
         });
+
+        const richCopyBtn = document.createElement('button');
+        richCopyBtn.className = 'note-callout-btn toolbar-btn copy-rich';
+        richCopyBtn.title = 'Copiar nota con formato';
+        richCopyBtn.textContent = '📄';
+        richCopyBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const html = callout.outerHTML || '';
+            if (navigator.clipboard?.write) {
+                const blob = new Blob([html], { type: 'text/html' });
+                const plain = new Blob([callout.innerText || ''], { type: 'text/plain' });
+                navigator.clipboard.write([new ClipboardItem({ 'text/html': blob, 'text/plain': plain })]);
+            } else {
+                navigator.clipboard?.writeText(html);
+            }
+        });
+
         const delBtn = document.createElement('button');
         delBtn.className = 'note-callout-btn toolbar-btn delete';
         delBtn.title = 'Eliminar nota';
@@ -693,6 +717,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         tools.appendChild(copyBtn);
+        tools.appendChild(richCopyBtn);
         tools.appendChild(delBtn);
         callout.appendChild(tools);
 
@@ -1632,7 +1657,7 @@ document.addEventListener('DOMContentLoaded', function () {
             sel.addRange(newRange);
         }
         // Focus back to editor
-        notesEditor.focus();
+        notesEditor.focus({ preventScroll: true });
     }
 
     /**
@@ -1783,7 +1808,7 @@ document.addEventListener('DOMContentLoaded', function () {
         newRange.setStartAfter(div);
         newRange.collapse(true);
         sel.addRange(newRange);
-        notesEditor.focus();
+        notesEditor.focus({ preventScroll: true });
     }
 
     // When loading a note into the editor, ensure any existing floating
@@ -2203,12 +2228,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function sanitizeCalloutContent(container) {
         if (!container) return;
-        container.querySelectorAll('font').forEach(el => {
-            const frag = document.createDocumentFragment();
-            while (el.firstChild) frag.appendChild(el.firstChild);
-            el.replaceWith(frag);
-        });
-        container.querySelectorAll('[style]').forEach(el => el.removeAttribute('style'));
+        // Preserve user-applied formatting; avoid stripping font or style attributes
+        // to maintain original appearance inside callouts.
         const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
         let text;
         while ((text = walker.nextNode())) {
@@ -2270,7 +2291,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         action();
                     }
                 });
-                notesEditor.focus();
+                notesEditor.focus({ preventScroll: true });
             });
             return btn;
         };
@@ -2547,7 +2568,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 swatch.addEventListener('click', (e) => {
                     e.preventDefault();
                     withEditorSelection(() => action(color));
-                    notesEditor.focus();
+                    notesEditor.focus({ preventScroll: true });
                 });
                 group.appendChild(swatch);
             });
@@ -2582,7 +2603,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     withEditorSelection(() => action(color));
                     submenu.classList.remove('visible');
                     savedEditorSelection = null;
-                    notesEditor.focus();
+                    notesEditor.focus({ preventScroll: true });
                 });
                 submenu.appendChild(swatch);
             });
@@ -2608,7 +2629,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 withEditorSelection(() => action(e.target.value));
                 savedEditorSelection = null;
-                notesEditor.focus();
+                notesEditor.focus({ preventScroll: true });
             });
              customColorInput.addEventListener('click', (e) => e.stopPropagation());
             submenu.appendChild(customColorLabel);
@@ -2734,7 +2755,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (selectFont.value) {
                 withEditorSelection(() => document.execCommand('fontName', false, selectFont.value));
                 selectFont.selectedIndex = 0;
-                notesEditor.focus();
+                notesEditor.focus({ preventScroll: true });
             }
         });
         editorToolbar.appendChild(selectFont);
@@ -2760,7 +2781,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (selectZoom.value) {
                 notesEditor.style.zoom = selectZoom.value;
                 selectZoom.selectedIndex = 0;
-                notesEditor.focus();
+                notesEditor.focus({ preventScroll: true });
             }
         });
         editorToolbar.appendChild(selectZoom);
@@ -2789,7 +2810,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (selectSize.value) {
                 withEditorSelection(() => document.execCommand('fontSize', false, selectSize.value));
                 selectSize.selectedIndex = 0; // Reset to placeholder
-                notesEditor.focus();
+                notesEditor.focus({ preventScroll: true });
             }
         });
         editorToolbar.appendChild(selectSize);
@@ -2805,7 +2826,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                 }
             });
-            notesEditor.focus();
+            notesEditor.focus({ preventScroll: true });
         };
 
         editorToolbar.appendChild(createButton('Disminuir tamaño de fuente', '-', null, null, () => adjustFontSize(0.9), 'compact-btn'));
@@ -2853,7 +2874,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 });
                 selectLineHeight.selectedIndex = 0; // Reset to placeholder
-                notesEditor.focus();
+                notesEditor.focus({ preventScroll: true });
             }
         });
         editorToolbar.appendChild(selectLineHeight);
@@ -2870,7 +2891,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     block.style.lineHeight = lh.toFixed(1);
                 }
             });
-            notesEditor.focus();
+            notesEditor.focus({ preventScroll: true });
         };
 
         const PRESET_STYLES = [
@@ -2927,7 +2948,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     e.preventDefault();
                     applyPresetStyle(s.style);
                     content.classList.remove('visible');
-                    notesEditor.focus();
+                    notesEditor.focus({ preventScroll: true });
                 });
                 content.appendChild(opt);
             });
@@ -3064,7 +3085,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 btn.addEventListener('click', () => {
                     applyPresetStyle(s.style, currentStyledSpan);
                     hideStylePopup();
-                    notesEditor.focus();
+                    notesEditor.focus({ preventScroll: true });
                 });
                 stylePopup.appendChild(btn);
             });
@@ -3151,7 +3172,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 b.addEventListener('click', () => {
                     applyPillTextStyle(colors, currentPillSpan);
                     hidePillTextPopup();
-                    notesEditor.focus();
+                    notesEditor.focus({ preventScroll: true });
                 });
                 pillTextPopup.appendChild(b);
             });
@@ -3271,7 +3292,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const b = document.createElement('button');
                     b.className = 'toolbar-btn';
                     b.innerHTML = `${icon} ${label}`;
-                    b.addEventListener('click', () => { fn(); hideTableMenu(); notesEditor.focus(); });
+                    b.addEventListener('click', () => { fn(); hideTableMenu(); notesEditor.focus({ preventScroll: true }); });
                     tabContent.appendChild(b);
                 };
                 makeBtn('Fila arriba', '⬆️', () => addRow(table, rIndex));
@@ -3292,7 +3313,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         TABLE_THEMES.forEach(tt => table.classList.remove(tt.class));
                         table.classList.add(t.class);
                         hideTableMenu();
-                        notesEditor.focus();
+                        notesEditor.focus({ preventScroll: true });
                     });
                     tabContent.appendChild(b);
                 });
@@ -3315,7 +3336,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             c.style.color = h.color;
                         });
                         hideTableMenu();
-                        notesEditor.focus();
+                        notesEditor.focus({ preventScroll: true });
                     });
                     tabContent.appendChild(b);
                 });
@@ -3399,7 +3420,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     e.preventDefault();
                     applyBlockVerticalPadding(value);
                     content.classList.remove('visible');
-                    notesEditor.focus();
+                    notesEditor.focus({ preventScroll: true });
                 });
                 content.appendChild(sizeBtn);
             }
@@ -3446,7 +3467,7 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 // Ensure the editor retains focus so the divider is inserted
                 // at the current caret position even when no text is selected.
-                notesEditor.focus();
+                notesEditor.focus({ preventScroll: true });
                 const selection = window.getSelection();
                 if (savedEditorSelection) {
                     selection.removeAllRanges();
@@ -3456,7 +3477,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 savedEditorSelection = null;
             }
             hideLineStylePopup();
-            notesEditor.focus();
+            notesEditor.focus({ preventScroll: true });
         };
 
         const renderLineStylePopup = () => {
@@ -3573,6 +3594,40 @@ document.addEventListener('DOMContentLoaded', function () {
             eraseLineBtn.classList.toggle('active', lineEraseMode);
         });
         editorToolbar.appendChild(eraseLineBtn);
+
+        const deleteLineBtn = document.createElement('button');
+        deleteLineBtn.className = 'toolbar-btn';
+        deleteLineBtn.title = 'Eliminar línea completa';
+        deleteLineBtn.textContent = '🗑️⏎';
+        deleteLineBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const sel = window.getSelection();
+            if (!sel.rangeCount) return;
+            const scrollY = window.scrollY;
+            const modalScroll = notesModalContent.scrollTop;
+            let node = sel.anchorNode;
+            if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+            const line = node.closest('p, div, li');
+            if (line && notesEditor.contains(line)) {
+                const next = line.nextSibling;
+                line.remove();
+                const range = document.createRange();
+                if (next) {
+                    if (next.nodeType === Node.TEXT_NODE) {
+                        range.setStart(next, 0);
+                    } else {
+                        range.selectNodeContents(next);
+                        range.collapse(true);
+                    }
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+            }
+            window.scrollTo(0, scrollY);
+            notesModalContent.scrollTop = modalScroll;
+            notesEditor.focus({ preventScroll: true });
+        });
+        editorToolbar.appendChild(deleteLineBtn);
 
         const collapsibleListSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-tree w-5 h-5"><path d="M21 7H9"/><path d="M21 12H9"/><path d="M21 17H9"/><path d="M3 17v-6a4 4 0 0 1 4-4h4"/></svg>`;
         const collapsibleListHTML = `<details class="collapsible-list"><summary>Elemento</summary><div>Texto...<br></div></details><p><br></p>`;
@@ -3721,7 +3776,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Determine next alignment (toggle left/right)
             lastFloatAlign = lastFloatAlign === 'left' ? 'right' : 'left';
             wrapSelectedImage(lastFloatAlign);
-            notesEditor.focus();
+            notesEditor.focus({ preventScroll: true });
         });
         editorToolbar.appendChild(floatImageBtn);
 
@@ -4668,21 +4723,18 @@ document.addEventListener('DOMContentLoaded', function () {
     
     // --- Note Modal Functions ---
     function closeNotesModal() {
-        hideModal(notesModal);
-        // Do not reset the current note state if tabs are still open.
-        // Resetting `currentNotesArray` here would later cause
-        // `saveActiveTab()` to overwrite the tab's content with an empty
-        // array when a tab is closed after the modal is hidden.  This led to
-        // situations where closing multiple tabs erased note contents.  By
-        // clearing the state only when no tabs remain, we preserve the note
-        // data until it is intentionally closed.
-        if (openNoteTabs.length === 0) {
-            activeNoteIcon = null;
-            currentNoteRow = null;
-            currentNotesArray = [];
-            activeNoteIndex = 0;
-            activeTabId = null;
+        if (activeTabId) {
+            const closingId = activeTabId;
+            closeTab(closingId);
+            return;
         }
+        hideModal(notesModal);
+        activeNoteIcon = null;
+        currentNoteRow = null;
+        currentNotesArray = [];
+        activeNoteIndex = 0;
+        activeTabId = null;
+        resetHistory('<p><br></p>');
     }
 
     function saveCurrentNote(index = activeNoteIndex) {
@@ -4824,9 +4876,10 @@ document.addEventListener('DOMContentLoaded', function () {
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
         notesEditor.querySelectorAll('table').forEach(initTableResize);
+        resetHistory(notesEditor.innerHTML);
 
         renderNotesList();
-        notesEditor.focus();
+        notesEditor.focus({ preventScroll: true });
         updateNoteInfo();
     }
     
@@ -4937,21 +4990,26 @@ document.addEventListener('DOMContentLoaded', function () {
     function closeTab(id) {
         const index = openNoteTabs.findIndex(t => t.id === id);
         if (index === -1) return;
-        if (openNoteTabs[index].id === activeTabId) {
+        const closingActive = openNoteTabs[index].id === activeTabId;
+        if (closingActive) {
             saveActiveTab();
-            openNoteTabs.splice(index, 1);
-            if (openNoteTabs.length > 0) {
+        }
+        openNoteTabs.splice(index, 1);
+        if (openNoteTabs.length > 0) {
+            if (closingActive) {
                 activeTabId = openNoteTabs[0].id;
                 loadTab(openNoteTabs[0]);
-                renderNoteTabs();
-            } else {
-                activeTabId = null;
-                hideModal(notesModal);
-                renderNoteTabs();
             }
-        } else {
-            openNoteTabs.splice(index, 1);
             renderNoteTabs();
+        } else {
+            activeTabId = null;
+            hideModal(notesModal);
+            renderNoteTabs();
+            activeNoteIcon = null;
+            currentNoteRow = null;
+            currentNotesArray = [];
+            activeNoteIndex = 0;
+            resetHistory('<p><br></p>');
         }
     }
 
@@ -4981,7 +5039,7 @@ document.addEventListener('DOMContentLoaded', function () {
         newRange.collapse(true);
         selection.removeAllRanges();
         selection.addRange(newRange);
-        notesEditor.focus();
+        notesEditor.focus({ preventScroll: true });
         // Save a placeholder subnote entry
         if (currentNotesArray[activeNoteIndex]) {
             if (!currentNotesArray[activeNoteIndex].postits) {
@@ -5748,21 +5806,11 @@ document.addEventListener('DOMContentLoaded', function () {
                  // Do nothing, to prevent closing on overlay click.
             }
         });
-        cancelNoteBtn.addEventListener('click', () => {
-            if (activeTabId) {
-                closeTab(activeTabId);
-            } else {
-                closeNotesModal();
-            }
-        });
+        cancelNoteBtn.addEventListener('click', closeNotesModal);
         saveNoteBtn.addEventListener('click', saveCurrentNote);
         saveAndCloseNoteBtn.addEventListener('click', () => {
             saveCurrentNote();
-            if (activeTabId) {
-                closeTab(activeTabId);
-            } else {
-                closeNotesModal();
-            }
+            closeNotesModal();
         });
         
         unmarkNoteBtn.addEventListener('click', async () => {
@@ -5863,7 +5911,7 @@ document.addEventListener('DOMContentLoaded', function () {
         notesModalTitle.addEventListener('keydown', (e) => {
              if (e.key === 'Enter') {
                  e.preventDefault();
-                 notesEditor.focus();
+                 notesEditor.focus({ preventScroll: true });
              }
         });
 
