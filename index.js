@@ -4984,7 +4984,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function closeTab(id) {
-        const index = openNoteTabs.findIndex(t => t.id === id);
+        const index = openNoteTabs.findIndex(t => String(t.id) === String(id));
         if (index === -1) return;
         if (openNoteTabs[index].id === activeTabId) {
             saveActiveTab();
@@ -5001,6 +5001,16 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             openNoteTabs.splice(index, 1);
             renderNoteTabs();
+        }
+    }
+
+    function closeActiveTab() {
+        if (activeTabId) {
+            closeTab(activeTabId);
+        } else if (openNoteTabs.length > 0) {
+            closeTab(openNoteTabs[0].id);
+        } else {
+            closeNotesModal();
         }
     }
 
@@ -5797,21 +5807,11 @@ document.addEventListener('DOMContentLoaded', function () {
                  // Do nothing, to prevent closing on overlay click.
             }
         });
-        cancelNoteBtn.addEventListener('click', () => {
-            if (activeTabId) {
-                closeTab(activeTabId);
-            } else {
-                closeNotesModal();
-            }
-        });
+        cancelNoteBtn.addEventListener('click', closeActiveTab);
         saveNoteBtn.addEventListener('click', saveCurrentNote);
         saveAndCloseNoteBtn.addEventListener('click', () => {
             saveCurrentNote();
-            if (activeTabId) {
-                closeTab(activeTabId);
-            } else {
-                closeNotesModal();
-            }
+            closeActiveTab();
         });
         
         unmarkNoteBtn.addEventListener('click', async () => {
