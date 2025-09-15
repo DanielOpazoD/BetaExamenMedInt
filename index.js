@@ -1340,6 +1340,7 @@ document.addEventListener('DOMContentLoaded', function () {
         subNoteToolbar.appendChild(createSNButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
             const printArea = getElem('print-area');
             printArea.innerHTML = `<div>${subNoteEditor.innerHTML}</div>`;
+            sanitizeTablesForPrint(printArea);
             window.print();
         }));
     }
@@ -3749,6 +3750,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const printBtn = createButton('Imprimir o Guardar como PDF', '💾', null, null, () => {
              const printArea = getElem('print-area');
              printArea.innerHTML = `<div>${notesEditor.innerHTML}</div>`;
+             sanitizeTablesForPrint(printArea);
              window.print();
         });
         editorToolbar.appendChild(printBtn);
@@ -5229,7 +5231,23 @@ document.addEventListener('DOMContentLoaded', function () {
         // Apply current zoom after updating image
         applyZoom();
     }
-    
+
+    function sanitizeTablesForPrint(container) {
+        container.querySelectorAll('.table-resize-handle').forEach(handle => handle.remove());
+        container.querySelectorAll('table').forEach(table => {
+            table.style.width = '';
+            table.style.height = '';
+            table.removeAttribute('width');
+            table.removeAttribute('height');
+            table.querySelectorAll('td, th').forEach(cell => {
+                cell.style.width = '';
+                cell.style.height = '';
+                cell.removeAttribute('width');
+                cell.removeAttribute('height');
+            });
+        });
+    }
+
     async function handlePrintAll() {
         await db.connect();
         const printArea = getElem('print-area');
@@ -5353,6 +5371,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const note = topicData.notes[0];
                     const noteContent = document.createElement('div');
                     noteContent.innerHTML = note.content;
+                    sanitizeTablesForPrint(noteContent);
                     noteContent.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
                         link.outerHTML = `<span>${link.innerHTML}</span>`;
                     });
@@ -5373,6 +5392,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        sanitizeTablesForPrint(printArea);
         window.print();
     }
 
@@ -5458,6 +5478,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const note = topicData.notes[0];
                 const noteContent = document.createElement('div');
                 noteContent.innerHTML = note.content;
+                sanitizeTablesForPrint(noteContent);
                 // Sanitize links for printing
                 // Convert sub-note and post-it links back to plain text for printing
                 noteContent.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
@@ -5479,6 +5500,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        sanitizeTablesForPrint(printArea);
         window.print();
     }
 

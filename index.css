@@ -861,6 +861,19 @@ table.resizable-table.selected .table-resize-handle {
             #print-index {
                 page-break-after: always;
             }
+            table.resizable-table {
+                width: auto !important;
+                height: auto !important;
+                page-break-inside: auto !important;
+            }
+            table.resizable-table td,
+            table.resizable-table th {
+                width: auto !important;
+                height: auto !important;
+            }
+            table.resizable-table .table-resize-handle {
+                display: none !important;
+            }
         }
 
 /* Note callout styles */
