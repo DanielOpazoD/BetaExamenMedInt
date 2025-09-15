@@ -4728,6 +4728,12 @@ document.addEventListener('DOMContentLoaded', function () {
             closeTab(closingId);
             return;
         }
+        if (openNoteTabs.length > 0) {
+            while (openNoteTabs.length) {
+                closeTab(openNoteTabs[0].id);
+            }
+            return;
+        }
         hideModal(notesModal);
         activeNoteIcon = null;
         currentNoteRow = null;
@@ -4989,12 +4995,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function closeTab(id) {
         const index = openNoteTabs.findIndex(t => t.id === id);
-        if (index === -1) return;
-        const closingActive = openNoteTabs[index].id === activeTabId;
+        const found = index !== -1;
+        const closingActive = found && openNoteTabs[index].id === activeTabId;
         if (closingActive) {
             saveActiveTab();
         }
-        openNoteTabs.splice(index, 1);
+        if (found) {
+            openNoteTabs.splice(index, 1);
+        }
+        const tabBtn = noteTabs?.querySelector(`[data-tab-id="${id}"]`);
+        tabBtn?.remove();
         if (openNoteTabs.length > 0) {
             if (closingActive) {
                 activeTabId = openNoteTabs[0].id;
