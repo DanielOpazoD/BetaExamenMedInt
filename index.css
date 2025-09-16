@@ -802,6 +802,7 @@ table.resizable-table.selected .table-resize-handle {
 
 
         @media print {
+            @page { size: A4; margin: 12mm; }
             html, body {
                 background: #fff !important; /* Fix for grey background on last page */
             }
@@ -861,6 +862,33 @@ table.resizable-table.selected .table-resize-handle {
             #print-index {
                 page-break-after: always;
             }
+            /* Ocultar artefactos del editor */
+            .table-resize-handle { display: none !important; }
+
+            /* Hacer que las tablas y contenedores se puedan fragmentar */
+            .resizable-table,
+            table {
+                width: auto !important;
+                table-layout: auto !important;
+                break-inside: auto !important;
+                page-break-inside: auto !important;
+            }
+
+            /* Evitar que filas se partan, pero permitir que la tabla sí se parta */
+            thead { display: table-header-group !important; }
+            tfoot { display: table-footer-group !important; }
+            tr    { break-inside: avoid !important; page-break-inside: avoid !important; }
+
+            /* Neutralizar posibles estilos del editor que bloquean la fragmentación */
+            [style*="overflow:hidden"] { overflow: visible !important; }
+            [style*="position:fixed"], [style*="position:absolute"], .sticky { position: static !important; }
+            [style*="transform"] { transform: none !important; }
+
+            /* Reducir márgenes verticales grandes en texto */
+            p, h1, h2, h3, h4, h5, h6 { margin-block: 6px !important; }
+
+            /* Indentaciones del editor que puedan generar huecos raros */
+            .indent-1, .indent-2, .indent-3 { margin-left: 0 !important; }
         }
 
 /* Note callout styles */
