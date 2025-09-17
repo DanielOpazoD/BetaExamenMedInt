@@ -106,6 +106,7 @@ export function setupImageTools(editor, toolbar) {
       <button data-layout="wrap-right">Wrap R</button>
       <button data-layout="block">Bloque</button>
     </div>
+    <div class="micro-group"><span>Micromov.</span></div>
     <div class="align-group">
       <button data-align="left">◧</button>
       <button data-align="center">◎</button>
@@ -114,6 +115,9 @@ export function setupImageTools(editor, toolbar) {
     <button class="title-btn">Título</button>
   `;
   document.body.appendChild(menu);
+
+  const micromoveStep = 4;
+  let activeImg = null;
 
   const sizeGroup = menu.querySelector('.size-group');
   const minusBtn = document.createElement('button');
@@ -132,6 +136,24 @@ export function setupImageTools(editor, toolbar) {
   delBtn.textContent = '🗑️';
   delBtn.addEventListener('click', deleteImage);
   sizeGroup.append(minusBtn, plusBtn, upBtn, downBtn, delBtn);
+
+  const microGroup = menu.querySelector('.micro-group');
+  const microButtons = [];
+  const createMicroButton = (direction, label) => {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.dataset.direction = direction;
+    btn.title = `Micromover ${direction}`;
+    btn.addEventListener('click', () => nudgeImage(direction));
+    microGroup.appendChild(btn);
+    microButtons.push(btn);
+    return btn;
+  };
+  createMicroButton('up', '↑');
+  createMicroButton('down', '↓');
+  createMicroButton('left', '←');
+  createMicroButton('right', '→');
+  updateMicromoveAvailability();
 
   menu.addEventListener('click', e => {
     const layoutBtn = e.target.closest('[data-layout]');
@@ -180,6 +202,36 @@ export function setupImageTools(editor, toolbar) {
     positionUI();
   }
 
+  function nudgeImage(direction) {
+    if (!activeImg) return;
+    const layout = activeImg.dataset.layout;
+    if (layout !== 'wrap-left' && layout !== 'wrap-right') return;
+    const computed = window.getComputedStyle(activeImg);
+    if (direction === 'up' || direction === 'down') {
+      const currentTop = parseFloat(activeImg.style.marginTop || computed.marginTop || '0');
+      const delta = direction === 'up' ? -micromoveStep : micromoveStep;
+      activeImg.style.marginTop = `${currentTop + delta}px`;
+    } else if (direction === 'left' || direction === 'right') {
+      if (layout === 'wrap-left') {
+        const currentLeft = parseFloat(activeImg.style.marginLeft || computed.marginLeft || '0');
+        const delta = direction === 'left' ? -micromoveStep : micromoveStep;
+        activeImg.style.marginLeft = `${currentLeft + delta}px`;
+      } else {
+        const currentRight = parseFloat(activeImg.style.marginRight || computed.marginRight || '0');
+        const delta = direction === 'left' ? micromoveStep : -micromoveStep;
+        activeImg.style.marginRight = `${currentRight + delta}px`;
+      }
+    }
+    positionUI();
+  }
+
+  function updateMicromoveAvailability() {
+    const enabled = !!activeImg && (activeImg.dataset.layout === 'wrap-left' || activeImg.dataset.layout === 'wrap-right');
+    microButtons.forEach(btn => {
+      btn.disabled = !enabled;
+    });
+  }
+
   function deleteImage() {
     if (!activeImg) return;
     const caption = activeImg.nextElementSibling;
@@ -199,7 +251,6 @@ export function setupImageTools(editor, toolbar) {
     }
   }
 
-  let activeImg = null;
   editor.addEventListener('click', e => {
     if (e.target.tagName === 'IMG') {
       selectImage(e.target);
@@ -217,12 +268,14 @@ export function setupImageTools(editor, toolbar) {
     positionUI();
     overlay.classList.remove('hidden');
     menu.classList.remove('hidden');
+    updateMicromoveAvailability();
   }
 
   function clearSelection() {
     activeImg = null;
     overlay.classList.add('hidden');
     menu.classList.add('hidden');
+    updateMicromoveAvailability();
   }
 
   function positionUI() {
@@ -297,6 +350,7 @@ export function setupImageTools(editor, toolbar) {
       activeImg.style.display = 'block';
       activeImg.style.margin = '0 auto';
     }
+    updateMicromoveAvailability();
   }
 
   /**
