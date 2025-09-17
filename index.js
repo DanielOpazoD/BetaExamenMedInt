@@ -573,6 +573,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const subNoteTitle = getElem('subnote-title');
     const subNoteEditor = getElem('subnote-editor');
     const subNoteModalContent = subNoteModal ? subNoteModal.querySelector('.notes-modal-content') : null;
+    const tooltipIconSelector = getElem('tooltip-icon-selector');
+    const tooltipIconButtons = tooltipIconSelector ? Array.from(tooltipIconSelector.querySelectorAll('button[data-icon]')) : [];
     const toggleHtmlPasteBtn = getElem('toggle-html-paste-btn');
     const dragBtn = getElem('toggle-block-drag-btn');
     const fullscreenBtn = getElem('toggle-fullscreen-btn');
@@ -619,6 +621,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveSubnoteBtn = getElem('save-subnote-btn');
     const cancelSubnoteBtn = getElem('cancel-subnote-btn');
     const toggleSubnoteReadOnlyBtn = getElem('toggle-subnote-readonly-btn');
+
+    const TOOLTIP_ICON_OPTIONS = ['✽', '✱', '🟢', '🔵', '●', '◆', 'ℹ️'];
+    const DEFAULT_TOOLTIP_ICON = 'ℹ️';
 
     // Note style modal elements
     const noteStyleModal = getElem('note-style-modal');
@@ -2352,8 +2357,71 @@ document.addEventListener('DOMContentLoaded', function () {
             return tmp.textContent.trim().replace(/\s+/g, ' ').slice(0, 160);
         };
 
+        const sanitizeTooltipIcon = (iconChar) => {
+            const icon = (iconChar || '').trim();
+            return icon || DEFAULT_TOOLTIP_ICON;
+        };
+
+        const setTooltipIconOnElement = (tooltipEl, iconChar) => {
+            if (!tooltipEl) return null;
+            const icon = sanitizeTooltipIcon(iconChar);
+            tooltipEl.dataset.tooltipIcon = icon;
+            tooltipEl.setAttribute('data-icon', icon);
+            let iconSpan = tooltipEl.querySelector('.editor-tooltip-icon');
+            if (!iconSpan) {
+                iconSpan = document.createElement('sup');
+                iconSpan.className = 'editor-tooltip-icon';
+            }
+            iconSpan.textContent = icon;
+            iconSpan.setAttribute('aria-hidden', 'true');
+            const contentSpan = tooltipEl.querySelector('.editor-tooltip-content');
+            if (contentSpan) {
+                tooltipEl.insertBefore(iconSpan, contentSpan);
+            } else if (!iconSpan.parentElement) {
+                tooltipEl.appendChild(iconSpan);
+            }
+            return iconSpan;
+        };
+
+        const getTooltipIconFromElement = (tooltipEl) => {
+            if (!tooltipEl) return DEFAULT_TOOLTIP_ICON;
+            const icon = tooltipEl.dataset.tooltipIcon
+                || tooltipEl.getAttribute('data-icon')
+                || tooltipEl.querySelector('.editor-tooltip-icon')?.textContent
+                || '';
+            return sanitizeTooltipIcon(icon);
+        };
+
+        const syncTooltipIconSelectionUI = (icon) => {
+            const sanitized = sanitizeTooltipIcon(icon);
+            if (!tooltipIconSelector) {
+                return sanitized;
+            }
+            let iconForUI = sanitized;
+            if (tooltipIconButtons.length && !tooltipIconButtons.some(btn => btn.dataset.icon === sanitized)) {
+                iconForUI = DEFAULT_TOOLTIP_ICON;
+            }
+            tooltipIconButtons.forEach(btn => {
+                const isActive = btn.dataset.icon === iconForUI;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+            return sanitized;
+        };
+
+        if (tooltipIconButtons.length) {
+            tooltipIconButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (!isTooltipEditing || !activeTooltipState) return;
+                    const appliedIcon = syncTooltipIconSelectionUI(btn.dataset.icon || DEFAULT_TOOLTIP_ICON);
+                    activeTooltipState.icon = appliedIcon;
+                });
+            });
+        }
+
         const normalizeTooltipElement = (tooltipEl) => {
             if (!tooltipEl) return null;
+            tooltipEl.classList.add('editor-tooltip');
             let contentSpan = tooltipEl.querySelector('.editor-tooltip-content');
             if (!contentSpan) {
                 contentSpan = document.createElement('span');
@@ -2382,6 +2450,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 nodesToMove.forEach(node => targetSpan.appendChild(node));
                 tooltipEl.insertBefore(targetSpan, contentSpan);
             }
+            const currentIcon = getTooltipIconFromElement(tooltipEl);
+            setTooltipIconOnElement(tooltipEl, currentIcon);
             tooltipEl.removeAttribute('data-tooltip');
             tooltipEl.setAttribute('tabindex', '0');
             const preview = extractTooltipPreview(contentSpan.innerHTML);
@@ -2440,7 +2510,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function positionManualTooltip(wrapper, popover) {
-            const targetRect = (wrapper.querySelector('.editor-tooltip-target') || wrapper).getBoundingClientRect();
+            const anchor = wrapper.querySelector('.editor-tooltip-icon')
+                || wrapper.querySelector('.editor-tooltip-target')
+                || wrapper;
+            const targetRect = anchor.getBoundingClientRect();
             const popRect = popover.getBoundingClientRect();
             let top = targetRect.top + window.scrollY - popRect.height - 12;
             const viewportTop = window.scrollY + 12;
@@ -2487,9 +2560,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const openTooltipEditor = (existingTooltip, range) => {
             isTooltipEditing = true;
+            const normalizedTooltip = existingTooltip ? normalizeTooltipElement(existingTooltip) : null;
+            const initialIcon = normalizedTooltip ? getTooltipIconFromElement(normalizedTooltip) : DEFAULT_TOOLTIP_ICON;
+            const appliedIcon = syncTooltipIconSelectionUI(initialIcon);
             activeTooltipState = {
-                existingTooltip: existingTooltip ? normalizeTooltipElement(existingTooltip) : null,
-                range: existingTooltip ? null : range
+                existingTooltip: normalizedTooltip,
+                range: normalizedTooltip ? null : range,
+                icon: appliedIcon
             };
             hideManualTooltipPopover(true);
             if (subNoteModalContent) {
@@ -2499,6 +2576,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             if (toggleSubnoteReadOnlyBtn) {
                 toggleSubnoteReadOnlyBtn.setAttribute('hidden', 'hidden');
+            }
+            if (tooltipIconSelector) {
+                tooltipIconSelector.classList.remove('hidden');
             }
             subNoteTitle.textContent = existingTooltip ? 'Editar tooltip' : 'Nuevo tooltip';
             subNoteTitle.contentEditable = false;
@@ -2512,6 +2592,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (toggleSubnoteReadOnlyBtn) {
                 toggleSubnoteReadOnlyBtn.removeAttribute('hidden');
             }
+            if (tooltipIconSelector) {
+                tooltipIconSelector.classList.add('hidden');
+            }
+            tooltipIconButtons.forEach(btn => {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-pressed', 'false');
+            });
             if (subNoteModalContent) {
                 subNoteModalContent.classList.remove('tooltip-mode');
                 if (subnoteModalWasReadonly) {
@@ -2533,6 +2620,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!isTooltipEditing || !activeTooltipState) return;
             const html = subNoteEditor.innerHTML;
             const isEmpty = isTooltipHtmlEmpty(html);
+            const icon = sanitizeTooltipIcon(activeTooltipState.icon);
+            activeTooltipState.icon = icon;
             if (!activeTooltipState.existingTooltip && isEmpty) {
                 showAlert('El contenido del tooltip no puede estar vacío.');
                 return;
@@ -2540,10 +2629,12 @@ document.addEventListener('DOMContentLoaded', function () {
             if (activeTooltipState.existingTooltip) {
                 if (isEmpty) {
                     unwrapTooltipElement(activeTooltipState.existingTooltip);
+                    activeTooltipState.existingTooltip = null;
                 } else {
                     const contentEl = activeTooltipState.existingTooltip.querySelector('.editor-tooltip-content');
                     if (contentEl) {
                         contentEl.innerHTML = html;
+                        setTooltipIconOnElement(activeTooltipState.existingTooltip, icon);
                         updateTooltipPreview(activeTooltipState.existingTooltip, html);
                     }
                 }
@@ -2554,7 +2645,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 wrapper.setAttribute('tabindex', '0');
                 const targetSpan = document.createElement('span');
                 targetSpan.className = 'editor-tooltip-target';
-                const extracted = range.extractContents();
+                const ancestor = range.commonAncestorContainer;
+                const containerNode = ancestor && ancestor.nodeType === Node.ELEMENT_NODE
+                    ? ancestor
+                    : ancestor?.parentNode;
+                if (!containerNode || !notesEditor.contains(containerNode)) {
+                    showAlert('Selecciona el texto al que deseas agregar un tooltip.');
+                    return;
+                }
+                let extracted;
+                try {
+                    extracted = range.extractContents();
+                } catch (error) {
+                    console.error('No se pudo crear el tooltip a partir de la selección:', error);
+                    showAlert('No se pudo crear el tooltip sobre la selección actual. Intenta seleccionar nuevamente el texto.');
+                    return;
+                }
                 const previewContainer = document.createElement('div');
                 previewContainer.appendChild(extracted.cloneNode(true));
                 if (isTooltipHtmlEmpty(previewContainer.innerHTML)) {
@@ -2568,6 +2674,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 contentSpan.innerHTML = html;
                 wrapper.appendChild(targetSpan);
                 wrapper.appendChild(contentSpan);
+                setTooltipIconOnElement(wrapper, icon);
                 updateTooltipPreview(wrapper, html);
                 range.insertNode(wrapper);
                 activeTooltipState.existingTooltip = wrapper;
