@@ -2298,6 +2298,85 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const blockSelector = 'p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details, table';
 
+        const getClosestTooltip = (node) => {
+            while (node && node !== notesEditor) {
+                if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('editor-tooltip')) {
+                    return node;
+                }
+                node = node.parentNode;
+            }
+            return null;
+        };
+
+        const unwrapTooltipElement = (tooltipEl) => {
+            if (!tooltipEl || !tooltipEl.parentNode) return;
+            const parent = tooltipEl.parentNode;
+            while (tooltipEl.firstChild) {
+                parent.insertBefore(tooltipEl.firstChild, tooltipEl);
+            }
+            tooltipEl.remove();
+        };
+
+        const triggerEditorChange = () => {
+            notesEditor.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+
+        const handleTooltipTool = () => {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) {
+                showAlert('Selecciona el texto al que deseas agregar un tooltip.');
+                return;
+            }
+
+            const range = selection.getRangeAt(0).cloneRange();
+            const startTooltip = getClosestTooltip(range.startContainer);
+            const endTooltip = getClosestTooltip(range.endContainer);
+            const existingTooltip = (startTooltip && startTooltip === endTooltip)
+                ? startTooltip
+                : (range.collapsed ? (startTooltip || endTooltip) : null);
+
+            const currentValue = existingTooltip?.getAttribute('data-tooltip') || '';
+            const tooltipText = prompt('Texto del tooltip (deja en blanco para eliminar)', currentValue);
+            if (tooltipText === null) {
+                return;
+            }
+
+            const normalized = tooltipText.trim();
+
+            if (existingTooltip) {
+                if (!normalized) {
+                    unwrapTooltipElement(existingTooltip);
+                } else {
+                    existingTooltip.setAttribute('data-tooltip', tooltipText);
+                    existingTooltip.setAttribute('aria-label', tooltipText);
+                    existingTooltip.setAttribute('tabindex', '0');
+                }
+                recordHistory();
+                triggerEditorChange();
+                return;
+            }
+
+            if (range.collapsed) {
+                showAlert('Selecciona el texto al que deseas agregar un tooltip.');
+                return;
+            }
+
+            if (!normalized) {
+                showAlert('El texto del tooltip no puede estar vacío.');
+                return;
+            }
+
+            const wrapper = document.createElement('span');
+            wrapper.className = 'editor-tooltip';
+            wrapper.setAttribute('data-tooltip', tooltipText);
+            wrapper.setAttribute('aria-label', tooltipText);
+            wrapper.setAttribute('tabindex', '0');
+            wrapper.appendChild(range.extractContents());
+            range.insertNode(wrapper);
+            recordHistory();
+            triggerEditorChange();
+        };
+
         const onDragStart = (e) => {
             const block = e.target.closest(blockSelector);
             if (block && notesEditor.contains(block)) {
@@ -3002,6 +3081,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             openNoteStyleModal();
         }));
+
+        editorToolbar.appendChild(createButton('Añadir tooltip', '💬', null, null, handleTooltipTool));
 
         editorToolbar.appendChild(createSeparator());
 
