@@ -2603,7 +2603,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         };
 
-        const createTooltipWrapper = (icon, fragment = null) => {
+        const createTooltipWrapper = (icon, fragment = null, contentHtml = '<p><br></p>') => {
             const sanitized = sanitizeTooltipIcon(icon);
             const wrapperEl = document.createElement('span');
             wrapperEl.className = 'editor-tooltip';
@@ -2623,38 +2623,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const content = document.createElement('span');
             content.className = 'editor-tooltip-content';
             content.hidden = true;
-            content.innerHTML = '<p><br></p>';
+            content.innerHTML = contentHtml || '<p><br></p>';
             wrapperEl.appendChild(content);
             wrapperEl.dataset.tooltipIcon = sanitized;
             wrapperEl.setAttribute('data-icon', sanitized);
             return ensureTooltipStructure(wrapperEl);
-        };
-
-        const placeTooltipAtRange = (range, icon) => {
-            if (!range) return null;
-            const sanitized = sanitizeTooltipIcon(icon);
-            let fragment = null;
-            if (!range.collapsed) {
-                fragment = range.extractContents();
-            }
-            const wrapper = createTooltipWrapper(sanitized, fragment);
-            try {
-                range.insertNode(wrapper);
-            } catch (error) {
-                console.error('Error al insertar el tooltip:', error);
-                return null;
-            }
-            setTooltipIconOnElement(wrapper, sanitized);
-            updateTooltipPreview(wrapper);
-            const selection = window.getSelection();
-            if (selection) {
-                const after = document.createRange();
-                after.setStartAfter(wrapper);
-                after.collapse(true);
-                selection.removeAllRanges();
-                selection.addRange(after);
-            }
-            return wrapper;
         };
 
         const notifyTooltipChange = () => {
@@ -2698,6 +2671,13 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 highlightTooltipIcon(toolbarSelectedTooltipIcon);
             }
+            if (activeTooltipState?.range) {
+                const selection = window.getSelection();
+                if (selection) {
+                    selection.removeAllRanges();
+                    selection.addRange(activeTooltipState.range);
+                }
+            }
             if (toggleSubnoteReadOnlyBtn) {
                 toggleSubnoteReadOnlyBtn.removeAttribute('hidden');
             }
@@ -2738,21 +2718,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     showAlert('Selecciona el texto al que deseas agregar un tooltip.');
                     return;
                 }
-                const wrapperEl = document.createElement('span');
-                wrapperEl.className = 'editor-tooltip';
-                const target = document.createElement('span');
-                target.className = 'editor-tooltip-target';
-                target.appendChild(range.cloneContents());
-                wrapperEl.appendChild(target);
-                const iconSup = document.createElement('sup');
-                iconSup.className = 'editor-tooltip-icon';
-                iconSup.textContent = icon;
-                wrapperEl.appendChild(iconSup);
-                const content = document.createElement('span');
-                content.className = 'editor-tooltip-content';
-                content.hidden = true;
-                content.innerHTML = html;
-                wrapperEl.appendChild(content);
+                let fragment = null;
+                try {
+                    fragment = range.cloneContents();
+                } catch (error) {
+                    console.warn('No se pudo clonar la selección del tooltip:', error);
+                }
+                const wrapperEl = createTooltipWrapper(icon, fragment, html);
                 try {
                     range.deleteContents();
                     range.insertNode(wrapperEl);
@@ -2762,6 +2734,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
                 wrapper = ensureTooltipStructure(wrapperEl);
+                setTooltipIconOnElement(wrapper, icon);
                 updateTooltipPreview(wrapper);
                 const selection = window.getSelection();
                 if (selection) {
@@ -2781,6 +2754,7 @@ document.addEventListener('DOMContentLoaded', function () {
             activeTooltipState.range = null;
             recordHistory();
             notifyTooltipChange();
+            saveCurrentNote();
             if (closeModal) {
                 hideModal(subNoteModal);
             } else {
@@ -2873,14 +2847,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 openTooltipEditor(existingTooltip, null);
                 return;
             }
-            const inserted = placeTooltipAtRange(range, toolbarSelectedTooltipIcon);
-            if (!inserted) {
-                showAlert('No se pudo insertar el tooltip en esta posición.');
+            if (range.collapsed) {
+                notesEditor.focus({ preventScroll: true });
+                showAlert('Selecciona el texto al que deseas agregar un tooltip.');
                 return;
             }
-            notifyTooltipChange();
-            recordHistory();
-            notesEditor.focus({ preventScroll: true });
+            openTooltipEditor(null, range);
         };
 
         const onDragStart = (e) => {
@@ -3571,6 +3543,8 @@ document.addEventListener('DOMContentLoaded', function () {
             sel.addRange(newRange);
         };
 
+        let presetVariantIdCounter = 0;
+
         const renderPresetStyleList = (container, { onSelectStyle }) => {
             container.innerHTML = '';
             const entries = [];
@@ -3585,14 +3559,37 @@ document.addEventListener('DOMContentLoaded', function () {
                     onSelectStyle(style, { closeAll });
                 }
             };
+            const formatPresetLabel = (label) => {
+                if (!label) return '';
+                const cleaned = label.replace(/^Estilo\s+/i, '').trim();
+                if (!cleaned) return label.trim();
+                return cleaned.replace(/^./, (c) => c.toUpperCase());
+            };
+            const createPreview = (label, style, badgeText = '') => {
+                const preview = document.createElement('span');
+                preview.className = 'preset-style-preview';
+                preview.setAttribute('style', style);
+                const text = document.createElement('span');
+                text.className = 'preset-style-label';
+                text.textContent = formatPresetLabel(label);
+                preview.appendChild(text);
+                if (badgeText) {
+                    const badge = document.createElement('span');
+                    badge.className = 'preset-style-variant-badge';
+                    badge.textContent = badgeText;
+                    preview.appendChild(badge);
+                }
+                return preview;
+            };
             PRESET_STYLE_GROUPS.forEach(group => {
                 const option = document.createElement('div');
                 option.className = 'preset-style-option';
                 const row = document.createElement('div');
                 row.className = 'preset-style-row';
                 const mainBtn = document.createElement('button');
+                mainBtn.type = 'button';
                 mainBtn.className = 'toolbar-btn preset-style-main';
-                mainBtn.innerHTML = `<span style="${group.style}">${group.label}</span>`;
+                mainBtn.appendChild(createPreview(group.label, group.style));
                 mainBtn.addEventListener('click', (e) => {
                     e.preventDefault();
                     handleSelect(group.style);
@@ -3602,17 +3599,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 toggle.type = 'button';
                 toggle.className = 'toolbar-btn preset-style-variants-toggle';
                 toggle.innerHTML = '＋';
-                toggle.title = 'Ver variaciones';
+                toggle.title = `Ver variaciones de ${formatPresetLabel(group.label)}`;
                 toggle.setAttribute('aria-expanded', 'false');
                 row.appendChild(toggle);
                 option.appendChild(row);
                 const variantsList = document.createElement('div');
                 variantsList.className = 'preset-style-variants';
                 variantsList.hidden = true;
+                const variantsId = `preset-style-variants-${++presetVariantIdCounter}`;
+                variantsList.id = variantsId;
+                toggle.setAttribute('aria-controls', variantsId);
                 group.variants.forEach(variant => {
                     const variantBtn = document.createElement('button');
+                    variantBtn.type = 'button';
                     variantBtn.className = 'toolbar-btn preset-style-variant';
-                    variantBtn.innerHTML = `<span style="${variant.style}">${variant.label}</span>`;
+                    const variantName = variant.label.replace(`${group.label} `, '').trim();
+                    variantBtn.appendChild(
+                        createPreview(variant.label, variant.style, variantName)
+                    );
                     variantBtn.addEventListener('click', (e) => {
                         e.preventDefault();
                         handleSelect(variant.style);
@@ -3787,16 +3791,22 @@ document.addEventListener('DOMContentLoaded', function () {
         stylePopup.className = 'preset-style-popup symbol-dropdown-content preset-style-panel';
         document.body.appendChild(stylePopup);
         let currentStyledSpan = null;
+        let currentStyleListControls = null;
 
         const hideStylePopup = () => {
             stylePopup.style.display = 'none';
             stylePopup.style.visibility = 'hidden';
+            stylePopup.classList.remove('visible');
             currentStyledSpan = null;
+            if (currentStyleListControls) {
+                currentStyleListControls.closeAll();
+                currentStyleListControls = null;
+            }
         };
 
         const showStylePopup = (span) => {
             currentStyledSpan = span;
-            renderPresetStyleList(stylePopup, {
+            currentStyleListControls = renderPresetStyleList(stylePopup, {
                 onSelectStyle: (style) => {
                     if (!currentStyledSpan) return;
                     applyPresetStyle(style, currentStyledSpan);
@@ -3805,6 +3815,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
             stylePopup.style.display = 'flex';
+            stylePopup.classList.add('visible');
             stylePopup.style.visibility = 'hidden';
             stylePopup.style.top = '0px';
             stylePopup.style.left = '0px';
