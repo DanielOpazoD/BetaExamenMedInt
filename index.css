@@ -116,6 +116,19 @@
             border: 1px solid var(--border-color);
         }
 
+        .notes-modal-content.tooltip-mode {
+            max-width: 60vw !important;
+            width: 60vw;
+        }
+
+        @media (max-width: 1024px) {
+            .notes-modal-content.tooltip-mode {
+                max-width: 90vw !important;
+                width: 90vw;
+            }
+        }
+
+
         #subnote-modal .notes-modal-content {
             padding: 1rem;
         }
@@ -288,52 +301,44 @@
 .editor-tooltip {
     position: relative;
     cursor: help;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    vertical-align: baseline;
+}
+
+.editor-tooltip-target {
     text-decoration: underline dotted;
 }
 
-.editor-tooltip::after {
-    content: attr(data-tooltip);
+.editor-tooltip-content[hidden],
+.editor-tooltip-content {
+    display: none !important;
+}
+
+.editor-tooltip:focus-within .editor-tooltip-target,
+.editor-tooltip:hover .editor-tooltip-target {
+    text-decoration-color: var(--accent-color, currentColor);
+}
+
+.manual-tooltip-popover {
     position: absolute;
-    left: 50%;
-    bottom: calc(100% + 8px);
-    transform: translate(-50%, 4px);
     background-color: var(--bg-secondary);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
-    padding: 0.35rem 0.55rem;
-    border-radius: 0.4rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    max-width: min(320px, 80vw);
-    white-space: pre-wrap;
-    z-index: 2100;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    max-width: min(460px, 80vw);
+    max-height: 70vh;
+    overflow: auto;
+    z-index: 2200;
+    pointer-events: auto;
 }
 
-.editor-tooltip::before {
-    content: '';
-    position: absolute;
-    left: 50%;
-    bottom: calc(100% + 2px);
-    transform: translate(-50%, 6px);
-    border-width: 6px 6px 0 6px;
-    border-style: solid;
-    border-color: var(--bg-secondary) transparent transparent transparent;
-    opacity: 0;
-    transition: opacity 0.15s ease, transform 0.15s ease;
-    pointer-events: none;
-    z-index: 2099;
-}
-
-.editor-tooltip:hover::after,
-.editor-tooltip:focus::after,
-.editor-tooltip:active::after,
-.editor-tooltip:hover::before,
-.editor-tooltip:focus::before,
-.editor-tooltip:active::before {
-    opacity: 1;
-    transform: translate(-50%, -2px);
+.manual-tooltip-popover:focus,
+.manual-tooltip-popover:focus-visible {
+    outline: none;
 }
         /* Toolbar styles */
         .toolbar-separator {

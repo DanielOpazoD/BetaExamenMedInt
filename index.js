@@ -169,6 +169,9 @@ document.addEventListener('DOMContentLoaded', function () {
             e.preventDefault();
             redoAction();
         }
+        if (notesEditor) {
+            notesEditor.querySelectorAll('.editor-tooltip').forEach(normalizeTooltipElement);
+        }
     });
 
     notesEditor.addEventListener('keyup', (e) => {
@@ -569,6 +572,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const subNoteModal = getElem('subnote-modal');
     const subNoteTitle = getElem('subnote-title');
     const subNoteEditor = getElem('subnote-editor');
+    const subNoteModalContent = subNoteModal ? subNoteModal.querySelector('.notes-modal-content') : null;
     const toggleHtmlPasteBtn = getElem('toggle-html-paste-btn');
     const dragBtn = getElem('toggle-block-drag-btn');
     const fullscreenBtn = getElem('toggle-fullscreen-btn');
@@ -1374,6 +1378,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Save and close sub-note
     if (saveCloseSubnoteBtn) {
         saveCloseSubnoteBtn.addEventListener('click', () => {
+            if (isTooltipEditing) {
+                saveTooltipContent(true);
+                return;
+            }
             if (activeSubnoteLink && currentNotesArray[activeNoteIndex]) {
                 const subnoteId = activeSubnoteLink.dataset.subnoteId || activeSubnoteLink.dataset.postitId;
                 if (!currentNotesArray[activeNoteIndex].postits) {
@@ -1394,6 +1402,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Save sub-note without closing the modal
     if (saveSubnoteBtn) {
         saveSubnoteBtn.addEventListener('click', () => {
+            if (isTooltipEditing) {
+                saveTooltipContent(false);
+                return;
+            }
             if (activeSubnoteLink && currentNotesArray[activeNoteIndex]) {
                 const subnoteId = activeSubnoteLink.dataset.subnoteId || activeSubnoteLink.dataset.postitId;
                 if (!currentNotesArray[activeNoteIndex].postits) {
@@ -1412,6 +1424,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Close sub-note without saving
     if (cancelSubnoteBtn) {
         cancelSubnoteBtn.addEventListener('click', () => {
+            if (isTooltipEditing) {
+                hideModal(subNoteModal);
+                return;
+            }
             hideModal(subNoteModal);
             activeSubnoteLink = null;
         });
@@ -1461,6 +1477,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentLightboxIndex = 0;
     let currentNoteRow = null;
     let activeSubnoteLink = null;
+    let isTooltipEditing = false;
+    let activeTooltipState = null;
     let editingQuickNote = false;
     let savedEditorSelection = null;
     let savedSelectedHtml = '';
@@ -2310,16 +2328,303 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const unwrapTooltipElement = (tooltipEl) => {
             if (!tooltipEl || !tooltipEl.parentNode) return;
+            if (tooltipEl === manualTooltipTarget) {
+                hideManualTooltipPopover(true);
+            }
             const parent = tooltipEl.parentNode;
-            while (tooltipEl.firstChild) {
-                parent.insertBefore(tooltipEl.firstChild, tooltipEl);
+            const target = tooltipEl.querySelector('.editor-tooltip-target');
+            if (target) {
+                while (target.firstChild) {
+                    parent.insertBefore(target.firstChild, tooltipEl);
+                }
             }
             tooltipEl.remove();
         };
 
         const triggerEditorChange = () => {
+            notesEditor.querySelectorAll('.editor-tooltip').forEach(normalizeTooltipElement);
             notesEditor.dispatchEvent(new Event('input', { bubbles: true }));
         };
+
+        const extractTooltipPreview = (html) => {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html || '';
+            return tmp.textContent.trim().replace(/\s+/g, ' ').slice(0, 160);
+        };
+
+        const normalizeTooltipElement = (tooltipEl) => {
+            if (!tooltipEl) return null;
+            let contentSpan = tooltipEl.querySelector('.editor-tooltip-content');
+            if (!contentSpan) {
+                contentSpan = document.createElement('span');
+                contentSpan.className = 'editor-tooltip-content';
+                contentSpan.hidden = true;
+                const existingText = tooltipEl.getAttribute('data-tooltip') || '';
+                if (existingText) {
+                    const p = document.createElement('p');
+                    p.textContent = existingText;
+                    contentSpan.appendChild(p);
+                } else {
+                    contentSpan.innerHTML = '<p><br></p>';
+                }
+                tooltipEl.appendChild(contentSpan);
+            }
+            let targetSpan = tooltipEl.querySelector('.editor-tooltip-target');
+            if (!targetSpan) {
+                targetSpan = document.createElement('span');
+                targetSpan.className = 'editor-tooltip-target';
+                const nodesToMove = [];
+                tooltipEl.childNodes.forEach(node => {
+                    if (node !== contentSpan) {
+                        nodesToMove.push(node);
+                    }
+                });
+                nodesToMove.forEach(node => targetSpan.appendChild(node));
+                tooltipEl.insertBefore(targetSpan, contentSpan);
+            }
+            tooltipEl.removeAttribute('data-tooltip');
+            tooltipEl.setAttribute('tabindex', '0');
+            const preview = extractTooltipPreview(contentSpan.innerHTML);
+            if (preview) {
+                tooltipEl.setAttribute('aria-label', preview);
+            } else {
+                tooltipEl.removeAttribute('aria-label');
+            }
+            return tooltipEl;
+        };
+
+        const getTooltipContentHTML = (tooltipEl) => {
+            const normalized = normalizeTooltipElement(tooltipEl);
+            return normalized?.querySelector('.editor-tooltip-content')?.innerHTML || '<p><br></p>';
+        };
+
+        const isTooltipHtmlEmpty = (html) => {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html || '';
+            if (tmp.querySelector('img, table, video, audio, iframe, svg, object')) return false;
+            return tmp.textContent.trim().length === 0;
+        };
+
+        const updateTooltipPreview = (tooltipEl, html) => {
+            const preview = extractTooltipPreview(html);
+            if (preview) {
+                tooltipEl.setAttribute('aria-label', preview);
+            } else {
+                const temp = document.createElement('div');
+                temp.innerHTML = html || '';
+                if (temp.querySelector('img, video, audio, iframe, svg, table')) {
+                    tooltipEl.setAttribute('aria-label', 'Tooltip con contenido multimedia');
+                } else {
+                    tooltipEl.removeAttribute('aria-label');
+                }
+            }
+        };
+
+        let subnoteModalWasReadonly = subNoteModalContent?.classList.contains('readonly-mode') || false;
+        let manualTooltipPopover = null;
+        let manualTooltipTarget = null;
+        let manualTooltipHideTimer = null;
+
+        function hideManualTooltipPopover(immediate = false) {
+            const cleanup = () => {
+                manualTooltipPopover?.remove();
+                manualTooltipPopover = null;
+                manualTooltipTarget = null;
+            };
+            clearTimeout(manualTooltipHideTimer);
+            if (immediate) {
+                cleanup();
+            } else {
+                manualTooltipHideTimer = setTimeout(cleanup, 180);
+            }
+        }
+
+        function positionManualTooltip(wrapper, popover) {
+            const targetRect = (wrapper.querySelector('.editor-tooltip-target') || wrapper).getBoundingClientRect();
+            const popRect = popover.getBoundingClientRect();
+            let top = targetRect.top + window.scrollY - popRect.height - 12;
+            const viewportTop = window.scrollY + 12;
+            if (top < viewportTop) {
+                top = targetRect.bottom + window.scrollY + 12;
+            }
+            let left = targetRect.left + window.scrollX + targetRect.width / 2 - popRect.width / 2;
+            const minLeft = window.scrollX + 12;
+            const maxLeft = window.scrollX + document.documentElement.clientWidth - popRect.width - 12;
+            if (left < minLeft) left = minLeft;
+            if (left > maxLeft) left = maxLeft;
+            popover.style.top = `${Math.max(top, viewportTop)}px`;
+            popover.style.left = `${left}px`;
+        }
+
+        function showManualTooltipPopover(wrapper) {
+            const contentEl = normalizeTooltipElement(wrapper)?.querySelector('.editor-tooltip-content');
+            if (!contentEl) return;
+            clearTimeout(manualTooltipHideTimer);
+            if (manualTooltipTarget !== wrapper) {
+                manualTooltipPopover?.remove();
+                manualTooltipPopover = null;
+            }
+            manualTooltipTarget = wrapper;
+            if (!manualTooltipPopover) {
+                manualTooltipPopover = document.createElement('div');
+                manualTooltipPopover.className = 'manual-tooltip-popover';
+                manualTooltipPopover.tabIndex = -1;
+                manualTooltipPopover.addEventListener('mouseenter', () => {
+                    clearTimeout(manualTooltipHideTimer);
+                });
+                manualTooltipPopover.addEventListener('mouseleave', () => {
+                    hideManualTooltipPopover();
+                });
+                document.body.appendChild(manualTooltipPopover);
+            }
+            manualTooltipPopover.innerHTML = contentEl.innerHTML;
+            requestAnimationFrame(() => {
+                if (manualTooltipPopover && manualTooltipTarget === wrapper) {
+                    positionManualTooltip(wrapper, manualTooltipPopover);
+                }
+            });
+        }
+
+        const openTooltipEditor = (existingTooltip, range) => {
+            isTooltipEditing = true;
+            activeTooltipState = {
+                existingTooltip: existingTooltip ? normalizeTooltipElement(existingTooltip) : null,
+                range: existingTooltip ? null : range
+            };
+            hideManualTooltipPopover(true);
+            if (subNoteModalContent) {
+                subnoteModalWasReadonly = subNoteModalContent.classList.contains('readonly-mode');
+                subNoteModalContent.classList.add('tooltip-mode');
+                subNoteModalContent.classList.remove('readonly-mode');
+            }
+            if (toggleSubnoteReadOnlyBtn) {
+                toggleSubnoteReadOnlyBtn.setAttribute('hidden', 'hidden');
+            }
+            subNoteTitle.textContent = existingTooltip ? 'Editar tooltip' : 'Nuevo tooltip';
+            subNoteTitle.contentEditable = false;
+            subNoteEditor.contentEditable = true;
+            subNoteEditor.innerHTML = existingTooltip ? getTooltipContentHTML(existingTooltip) : '<p><br></p>';
+            showModal(subNoteModal);
+            setTimeout(() => subNoteEditor.focus(), 0);
+        };
+
+        const resetTooltipEditorState = () => {
+            if (toggleSubnoteReadOnlyBtn) {
+                toggleSubnoteReadOnlyBtn.removeAttribute('hidden');
+            }
+            if (subNoteModalContent) {
+                subNoteModalContent.classList.remove('tooltip-mode');
+                if (subnoteModalWasReadonly) {
+                    subNoteModalContent.classList.add('readonly-mode');
+                } else {
+                    subNoteModalContent.classList.remove('readonly-mode');
+                }
+            }
+            subNoteEditor.contentEditable = false;
+            subNoteEditor.innerHTML = '<p><br></p>';
+            subNoteTitle.textContent = '';
+            subNoteTitle.contentEditable = false;
+            activeTooltipState = null;
+            isTooltipEditing = false;
+            hideManualTooltipPopover(true);
+        };
+
+        const saveTooltipContent = (closeModal = false) => {
+            if (!isTooltipEditing || !activeTooltipState) return;
+            const html = subNoteEditor.innerHTML;
+            const isEmpty = isTooltipHtmlEmpty(html);
+            if (!activeTooltipState.existingTooltip && isEmpty) {
+                showAlert('El contenido del tooltip no puede estar vacío.');
+                return;
+            }
+            if (activeTooltipState.existingTooltip) {
+                if (isEmpty) {
+                    unwrapTooltipElement(activeTooltipState.existingTooltip);
+                } else {
+                    const contentEl = activeTooltipState.existingTooltip.querySelector('.editor-tooltip-content');
+                    if (contentEl) {
+                        contentEl.innerHTML = html;
+                        updateTooltipPreview(activeTooltipState.existingTooltip, html);
+                    }
+                }
+            } else if (activeTooltipState.range) {
+                const range = activeTooltipState.range;
+                const wrapper = document.createElement('span');
+                wrapper.className = 'editor-tooltip';
+                wrapper.setAttribute('tabindex', '0');
+                const targetSpan = document.createElement('span');
+                targetSpan.className = 'editor-tooltip-target';
+                const extracted = range.extractContents();
+                const previewContainer = document.createElement('div');
+                previewContainer.appendChild(extracted.cloneNode(true));
+                if (isTooltipHtmlEmpty(previewContainer.innerHTML)) {
+                    showAlert('Selecciona el texto al que deseas agregar un tooltip.');
+                    return;
+                }
+                targetSpan.appendChild(extracted);
+                const contentSpan = document.createElement('span');
+                contentSpan.className = 'editor-tooltip-content';
+                contentSpan.hidden = true;
+                contentSpan.innerHTML = html;
+                wrapper.appendChild(targetSpan);
+                wrapper.appendChild(contentSpan);
+                updateTooltipPreview(wrapper, html);
+                range.insertNode(wrapper);
+                activeTooltipState.existingTooltip = wrapper;
+                activeTooltipState.range = null;
+            }
+            recordHistory();
+            triggerEditorChange();
+            if (closeModal) {
+                hideModal(subNoteModal);
+            }
+        };
+
+        notesEditor.addEventListener('mouseover', (e) => {
+            const tooltip = e.target.closest('.editor-tooltip');
+            if (tooltip && notesEditor.contains(tooltip)) {
+                showManualTooltipPopover(tooltip);
+            }
+        });
+
+        notesEditor.addEventListener('mouseout', (e) => {
+            if (!manualTooltipTarget) return;
+            const tooltip = e.target.closest('.editor-tooltip');
+            const related = e.relatedTarget;
+            if (tooltip && tooltip === manualTooltipTarget) {
+                if (related && (tooltip.contains(related) || manualTooltipPopover?.contains(related))) {
+                    return;
+                }
+                hideManualTooltipPopover();
+            }
+        });
+
+        notesEditor.addEventListener('focusin', (e) => {
+            const tooltip = e.target.closest('.editor-tooltip');
+            if (tooltip && notesEditor.contains(tooltip)) {
+                showManualTooltipPopover(tooltip);
+            }
+        });
+
+        notesEditor.addEventListener('focusout', (e) => {
+            if (!manualTooltipTarget) return;
+            const tooltip = e.target.closest('.editor-tooltip');
+            if (tooltip && tooltip === manualTooltipTarget) {
+                hideManualTooltipPopover();
+            }
+        });
+
+        document.addEventListener('scroll', () => {
+            if (manualTooltipPopover) {
+                hideManualTooltipPopover(true);
+            }
+        }, true);
+
+        window.addEventListener('resize', () => {
+            if (manualTooltipPopover && manualTooltipTarget) {
+                positionManualTooltip(manualTooltipTarget, manualTooltipPopover);
+            }
+        });
 
         const handleTooltipTool = () => {
             const selection = window.getSelection();
@@ -2335,24 +2640,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? startTooltip
                 : (range.collapsed ? (startTooltip || endTooltip) : null);
 
-            const currentValue = existingTooltip?.getAttribute('data-tooltip') || '';
-            const tooltipText = prompt('Texto del tooltip (deja en blanco para eliminar)', currentValue);
-            if (tooltipText === null) {
-                return;
-            }
-
-            const normalized = tooltipText.trim();
-
             if (existingTooltip) {
-                if (!normalized) {
-                    unwrapTooltipElement(existingTooltip);
-                } else {
-                    existingTooltip.setAttribute('data-tooltip', tooltipText);
-                    existingTooltip.setAttribute('aria-label', tooltipText);
-                    existingTooltip.setAttribute('tabindex', '0');
-                }
-                recordHistory();
-                triggerEditorChange();
+                openTooltipEditor(existingTooltip, null);
                 return;
             }
 
@@ -2361,20 +2650,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            if (!normalized) {
-                showAlert('El texto del tooltip no puede estar vacío.');
-                return;
-            }
-
-            const wrapper = document.createElement('span');
-            wrapper.className = 'editor-tooltip';
-            wrapper.setAttribute('data-tooltip', tooltipText);
-            wrapper.setAttribute('aria-label', tooltipText);
-            wrapper.setAttribute('tabindex', '0');
-            wrapper.appendChild(range.extractContents());
-            range.insertNode(wrapper);
-            recordHistory();
-            triggerEditorChange();
+            openTooltipEditor(null, range);
         };
 
         const onDragStart = (e) => {
@@ -4315,6 +4591,9 @@ document.addEventListener('DOMContentLoaded', function () {
         modal.classList.remove('visible');
         if (modal === notesModal) {
             resetEditorModes();
+        }
+        if (modal === subNoteModal && isTooltipEditing) {
+            resetTooltipEditorState();
         }
     }
 
