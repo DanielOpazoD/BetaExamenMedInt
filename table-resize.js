@@ -6,6 +6,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   let startSize = 0;
   let startWidth = 0;
   let startHeight = 0;
+  const isTableElement = table instanceof HTMLTableElement;
 
   table.style.position = 'relative';
   const handle = document.createElement('div');
@@ -32,7 +33,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   document.addEventListener('keydown', cancelOnEsc);
 
   function onHover(e) {
-    if (activeResize) return;
+    if (!isTableElement || activeResize) return;
     const rect = table.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -54,7 +55,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   }
 
   function startResize(e) {
-    if (!hoverEdge) return;
+    if (!isTableElement || !hoverEdge) return;
     e.preventDefault();
     activeResize = hoverEdge;
     startX = e.clientX;
@@ -119,6 +120,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   }
 
   function findColEdge(x) {
+    if (!isTableElement) return -1;
     let left = 0;
     const row = table.rows[0];
     if (!row) return -1;
@@ -130,6 +132,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   }
 
   function findRowEdge(y) {
+    if (!isTableElement) return -1;
     let top = 0;
     for (let i = 0; i < table.rows.length; i++) {
       top += table.rows[i].offsetHeight;
@@ -139,11 +142,13 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   }
 
   function getColWidth(index) {
+    if (!isTableElement) return 0;
     const cell = table.rows[0]?.cells[index];
     return cell ? cell.offsetWidth : 0;
   }
 
   function setColWidth(index, width) {
+    if (!isTableElement) return;
     for (const row of table.rows) {
       const cell = row.cells[index];
       if (cell) cell.style.width = width + 'px';
@@ -151,16 +156,19 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   }
 
   function getRowHeight(index) {
+    if (!isTableElement) return 0;
     const row = table.rows[index];
     return row ? row.offsetHeight : 0;
   }
 
   function setRowHeight(index, height) {
+    if (!isTableElement) return;
     const row = table.rows[index];
     if (row) row.style.height = height + 'px';
   }
 
   function getEdgePosition(type, index) {
+    if (!isTableElement) return 0;
     if (type === 'col') {
       let left = 0;
       const row = table.rows[0];

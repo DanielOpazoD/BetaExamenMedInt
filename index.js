@@ -4811,16 +4811,55 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         // initialize resizers on newly inserted tables (defer to allow DOM insertion)
         setTimeout(() => {
-            const tables = notesEditor.querySelectorAll('table');
-            tables.forEach(t => initTableResize(t));
+            initAllResizableElements(notesEditor);
         }, 50);
     }
-    function initTableResize(table) {
-        table.querySelector('.table-resize-handle')?.remove();
-        table.querySelector('.table-resize-guide')?.remove();
-        table.classList.add('resizable-table');
-        table.removeAttribute('data-resizable-initialized');
-        makeTableResizable(table);
+    function initTableResize(element) {
+        if (!element) return;
+        element.querySelector('.table-resize-handle')?.remove();
+        element.querySelector('.table-resize-guide')?.remove();
+        if (element instanceof HTMLTableElement) {
+            element.classList.add('resizable-table');
+            element.classList.remove('resizable-block');
+        } else {
+            element.classList.add('resizable-block');
+            element.classList.remove('resizable-table');
+        }
+        element.removeAttribute('data-resizable-initialized');
+        makeTableResizable(element);
+    }
+
+    function wrapClinicalNoteBlocks(root) {
+        if (!root) return;
+        const headers = root.querySelectorAll('.nota-clinica__header');
+        headers.forEach(header => {
+            if (header.closest('.nota-clinica')) return;
+            const container = document.createElement('div');
+            container.className = 'nota-clinica';
+            const parent = header.parentNode;
+            const bodyCandidate = header.nextElementSibling;
+            parent.insertBefore(container, header);
+            container.appendChild(header);
+            if (bodyCandidate && bodyCandidate.classList.contains('nota-clinica__body')) {
+                container.appendChild(bodyCandidate);
+            }
+        });
+        const bodies = root.querySelectorAll('.nota-clinica__body');
+        bodies.forEach(body => {
+            if (body.closest('.nota-clinica')) return;
+            const container = document.createElement('div');
+            container.className = 'nota-clinica';
+            const parent = body.parentNode;
+            parent.insertBefore(container, body);
+            container.appendChild(body);
+        });
+    }
+
+    function initAllResizableElements(root = notesEditor) {
+        if (!root) return;
+        wrapClinicalNoteBlocks(root);
+        root.querySelectorAll('table').forEach(initTableResize);
+        root.querySelectorAll('.nota-clinica').forEach(initTableResize);
     }
 
     function renderNotesList() {
@@ -4881,7 +4920,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
-        notesEditor.querySelectorAll('table').forEach(initTableResize);
+        initAllResizableElements(notesEditor);
         resetHistory(notesEditor.innerHTML);
 
         renderNotesList();
@@ -5901,7 +5940,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const reader = new FileReader();
                     reader.onload = (e) => {
                         notesEditor.innerHTML = e.target.result;
-                        notesEditor.querySelectorAll('table').forEach(initTableResize);
+                        initAllResizableElements(notesEditor);
                     };
                     reader.readAsText(file);
                 }
@@ -5938,13 +5977,13 @@ document.addEventListener('DOMContentLoaded', function () {
              }
 
              // Handle table selection
-             const tbl = e.target.closest('table');
-             if (tbl && notesEditor.contains(tbl)) {
-                 notesEditor.querySelectorAll('table').forEach(t => t.classList.remove('selected-for-move'));
-                 tbl.classList.add('selected-for-move');
-                 selectedTableForMove = tbl;
+             const resizable = e.target.closest('table, .nota-clinica');
+             if (resizable && notesEditor.contains(resizable)) {
+                 notesEditor.querySelectorAll('table, .nota-clinica').forEach(el => el.classList.remove('selected-for-move'));
+                 resizable.classList.add('selected-for-move');
+                 selectedTableForMove = resizable;
              } else {
-                 notesEditor.querySelectorAll('table').forEach(t => t.classList.remove('selected-for-move'));
+                 notesEditor.querySelectorAll('table, .nota-clinica').forEach(el => el.classList.remove('selected-for-move'));
                  selectedTableForMove = null;
              }
 
@@ -6385,7 +6424,12 @@ document.addEventListener('DOMContentLoaded', function () {
         populateIconPicker();
         loadState();
         setupEventListeners();
-        document.querySelectorAll('table').forEach(initTableResize);
+        document.querySelectorAll('table').forEach(tbl => {
+            if (!notesEditor || !notesEditor.contains(tbl)) {
+                initTableResize(tbl);
+            }
+        });
+        initAllResizableElements(notesEditor);
         applyTheme(document.documentElement.dataset.theme || 'default');
         setupAdvancedSearchReplace();
         setupKeyboardShortcuts();
