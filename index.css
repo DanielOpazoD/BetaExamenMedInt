@@ -412,9 +412,10 @@
 .toolbar-btn.tooltip-icon-picker-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    min-width: 120px;
-    padding: 4px 8px;
+    justify-content: center;
+    gap: 4px;
+    min-width: 36px;
+    padding: 4px 6px;
     border-radius: 9999px;
     border: 1px solid transparent;
     transition: border-color 0.2s ease, background-color 0.2s ease;
@@ -431,16 +432,8 @@
     line-height: 1;
 }
 
-.tooltip-icon-label {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--text-secondary, #4b5563);
-}
-
 .tooltip-icon-caret {
     font-size: 0.65rem;
-    margin-left: 2px;
     color: var(--text-secondary, #6b7280);
 }
         /* Toolbar styles */
@@ -520,60 +513,72 @@
             max-height: none;
             overflow-y: visible;
         }
-        .symbol-dropdown-content.preset-style-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 0.75rem;
-            padding: 12px;
+        .symbol-dropdown-content.preset-style-panel {
+            display: none;
+            flex-direction: column;
+            gap: 0.35rem;
+            padding: 10px;
+            min-width: 240px;
         }
+
+        .symbol-dropdown-content.preset-style-panel.visible {
+            display: flex;
+        }
+
+.preset-style-popup.preset-style-panel {
+    display: none;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 240px;
+}
 
 .preset-style-option {
     border: 1px solid transparent;
-    border-radius: 0.75rem;
-    padding: 0.45rem;
+    border-radius: 0.65rem;
+    padding: 0.25rem;
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
-    background: var(--bg-secondary);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    gap: 0.3rem;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .preset-style-option:hover,
 .preset-style-option:focus-within {
-    border-color: var(--accent-color, var(--btn-primary-bg));
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.15);
+    border-color: var(--border-color);
+    background: var(--bg-tertiary);
 }
 
 .preset-style-row {
     display: flex;
-    align-items: stretch;
-    gap: 0.3rem;
+    align-items: center;
+    gap: 0.4rem;
 }
 
-.preset-style-row .toolbar-btn {
+.preset-style-main {
     flex: 1;
     justify-content: flex-start;
 }
 
 .preset-style-variants-toggle {
     min-width: 32px;
+    padding: 4px;
     font-weight: 700;
 }
 
 .preset-style-variants {
-    display: grid;
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 0.25rem;
+    padding-left: 1.5rem;
 }
 
 .preset-style-variants[hidden] {
     display: none !important;
 }
 
-.preset-style-variants .toolbar-btn {
-    width: 100%;
-    text-align: left;
+.preset-style-variant {
     justify-content: flex-start;
+    width: 100%;
 }
         .flex-dropdown .toolbar-btn {
             justify-content: flex-start;

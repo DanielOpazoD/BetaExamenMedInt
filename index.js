@@ -2371,7 +2371,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const updateTooltipIconPickerLabel = (icon) => {
             if (tooltipIconPickerBtn) {
-                tooltipIconPickerBtn.innerHTML = `<span class="tooltip-icon-current">${icon}</span><span class="tooltip-icon-label">Icono tooltip</span><span class="tooltip-icon-caret">▾</span>`;
+                tooltipIconPickerBtn.innerHTML = `<span class="tooltip-icon-current" aria-hidden="true">${icon}</span><span class="tooltip-icon-caret" aria-hidden="true">▾</span>`;
             }
         };
 
@@ -2730,7 +2730,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             } else if (activeTooltipState.range) {
-                const range = activeTooltipState.range;
+                const storedRange = activeTooltipState.range;
+                const range = storedRange && typeof storedRange.cloneRange === 'function'
+                    ? storedRange.cloneRange()
+                    : storedRange;
+                if (!range) {
+                    showAlert('Selecciona el texto al que deseas agregar un tooltip.');
+                    return;
+                }
                 const wrapper = document.createElement('span');
                 wrapper.className = 'editor-tooltip';
                 wrapper.setAttribute('tabindex', '0');
@@ -3498,22 +3505,22 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         const PRESET_STYLE_GROUPS = [
-            createStyleGroup('Texto estilo celeste', '#e0f7fa', '#01579b'),
-            createStyleGroup('Texto estilo lila', '#f3e5f5', '#6a1b9a'),
-            createStyleGroup('Texto estilo menta', '#e8f5e9', '#1b5e20'),
-            createStyleGroup('Texto estilo durazno', '#fff3e0', '#e65100'),
-            createStyleGroup('Texto estilo amarillo', '#fffde7', '#f57f17'),
-            createStyleGroup('Texto estilo rosado', '#fce4ec', '#ad1457'),
-            createStyleGroup('Texto estilo azul', '#e3f2fd', '#1a237e'),
-            createStyleGroup('Texto estilo turquesa', '#e0f2f1', '#004d40'),
-            createStyleGroup('Texto estilo arena', '#fbe9e7', '#4e342e'),
-            createStyleGroup('Texto estilo café', '#efebe9', '#5d4037'),
-            createStyleGroup('Texto estilo rojo', '#f44336', '#ffffff'),
-            createStyleGroup('Texto estilo verde oscuro', '#1b5e20', '#ffffff'),
-            createStyleGroup('Texto estilo coral', '#ffe5e0', '#bf360c'),
-            createStyleGroup('Texto estilo oliva', '#f1f8e9', '#33691e'),
-            createStyleGroup('Texto estilo marino', '#e1f5fe', '#0277bd'),
-            createStyleGroup('Texto estilo grafito', '#eceff1', '#263238')
+            createStyleGroup('Estilo celeste', '#e0f7fa', '#01579b'),
+            createStyleGroup('Estilo lila', '#f3e5f5', '#6a1b9a'),
+            createStyleGroup('Estilo menta', '#e8f5e9', '#1b5e20'),
+            createStyleGroup('Estilo durazno', '#fff3e0', '#e65100'),
+            createStyleGroup('Estilo amarillo', '#fffde7', '#f57f17'),
+            createStyleGroup('Estilo rosado', '#fce4ec', '#ad1457'),
+            createStyleGroup('Estilo azul', '#e3f2fd', '#1a237e'),
+            createStyleGroup('Estilo turquesa', '#e0f2f1', '#004d40'),
+            createStyleGroup('Estilo arena', '#fbe9e7', '#4e342e'),
+            createStyleGroup('Estilo café', '#efebe9', '#5d4037'),
+            createStyleGroup('Estilo rojo', '#f44336', '#ffffff'),
+            createStyleGroup('Estilo verde oscuro', '#1b5e20', '#ffffff'),
+            createStyleGroup('Estilo coral', '#ffe5e0', '#bf360c'),
+            createStyleGroup('Estilo oliva', '#f1f8e9', '#33691e'),
+            createStyleGroup('Estilo marino', '#e1f5fe', '#0277bd'),
+            createStyleGroup('Estilo grafito', '#eceff1', '#263238')
         ];
 
         const applyPresetStyle = (cssText, existingSpan = null) => {
@@ -3540,33 +3547,39 @@ document.addEventListener('DOMContentLoaded', function () {
             sel.addRange(newRange);
         };
 
-        const createPresetStyleDropdown = () => {
-            const dropdown = document.createElement('div');
-            dropdown.className = 'symbol-dropdown';
-            const btn = createButton('Estilos de texto', '🖌️', null, null, null);
-            dropdown.appendChild(btn);
-            const content = document.createElement('div');
-            content.className = 'symbol-dropdown-content preset-style-grid';
+        const renderPresetStyleList = (container, { onSelectStyle }) => {
+            container.innerHTML = '';
+            const entries = [];
+            const closeAll = () => {
+                entries.forEach(({ list, toggle }) => {
+                    list.hidden = true;
+                    toggle.setAttribute('aria-expanded', 'false');
+                });
+            };
+            const handleSelect = (style) => {
+                if (typeof onSelectStyle === 'function') {
+                    onSelectStyle(style, { closeAll });
+                }
+            };
             PRESET_STYLE_GROUPS.forEach(group => {
                 const option = document.createElement('div');
                 option.className = 'preset-style-option';
                 const row = document.createElement('div');
                 row.className = 'preset-style-row';
                 const mainBtn = document.createElement('button');
-                mainBtn.className = 'toolbar-btn';
+                mainBtn.className = 'toolbar-btn preset-style-main';
                 mainBtn.innerHTML = `<span style="${group.style}">${group.label}</span>`;
                 mainBtn.addEventListener('click', (e) => {
                     e.preventDefault();
-                    applyPresetStyle(group.style);
-                    content.classList.remove('visible');
-                    content.querySelectorAll('.preset-style-variants').forEach(list => list.hidden = true);
-                    notesEditor.focus({ preventScroll: true });
+                    handleSelect(group.style);
                 });
                 row.appendChild(mainBtn);
                 const toggle = document.createElement('button');
+                toggle.type = 'button';
                 toggle.className = 'toolbar-btn preset-style-variants-toggle';
                 toggle.innerHTML = '＋';
                 toggle.title = 'Ver variaciones';
+                toggle.setAttribute('aria-expanded', 'false');
                 row.appendChild(toggle);
                 option.appendChild(row);
                 const variantsList = document.createElement('div');
@@ -3574,14 +3587,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 variantsList.hidden = true;
                 group.variants.forEach(variant => {
                     const variantBtn = document.createElement('button');
-                    variantBtn.className = 'toolbar-btn';
+                    variantBtn.className = 'toolbar-btn preset-style-variant';
                     variantBtn.innerHTML = `<span style="${variant.style}">${variant.label}</span>`;
                     variantBtn.addEventListener('click', (e) => {
                         e.preventDefault();
-                        applyPresetStyle(variant.style);
-                        content.classList.remove('visible');
-                        variantsList.hidden = true;
-                        notesEditor.focus({ preventScroll: true });
+                        handleSelect(variant.style);
                     });
                     variantsList.appendChild(variantBtn);
                 });
@@ -3589,10 +3599,32 @@ document.addEventListener('DOMContentLoaded', function () {
                 toggle.addEventListener('click', (e) => {
                     e.preventDefault();
                     const shouldOpen = variantsList.hidden;
-                    content.querySelectorAll('.preset-style-variants').forEach(list => list.hidden = true);
-                    variantsList.hidden = !shouldOpen ? true : false;
+                    closeAll();
+                    if (shouldOpen) {
+                        variantsList.hidden = false;
+                        toggle.setAttribute('aria-expanded', 'true');
+                    }
                 });
-                content.appendChild(option);
+                container.appendChild(option);
+                entries.push({ list: variantsList, toggle });
+            });
+            return { closeAll };
+        };
+
+        const createPresetStyleDropdown = () => {
+            const dropdown = document.createElement('div');
+            dropdown.className = 'symbol-dropdown';
+            const btn = createButton('Estilos de texto', '🖌️', null, null, null);
+            dropdown.appendChild(btn);
+            const content = document.createElement('div');
+            content.className = 'symbol-dropdown-content preset-style-panel';
+            const listControls = renderPresetStyleList(content, {
+                onSelectStyle: (style, { closeAll }) => {
+                    applyPresetStyle(style);
+                    closeAll();
+                    content.classList.remove('visible');
+                    notesEditor.focus({ preventScroll: true });
+                }
             });
             dropdown.appendChild(content);
             btn.addEventListener('click', (e) => {
@@ -3615,7 +3647,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (left > maxLeft) left = maxLeft;
                     content.style.left = `${left}px`;
                 } else {
-                    content.querySelectorAll('.preset-style-variants').forEach(list => list.hidden = true);
+                    listControls.closeAll();
                 }
             });
             return dropdown;
@@ -3658,6 +3690,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 'tooltip-icon-picker-btn');
         tooltipIconPickerBtn.setAttribute('aria-haspopup', 'true');
         tooltipIconPickerBtn.setAttribute('aria-expanded', 'false');
+        tooltipIconPickerBtn.setAttribute('aria-label', 'Seleccionar icono de tooltip');
         updateTooltipIconPickerLabel(toolbarSelectedTooltipIcon);
         editorToolbar.appendChild(tooltipIconPickerBtn);
 
@@ -3727,7 +3760,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Popup to change existing preset styles
         const stylePopup = document.createElement('div');
-        stylePopup.className = 'preset-style-popup';
+        stylePopup.className = 'preset-style-popup preset-style-panel';
         document.body.appendChild(stylePopup);
         let currentStyledSpan = null;
 
@@ -3737,35 +3770,22 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         const showStylePopup = (span) => {
-            stylePopup.innerHTML = '';
-            PRESET_STYLE_GROUPS.forEach(group => {
-                const baseBtn = document.createElement('button');
-                baseBtn.className = 'toolbar-btn';
-                baseBtn.innerHTML = `<span style="${group.style}">${group.label}</span>`;
-                baseBtn.addEventListener('click', () => {
-                    applyPresetStyle(group.style, currentStyledSpan);
+            currentStyledSpan = span;
+            renderPresetStyleList(stylePopup, {
+                onSelectStyle: (style) => {
+                    if (!currentStyledSpan) return;
+                    applyPresetStyle(style, currentStyledSpan);
                     hideStylePopup();
                     notesEditor.focus({ preventScroll: true });
-                });
-                stylePopup.appendChild(baseBtn);
-                group.variants.forEach(variant => {
-                    const variantBtn = document.createElement('button');
-                    variantBtn.className = 'toolbar-btn';
-                    variantBtn.innerHTML = `<span style="${variant.style}">${variant.label}</span>`;
-                    variantBtn.style.paddingLeft = '24px';
-                    variantBtn.addEventListener('click', () => {
-                        applyPresetStyle(variant.style, currentStyledSpan);
-                        hideStylePopup();
-                        notesEditor.focus({ preventScroll: true });
-                    });
-                    stylePopup.appendChild(variantBtn);
-                });
+                }
             });
-            stylePopup.style.display = 'block';
+            stylePopup.style.display = 'flex';
             const rect = span.getBoundingClientRect();
             stylePopup.style.top = `${window.scrollY + rect.top - stylePopup.offsetHeight - 8}px`;
             stylePopup.style.left = `${window.scrollX + rect.left}px`;
         };
+
+        hideStylePopup();
 
         notesEditor.addEventListener('click', (e) => {
             const span = e.target.closest('span[data-preset-style]');
