@@ -2397,6 +2397,15 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 target.className = 'editor-tooltip-target';
             }
+            const hasVisibleTargetContent = target.textContent.trim().length > 0 || target.querySelector('img, video, audio, iframe, svg, object, table');
+            if (hasVisibleTargetContent) {
+                target.hidden = false;
+                target.removeAttribute('aria-hidden');
+            } else {
+                target.hidden = true;
+                target.setAttribute('aria-hidden', 'true');
+                target.innerHTML = '';
+            }
 
             let iconEl = tooltipEl.querySelector('.editor-tooltip-icon');
             const icon = sanitizeTooltipIcon(tooltipEl.dataset.tooltipIcon || iconEl?.textContent || DEFAULT_TOOLTIP_ICON);
@@ -2594,6 +2603,60 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         };
 
+        const createTooltipWrapper = (icon, fragment = null) => {
+            const sanitized = sanitizeTooltipIcon(icon);
+            const wrapperEl = document.createElement('span');
+            wrapperEl.className = 'editor-tooltip';
+            const target = document.createElement('span');
+            target.className = 'editor-tooltip-target';
+            if (fragment && fragment.childNodes && fragment.childNodes.length) {
+                target.appendChild(fragment);
+                target.hidden = false;
+            } else {
+                target.hidden = true;
+            }
+            wrapperEl.appendChild(target);
+            const iconSup = document.createElement('sup');
+            iconSup.className = 'editor-tooltip-icon';
+            iconSup.textContent = sanitized;
+            wrapperEl.appendChild(iconSup);
+            const content = document.createElement('span');
+            content.className = 'editor-tooltip-content';
+            content.hidden = true;
+            content.innerHTML = '<p><br></p>';
+            wrapperEl.appendChild(content);
+            wrapperEl.dataset.tooltipIcon = sanitized;
+            wrapperEl.setAttribute('data-icon', sanitized);
+            return ensureTooltipStructure(wrapperEl);
+        };
+
+        const placeTooltipAtRange = (range, icon) => {
+            if (!range) return null;
+            const sanitized = sanitizeTooltipIcon(icon);
+            let fragment = null;
+            if (!range.collapsed) {
+                fragment = range.extractContents();
+            }
+            const wrapper = createTooltipWrapper(sanitized, fragment);
+            try {
+                range.insertNode(wrapper);
+            } catch (error) {
+                console.error('Error al insertar el tooltip:', error);
+                return null;
+            }
+            setTooltipIconOnElement(wrapper, sanitized);
+            updateTooltipPreview(wrapper);
+            const selection = window.getSelection();
+            if (selection) {
+                const after = document.createRange();
+                after.setStartAfter(wrapper);
+                after.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(after);
+            }
+            return wrapper;
+        };
+
         const notifyTooltipChange = () => {
             notesEditor.querySelectorAll('.editor-tooltip').forEach(ensureTooltipStructure);
             notesEditor.dispatchEvent(new Event('input', { bubbles: true }));
@@ -2768,6 +2831,18 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
+        notesEditor.addEventListener('click', (e) => {
+            const icon = e.target.closest('.editor-tooltip-icon');
+            if (icon && notesEditor.contains(icon)) {
+                e.preventDefault();
+                const tooltip = icon.closest('.editor-tooltip');
+                if (tooltip) {
+                    destroyTooltipPopover(true);
+                    openTooltipEditor(tooltip, null);
+                }
+            }
+        });
+
         notesEditor.addEventListener('dblclick', (e) => {
             const tooltip = e.target.closest('.editor-tooltip');
             if (tooltip && notesEditor.contains(tooltip)) {
@@ -2779,10 +2854,16 @@ document.addEventListener('DOMContentLoaded', function () {
             hideTooltipIconSelector();
             const selection = window.getSelection();
             if (!selection || selection.rangeCount === 0) {
-                showAlert('Selecciona el texto al que deseas agregar un tooltip.');
+                notesEditor.focus({ preventScroll: true });
+                showAlert('Coloca el cursor dentro del texto para insertar un tooltip.');
                 return;
             }
             const range = selection.getRangeAt(0);
+            if (!range || !notesEditor.contains(range.commonAncestorContainer)) {
+                notesEditor.focus({ preventScroll: true });
+                showAlert('Coloca el cursor dentro del texto para insertar un tooltip.');
+                return;
+            }
             const startTooltip = getClosestTooltip(range.startContainer);
             const endTooltip = getClosestTooltip(range.endContainer);
             const existingTooltip = (startTooltip && startTooltip === endTooltip)
@@ -2792,11 +2873,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 openTooltipEditor(existingTooltip, null);
                 return;
             }
-            if (range.collapsed || range.toString().trim() === '') {
-                showAlert('Selecciona el texto al que deseas agregar un tooltip.');
+            const inserted = placeTooltipAtRange(range, toolbarSelectedTooltipIcon);
+            if (!inserted) {
+                showAlert('No se pudo insertar el tooltip en esta posición.');
                 return;
             }
-            openTooltipEditor(null, range.cloneRange());
+            notifyTooltipChange();
+            recordHistory();
+            notesEditor.focus({ preventScroll: true });
         };
 
         const onDragStart = (e) => {
@@ -3700,12 +3784,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Popup to change existing preset styles
         const stylePopup = document.createElement('div');
-        stylePopup.className = 'preset-style-popup preset-style-panel';
+        stylePopup.className = 'preset-style-popup symbol-dropdown-content preset-style-panel';
         document.body.appendChild(stylePopup);
         let currentStyledSpan = null;
 
         const hideStylePopup = () => {
             stylePopup.style.display = 'none';
+            stylePopup.style.visibility = 'hidden';
             currentStyledSpan = null;
         };
 
@@ -3720,9 +3805,25 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
             stylePopup.style.display = 'flex';
-            const rect = span.getBoundingClientRect();
-            stylePopup.style.top = `${window.scrollY + rect.top - stylePopup.offsetHeight - 8}px`;
-            stylePopup.style.left = `${window.scrollX + rect.left}px`;
+            stylePopup.style.visibility = 'hidden';
+            stylePopup.style.top = '0px';
+            stylePopup.style.left = '0px';
+            requestAnimationFrame(() => {
+                if (!currentStyledSpan) return;
+                const rect = span.getBoundingClientRect();
+                const popupRect = stylePopup.getBoundingClientRect();
+                let top = rect.bottom + window.scrollY + 8;
+                if (top + popupRect.height > window.scrollY + window.innerHeight) {
+                    top = rect.top + window.scrollY - popupRect.height - 8;
+                }
+                let left = rect.left + window.scrollX;
+                if (left + popupRect.width > window.scrollX + window.innerWidth) {
+                    left = window.scrollX + window.innerWidth - popupRect.width - 8;
+                }
+                stylePopup.style.top = `${Math.max(window.scrollY + 8, top)}px`;
+                stylePopup.style.left = `${Math.max(window.scrollX + 8, left)}px`;
+                stylePopup.style.visibility = 'visible';
+            });
         };
 
         hideStylePopup();
