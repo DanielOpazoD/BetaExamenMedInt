@@ -124,6 +124,41 @@ document.addEventListener('DOMContentLoaded', function () {
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
 
+    function findTooltipWrapper(node) {
+        while (node && node !== notesEditor) {
+            if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('tooltip-wrapper')) {
+                return node;
+            }
+            node = node.parentNode;
+        }
+        return null;
+    }
+
+    function unwrapTooltipElement(element) {
+        if (!element || !element.parentNode) return null;
+        const fragment = document.createDocumentFragment();
+        let lastChild = null;
+        while (element.firstChild) {
+            lastChild = fragment.appendChild(element.firstChild);
+        }
+        element.parentNode.replaceChild(fragment, element);
+        return lastChild;
+    }
+
+    function createCollapsedRangeAfterNode(node) {
+        if (!node) return null;
+        const range = document.createRange();
+        if (node.nodeType === Node.TEXT_NODE) {
+            range.setStart(node, node.length);
+        } else if (node.parentNode) {
+            range.setStartAfter(node);
+        } else {
+            return null;
+        }
+        range.collapse(true);
+        return range;
+    }
+
     // --- Undo/Redo History ---
     const historyStack = [];
     let historyIndex = -1;
@@ -2263,16 +2298,23 @@ document.addEventListener('DOMContentLoaded', function () {
         // Run a callback while preserving the current text selection
         const withEditorSelection = (fn) => {
             const sel = window.getSelection();
-            const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+            const hasSelection = sel && sel.rangeCount > 0;
+            const originalRange = hasSelection ? sel.getRangeAt(0).cloneRange() : null;
             const scrollY = window.scrollY;
             const modalScroll = notesModalContent.scrollTop;
-            fn();
-            if (range) {
-                sel.removeAllRanges();
-                sel.addRange(range);
+            const result = fn(sel);
+            if (sel) {
+                if (result && result.type === 'setRange' && result.range) {
+                    sel.removeAllRanges();
+                    sel.addRange(result.range);
+                } else if (originalRange) {
+                    sel.removeAllRanges();
+                    sel.addRange(originalRange);
+                }
             }
             window.scrollTo(0, scrollY);
             notesModalContent.scrollTop = modalScroll;
+            return result;
         };
 
         const createButton = (title, content, command, value = null, action = null, extraClass = '') => {
@@ -2283,17 +2325,103 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.addEventListener('mousedown', e => e.preventDefault());
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                withEditorSelection(() => {
+                withEditorSelection((sel) => {
                     if (command) {
                         document.execCommand(command, false, value);
                     }
                     if (action) {
-                        action();
+                        return action(sel);
                     }
+                    return null;
                 });
                 notesEditor.focus({ preventScroll: true });
             });
             return btn;
+        };
+
+        const disallowedTooltipSelector = 'p, div, section, article, table, ul, ol, li, h1, h2, h3, h4, h5, h6, blockquote, pre, details, figure';
+
+        const insertOrEditTooltip = (sel) => {
+            if (!sel || sel.rangeCount === 0) {
+                showAlert('Selecciona el texto al que deseas añadir un tooltip.');
+                return null;
+            }
+
+            const currentRange = sel.getRangeAt(0);
+            let existingTooltip = findTooltipWrapper(currentRange.commonAncestorContainer) ||
+                findTooltipWrapper(sel.anchorNode) ||
+                findTooltipWrapper(sel.focusNode);
+
+            if (!existingTooltip && currentRange.collapsed) {
+                showAlert('Selecciona el texto al que deseas añadir un tooltip.');
+                return null;
+            }
+
+            const containerNode = currentRange.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+                ? currentRange.commonAncestorContainer
+                : currentRange.commonAncestorContainer.parentNode;
+
+            if (!existingTooltip && (!containerNode || !notesEditor.contains(containerNode))) {
+                showAlert('Selecciona el texto dentro de la nota antes de añadir el tooltip.');
+                return null;
+            }
+
+            const defaultText = existingTooltip ? (existingTooltip.dataset.tooltip || '') : '';
+            const tooltipText = prompt(existingTooltip ? 'Editar tooltip' : 'Texto del tooltip', defaultText);
+            if (tooltipText === null) {
+                return null;
+            }
+
+            const trimmed = tooltipText.trim();
+
+            if (existingTooltip) {
+                const parentNode = existingTooltip.parentNode;
+                if (!trimmed) {
+                    const lastNode = unwrapTooltipElement(existingTooltip);
+                    recordHistory();
+                    const rangeAfter = createCollapsedRangeAfterNode(lastNode);
+                    if (rangeAfter) {
+                        return { type: 'setRange', range: rangeAfter };
+                    }
+                    if (parentNode) {
+                        const fallbackRange = document.createRange();
+                        fallbackRange.setStart(parentNode, 0);
+                        fallbackRange.collapse(true);
+                        return { type: 'setRange', range: fallbackRange };
+                    }
+                    return null;
+                }
+                existingTooltip.dataset.tooltip = trimmed;
+                existingTooltip.setAttribute('data-tooltip', trimmed);
+                const newRange = document.createRange();
+                newRange.selectNodeContents(existingTooltip);
+                newRange.collapse(false);
+                recordHistory();
+                return { type: 'setRange', range: newRange };
+            }
+
+            if (!trimmed) {
+                return null;
+            }
+
+            const fragment = currentRange.cloneContents();
+            if (fragment.querySelector && fragment.querySelector(disallowedTooltipSelector)) {
+                showAlert('El tooltip solo se puede aplicar a texto o elementos en línea.');
+                return null;
+            }
+
+            const wrapper = document.createElement('span');
+            wrapper.className = 'tooltip-wrapper';
+            wrapper.dataset.tooltip = trimmed;
+            wrapper.setAttribute('data-tooltip', trimmed);
+            wrapper.setAttribute('tabindex', '0');
+            wrapper.appendChild(currentRange.extractContents());
+            currentRange.insertNode(wrapper);
+            const newRange = document.createRange();
+            newRange.setStartAfter(wrapper);
+            newRange.collapse(true);
+            recordHistory();
+            return { type: 'setRange', range: newRange };
         };
 
         const blockSelector = 'p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details, table';
@@ -3753,6 +3881,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const subnoteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
         // El botón ahora crea una sub-nota en lugar de un Post-it
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
+
+        const tooltipBtn = createButton('Insertar tooltip', '💬', null, null, insertOrEditTooltip);
+        editorToolbar.appendChild(tooltipBtn);
 
         editorToolbar.appendChild(createSeparator());
 
@@ -6088,6 +6219,49 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         notesEditor.addEventListener('dblclick', (e) => {
+            const tooltipSpan = e.target.closest('.tooltip-wrapper');
+            if (tooltipSpan) {
+                e.preventDefault();
+                const newText = prompt('Editar tooltip', tooltipSpan.dataset.tooltip || '');
+                if (newText === null) {
+                    return;
+                }
+                const trimmed = newText.trim();
+                if (!trimmed) {
+                    const parentNode = tooltipSpan.parentNode;
+                    const lastNode = unwrapTooltipElement(tooltipSpan);
+                    recordHistory();
+                    const rangeAfter = createCollapsedRangeAfterNode(lastNode) || (() => {
+                        if (!parentNode) return null;
+                        const range = document.createRange();
+                        range.setStart(parentNode, 0);
+                        range.collapse(true);
+                        return range;
+                    })();
+                    if (rangeAfter) {
+                        const sel = window.getSelection();
+                        if (sel) {
+                            sel.removeAllRanges();
+                            sel.addRange(rangeAfter);
+                        }
+                    }
+                } else {
+                    tooltipSpan.dataset.tooltip = trimmed;
+                    tooltipSpan.setAttribute('data-tooltip', trimmed);
+                    const range = document.createRange();
+                    range.selectNodeContents(tooltipSpan);
+                    range.collapse(false);
+                    const sel = window.getSelection();
+                    if (sel) {
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                    recordHistory();
+                }
+                notesEditor.focus({ preventScroll: true });
+                return;
+            }
+
             if (e.target.tagName === 'IMG') {
                 e.preventDefault();
                 const images = Array.from(notesEditor.querySelectorAll('img')).map(img => ({
