@@ -573,8 +573,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const subNoteTitle = getElem('subnote-title');
     const subNoteEditor = getElem('subnote-editor');
     const subNoteModalContent = subNoteModal ? subNoteModal.querySelector('.notes-modal-content') : null;
-    const tooltipIconSelector = getElem('tooltip-icon-selector');
-    const tooltipIconButtons = tooltipIconSelector ? Array.from(tooltipIconSelector.querySelectorAll('button[data-icon]')) : [];
     const toggleHtmlPasteBtn = getElem('toggle-html-paste-btn');
     const dragBtn = getElem('toggle-block-drag-btn');
     const fullscreenBtn = getElem('toggle-fullscreen-btn');
@@ -624,6 +622,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const TOOLTIP_ICON_OPTIONS = ['✽', '✱', '🟢', '🔵', '●', '◆', 'ℹ️'];
     const DEFAULT_TOOLTIP_ICON = 'ℹ️';
+
+    let toolbarSelectedTooltipIcon = DEFAULT_TOOLTIP_ICON;
+    let tooltipIconSelector = null;
+    let tooltipIconButtons = [];
+    let tooltipIconPickerBtn = null;
+    let tooltipIconOutsideHandler = null;
+    let tooltipIconGlobalListenersInitialized = false;
+    let restoreToolbarIconOnClose = null;
+    let hideTooltipIconSelector = () => {};
 
     // Note style modal elements
     const noteStyleModal = getElem('note-style-modal');
@@ -2362,6 +2369,110 @@ document.addEventListener('DOMContentLoaded', function () {
             return icon || DEFAULT_TOOLTIP_ICON;
         };
 
+        const updateTooltipIconPickerLabel = (icon) => {
+            if (tooltipIconPickerBtn) {
+                tooltipIconPickerBtn.innerHTML = `<span class="tooltip-icon-current">${icon}</span><span class="tooltip-icon-label">Icono tooltip</span><span class="tooltip-icon-caret">▾</span>`;
+            }
+        };
+
+        const syncTooltipIconSelectionUI = (icon) => {
+            const sanitized = sanitizeTooltipIcon(icon);
+            tooltipIconButtons.forEach(btn => {
+                const isActive = btn.dataset.icon === sanitized;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+            updateTooltipIconPickerLabel(sanitized);
+            return sanitized;
+        };
+
+        const applyTooltipIconSelection = (icon, { updateDefault = true, updateActive = true } = {}) => {
+            const sanitized = sanitizeTooltipIcon(icon);
+            if (updateDefault) {
+                toolbarSelectedTooltipIcon = sanitized;
+            }
+            syncTooltipIconSelectionUI(sanitized);
+            if (updateActive && isTooltipEditing && activeTooltipState) {
+                activeTooltipState.icon = sanitized;
+            }
+            return sanitized;
+        };
+
+        if (tooltipIconOutsideHandler) {
+            document.removeEventListener('mousedown', tooltipIconOutsideHandler);
+            tooltipIconOutsideHandler = null;
+        }
+        if (tooltipIconSelector && tooltipIconSelector.parentNode) {
+            tooltipIconSelector.remove();
+        }
+        tooltipIconSelector = document.createElement('div');
+        tooltipIconSelector.id = 'tooltip-icon-selector';
+        tooltipIconSelector.className = 'tooltip-icon-selector hidden';
+        tooltipIconSelector.setAttribute('role', 'menu');
+        const tooltipIconLabel = document.createElement('span');
+        tooltipIconLabel.className = 'tooltip-icon-selector-label';
+        tooltipIconLabel.textContent = 'Icono del tooltip';
+        const tooltipIconOptions = document.createElement('div');
+        tooltipIconOptions.className = 'tooltip-icon-options';
+        tooltipIconSelector.append(tooltipIconLabel, tooltipIconOptions);
+        document.body.appendChild(tooltipIconSelector);
+        tooltipIconButtons = [];
+        TOOLTIP_ICON_OPTIONS.forEach(optionIcon => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'tooltip-icon-option';
+            btn.dataset.icon = optionIcon;
+            btn.textContent = optionIcon;
+            btn.setAttribute('aria-pressed', 'false');
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                applyTooltipIconSelection(optionIcon);
+                hideTooltipIconSelector();
+            });
+            tooltipIconOptions.appendChild(btn);
+            tooltipIconButtons.push(btn);
+        });
+
+        const positionTooltipIconSelector = () => {
+            if (!tooltipIconSelector || !tooltipIconPickerBtn) return;
+            const rect = tooltipIconPickerBtn.getBoundingClientRect();
+            tooltipIconSelector.style.top = `${rect.bottom + window.scrollY + 8}px`;
+            tooltipIconSelector.style.left = `${rect.left + window.scrollX}px`;
+        };
+
+        const showTooltipIconSelector = () => {
+            if (!tooltipIconSelector) return;
+            positionTooltipIconSelector();
+            tooltipIconSelector.classList.remove('hidden');
+            tooltipIconPickerBtn?.classList.add('active');
+            tooltipIconPickerBtn?.setAttribute('aria-expanded', 'true');
+            tooltipIconOutsideHandler = (event) => {
+                if (!tooltipIconSelector.contains(event.target) && event.target !== tooltipIconPickerBtn) {
+                    hideTooltipIconSelector();
+                }
+            };
+            document.addEventListener('mousedown', tooltipIconOutsideHandler);
+        };
+
+        hideTooltipIconSelector = () => {
+            if (!tooltipIconSelector) return;
+            tooltipIconSelector.classList.add('hidden');
+            tooltipIconPickerBtn?.classList.remove('active');
+            tooltipIconPickerBtn?.setAttribute('aria-expanded', 'false');
+            if (tooltipIconOutsideHandler) {
+                document.removeEventListener('mousedown', tooltipIconOutsideHandler);
+                tooltipIconOutsideHandler = null;
+            }
+        };
+
+        if (!tooltipIconGlobalListenersInitialized) {
+            window.addEventListener('resize', hideTooltipIconSelector);
+            document.addEventListener('scroll', hideTooltipIconSelector, true);
+            tooltipIconGlobalListenersInitialized = true;
+        }
+
+        syncTooltipIconSelectionUI(toolbarSelectedTooltipIcon);
+
         const setTooltipIconOnElement = (tooltipEl, iconChar) => {
             if (!tooltipEl) return null;
             const icon = sanitizeTooltipIcon(iconChar);
@@ -2391,33 +2502,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 || '';
             return sanitizeTooltipIcon(icon);
         };
-
-        const syncTooltipIconSelectionUI = (icon) => {
-            const sanitized = sanitizeTooltipIcon(icon);
-            if (!tooltipIconSelector) {
-                return sanitized;
-            }
-            let iconForUI = sanitized;
-            if (tooltipIconButtons.length && !tooltipIconButtons.some(btn => btn.dataset.icon === sanitized)) {
-                iconForUI = DEFAULT_TOOLTIP_ICON;
-            }
-            tooltipIconButtons.forEach(btn => {
-                const isActive = btn.dataset.icon === iconForUI;
-                btn.classList.toggle('active', isActive);
-                btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-            });
-            return sanitized;
-        };
-
-        if (tooltipIconButtons.length) {
-            tooltipIconButtons.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    if (!isTooltipEditing || !activeTooltipState) return;
-                    const appliedIcon = syncTooltipIconSelectionUI(btn.dataset.icon || DEFAULT_TOOLTIP_ICON);
-                    activeTooltipState.icon = appliedIcon;
-                });
-            });
-        }
 
         const normalizeTooltipElement = (tooltipEl) => {
             if (!tooltipEl) return null;
@@ -2559,14 +2643,21 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const openTooltipEditor = (existingTooltip, range) => {
+            hideTooltipIconSelector();
             isTooltipEditing = true;
             const normalizedTooltip = existingTooltip ? normalizeTooltipElement(existingTooltip) : null;
-            const initialIcon = normalizedTooltip ? getTooltipIconFromElement(normalizedTooltip) : DEFAULT_TOOLTIP_ICON;
-            const appliedIcon = syncTooltipIconSelectionUI(initialIcon);
+            const initialIcon = normalizedTooltip ? getTooltipIconFromElement(normalizedTooltip) : toolbarSelectedTooltipIcon;
+            if (normalizedTooltip) {
+                restoreToolbarIconOnClose = toolbarSelectedTooltipIcon;
+                applyTooltipIconSelection(initialIcon, { updateDefault: true, updateActive: false });
+            } else {
+                restoreToolbarIconOnClose = null;
+                syncTooltipIconSelectionUI(toolbarSelectedTooltipIcon);
+            }
             activeTooltipState = {
                 existingTooltip: normalizedTooltip,
                 range: normalizedTooltip ? null : range,
-                icon: appliedIcon
+                icon: sanitizeTooltipIcon(normalizedTooltip ? initialIcon : toolbarSelectedTooltipIcon)
             };
             hideManualTooltipPopover(true);
             if (subNoteModalContent) {
@@ -2589,16 +2680,15 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         const resetTooltipEditorState = () => {
+            hideTooltipIconSelector();
+            if (restoreToolbarIconOnClose !== null) {
+                toolbarSelectedTooltipIcon = restoreToolbarIconOnClose;
+                restoreToolbarIconOnClose = null;
+            }
+            syncTooltipIconSelectionUI(toolbarSelectedTooltipIcon);
             if (toggleSubnoteReadOnlyBtn) {
                 toggleSubnoteReadOnlyBtn.removeAttribute('hidden');
             }
-            if (tooltipIconSelector) {
-                tooltipIconSelector.classList.add('hidden');
-            }
-            tooltipIconButtons.forEach(btn => {
-                btn.classList.remove('active');
-                btn.setAttribute('aria-pressed', 'false');
-            });
             if (subNoteModalContent) {
                 subNoteModalContent.classList.remove('tooltip-mode');
                 if (subnoteModalWasReadonly) {
@@ -2618,6 +2708,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const saveTooltipContent = (closeModal = false) => {
             if (!isTooltipEditing || !activeTooltipState) return;
+            hideTooltipIconSelector();
             const html = subNoteEditor.innerHTML;
             const isEmpty = isTooltipHtmlEmpty(html);
             const icon = sanitizeTooltipIcon(activeTooltipState.icon);
@@ -2734,6 +2825,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         const handleTooltipTool = () => {
+            hideTooltipIconSelector();
             const selection = window.getSelection();
             if (!selection || selection.rangeCount === 0) {
                 showAlert('Selecciona el texto al que deseas agregar un tooltip.');
@@ -3356,19 +3448,72 @@ document.addEventListener('DOMContentLoaded', function () {
             notesEditor.focus({ preventScroll: true });
         };
 
-        const PRESET_STYLES = [
-            { label: 'Texto estilo celeste', style: 'font-family:Arial; font-weight:600; background:#e0f7fa; color:#01579b; padding:2px 4px; border-radius:4px;' },
-            { label: 'Texto estilo lila', style: 'font-family:Arial; font-weight:600; background:#f3e5f5; color:#6a1b9a; padding:2px 4px; border-radius:4px;' },
-            { label: 'Texto estilo menta', style: 'font-family:Arial; font-weight:600; background:#e8f5e9; color:#1b5e20; padding:2px 4px; border-radius:4px;' },
-            { label: 'Texto estilo durazno', style: 'font-family:Arial; font-weight:600; background:#fff3e0; color:#e65100; padding:2px 4px; border-radius:4px;' },
-            { label: 'Texto estilo amarillo', style: 'font-family:Arial; font-weight:600; background:#fffde7; color:#f57f17; padding:2px 4px; border-radius:4px;' },
-            { label: 'Texto estilo rosado', style: 'font-family:Arial; font-weight:600; background:#fce4ec; color:#ad1457; padding:2px 4px; border-radius:4px;' },
-            { label: 'Texto estilo azul', style: 'font-family:Arial; font-weight:600; background:#e3f2fd; color:#1a237e; padding:2px 4px; border-radius:4px;' },
-            { label: 'Texto estilo turquesa', style: 'font-family:Arial; font-weight:600; background:#e0f2f1; color:#004d40; padding:2px 4px; border-radius:4px;' },
-            { label: 'Texto estilo arena', style: 'font-family:Arial; font-weight:600; background:#fbe9e7; color:#4e342e; padding:2px 4px; border-radius:4px;' },
-            { label: 'Texto estilo café', style: 'font-family:Arial; font-weight:600; background:#efebe9; color:#5d4037; padding:2px 4px; border-radius:4px;' },
-            { label: 'Texto estilo rojo', style: 'font-family:Arial; font-weight:600; background:#f44336; color:#ffffff; padding:2px 4px; border-radius:4px;' },
-            { label: 'Texto estilo verde oscuro', style: 'font-family:Arial; font-weight:600; background:#1b5e20; color:#ffffff; padding:2px 4px; border-radius:4px;' }
+        const buildPresetStyle = (background, color) => `font-family:Arial; font-weight:600; background:${background}; color:${color}; padding:2px 4px; border-radius:4px;`;
+
+        const hexToRgb = (hex) => {
+            let value = (hex || '#000000').replace('#', '');
+            if (value.length === 3) {
+                value = value.split('').map(ch => ch + ch).join('');
+            }
+            const num = parseInt(value, 16);
+            return {
+                r: (num >> 16) & 255,
+                g: (num >> 8) & 255,
+                b: num & 255
+            };
+        };
+
+        const rgbToHex = (r, g, b) => '#' + [r, g, b]
+            .map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0'))
+            .join('');
+
+        const mixColors = (hex1, hex2, weight = 0.5) => {
+            const w = Math.max(0, Math.min(1, weight));
+            const c1 = hexToRgb(hex1);
+            const c2 = hexToRgb(hex2);
+            return rgbToHex(
+                c1.r * w + c2.r * (1 - w),
+                c1.g * w + c2.g * (1 - w),
+                c1.b * w + c2.b * (1 - w)
+            );
+        };
+
+        const VARIANT_BLUEPRINTS = [
+            { name: 'Pastel', create: (bg, color) => ({ background: mixColors(bg, '#ffffff', 0.72), color: mixColors(color, '#374151', 0.55) }) },
+            { name: 'Intenso', create: (bg, color) => ({ background: mixColors(bg, '#000000', 0.85), color: mixColors(color, '#ffffff', 0.4) }) },
+            { name: 'Contraste', create: (bg, color) => ({ background: mixColors(bg, color, 0.6), color: mixColors(color, '#111827', 0.7) }) },
+            { name: 'Suave', create: (bg, color) => ({ background: mixColors(bg, '#ffffff', 0.85), color: mixColors(color, '#000000', 0.5) }) }
+        ];
+
+        const createStyleGroup = (label, background, color) => {
+            const baseStyle = buildPresetStyle(background, color);
+            const variants = VARIANT_BLUEPRINTS.map(variant => {
+                const colors = variant.create(background, color);
+                return {
+                    label: `${label} ${variant.name}`,
+                    style: buildPresetStyle(colors.background, colors.color)
+                };
+            });
+            return { label, style: baseStyle, variants };
+        };
+
+        const PRESET_STYLE_GROUPS = [
+            createStyleGroup('Texto estilo celeste', '#e0f7fa', '#01579b'),
+            createStyleGroup('Texto estilo lila', '#f3e5f5', '#6a1b9a'),
+            createStyleGroup('Texto estilo menta', '#e8f5e9', '#1b5e20'),
+            createStyleGroup('Texto estilo durazno', '#fff3e0', '#e65100'),
+            createStyleGroup('Texto estilo amarillo', '#fffde7', '#f57f17'),
+            createStyleGroup('Texto estilo rosado', '#fce4ec', '#ad1457'),
+            createStyleGroup('Texto estilo azul', '#e3f2fd', '#1a237e'),
+            createStyleGroup('Texto estilo turquesa', '#e0f2f1', '#004d40'),
+            createStyleGroup('Texto estilo arena', '#fbe9e7', '#4e342e'),
+            createStyleGroup('Texto estilo café', '#efebe9', '#5d4037'),
+            createStyleGroup('Texto estilo rojo', '#f44336', '#ffffff'),
+            createStyleGroup('Texto estilo verde oscuro', '#1b5e20', '#ffffff'),
+            createStyleGroup('Texto estilo coral', '#ffe5e0', '#bf360c'),
+            createStyleGroup('Texto estilo oliva', '#f1f8e9', '#33691e'),
+            createStyleGroup('Texto estilo marino', '#e1f5fe', '#0277bd'),
+            createStyleGroup('Texto estilo grafito', '#eceff1', '#263238')
         ];
 
         const applyPresetStyle = (cssText, existingSpan = null) => {
@@ -3401,18 +3546,53 @@ document.addEventListener('DOMContentLoaded', function () {
             const btn = createButton('Estilos de texto', '🖌️', null, null, null);
             dropdown.appendChild(btn);
             const content = document.createElement('div');
-            content.className = 'symbol-dropdown-content flex-dropdown';
-            PRESET_STYLES.forEach(s => {
-                const opt = document.createElement('button');
-                opt.className = 'toolbar-btn';
-                opt.innerHTML = `<span style="${s.style}">${s.label}</span>`;
-                opt.addEventListener('click', (e) => {
+            content.className = 'symbol-dropdown-content preset-style-grid';
+            PRESET_STYLE_GROUPS.forEach(group => {
+                const option = document.createElement('div');
+                option.className = 'preset-style-option';
+                const row = document.createElement('div');
+                row.className = 'preset-style-row';
+                const mainBtn = document.createElement('button');
+                mainBtn.className = 'toolbar-btn';
+                mainBtn.innerHTML = `<span style="${group.style}">${group.label}</span>`;
+                mainBtn.addEventListener('click', (e) => {
                     e.preventDefault();
-                    applyPresetStyle(s.style);
+                    applyPresetStyle(group.style);
                     content.classList.remove('visible');
+                    content.querySelectorAll('.preset-style-variants').forEach(list => list.hidden = true);
                     notesEditor.focus({ preventScroll: true });
                 });
-                content.appendChild(opt);
+                row.appendChild(mainBtn);
+                const toggle = document.createElement('button');
+                toggle.className = 'toolbar-btn preset-style-variants-toggle';
+                toggle.innerHTML = '＋';
+                toggle.title = 'Ver variaciones';
+                row.appendChild(toggle);
+                option.appendChild(row);
+                const variantsList = document.createElement('div');
+                variantsList.className = 'preset-style-variants';
+                variantsList.hidden = true;
+                group.variants.forEach(variant => {
+                    const variantBtn = document.createElement('button');
+                    variantBtn.className = 'toolbar-btn';
+                    variantBtn.innerHTML = `<span style="${variant.style}">${variant.label}</span>`;
+                    variantBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        applyPresetStyle(variant.style);
+                        content.classList.remove('visible');
+                        variantsList.hidden = true;
+                        notesEditor.focus({ preventScroll: true });
+                    });
+                    variantsList.appendChild(variantBtn);
+                });
+                option.appendChild(variantsList);
+                toggle.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const shouldOpen = variantsList.hidden;
+                    content.querySelectorAll('.preset-style-variants').forEach(list => list.hidden = true);
+                    variantsList.hidden = !shouldOpen ? true : false;
+                });
+                content.appendChild(option);
             });
             dropdown.appendChild(content);
             btn.addEventListener('click', (e) => {
@@ -3421,8 +3601,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
                     if (d !== content) d.classList.remove('visible');
                 });
-                content.classList.toggle('visible');
-                if (content.classList.contains('visible')) {
+                const wasVisible = content.classList.contains('visible');
+                content.classList.toggle('visible', !wasVisible);
+                if (!wasVisible) {
                     const editorRect = notesModalContent.getBoundingClientRect();
                     const dropdownRect = dropdown.getBoundingClientRect();
                     const contentRect = content.getBoundingClientRect();
@@ -3433,6 +3614,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (left < minLeft) left = minLeft;
                     if (left > maxLeft) left = maxLeft;
                     content.style.left = `${left}px`;
+                } else {
+                    content.querySelectorAll('.preset-style-variants').forEach(list => list.hidden = true);
                 }
             });
             return dropdown;
@@ -3464,6 +3647,19 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             openNoteStyleModal();
         }));
+
+        tooltipIconPickerBtn = createButton('Seleccionar icono de tooltip', '', null, null, () => {
+            if (!tooltipIconSelector) return;
+            if (tooltipIconSelector.classList.contains('hidden')) {
+                showTooltipIconSelector();
+            } else {
+                hideTooltipIconSelector();
+            }
+        }, 'tooltip-icon-picker-btn');
+        tooltipIconPickerBtn.setAttribute('aria-haspopup', 'true');
+        tooltipIconPickerBtn.setAttribute('aria-expanded', 'false');
+        updateTooltipIconPickerLabel(toolbarSelectedTooltipIcon);
+        editorToolbar.appendChild(tooltipIconPickerBtn);
 
         editorToolbar.appendChild(createButton('Añadir tooltip', '💬', null, null, handleTooltipTool));
 
@@ -3542,16 +3738,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const showStylePopup = (span) => {
             stylePopup.innerHTML = '';
-            PRESET_STYLES.forEach(s => {
-                const btn = document.createElement('button');
-                btn.className = 'toolbar-btn';
-                btn.innerHTML = `<span style="${s.style}">${s.label}</span>`;
-                btn.addEventListener('click', () => {
-                    applyPresetStyle(s.style, currentStyledSpan);
+            PRESET_STYLE_GROUPS.forEach(group => {
+                const baseBtn = document.createElement('button');
+                baseBtn.className = 'toolbar-btn';
+                baseBtn.innerHTML = `<span style="${group.style}">${group.label}</span>`;
+                baseBtn.addEventListener('click', () => {
+                    applyPresetStyle(group.style, currentStyledSpan);
                     hideStylePopup();
                     notesEditor.focus({ preventScroll: true });
                 });
-                stylePopup.appendChild(btn);
+                stylePopup.appendChild(baseBtn);
+                group.variants.forEach(variant => {
+                    const variantBtn = document.createElement('button');
+                    variantBtn.className = 'toolbar-btn';
+                    variantBtn.innerHTML = `<span style="${variant.style}">${variant.label}</span>`;
+                    variantBtn.style.paddingLeft = '24px';
+                    variantBtn.addEventListener('click', () => {
+                        applyPresetStyle(variant.style, currentStyledSpan);
+                        hideStylePopup();
+                        notesEditor.focus({ preventScroll: true });
+                    });
+                    stylePopup.appendChild(variantBtn);
+                });
             });
             stylePopup.style.display = 'block';
             const rect = span.getBoundingClientRect();
@@ -3719,12 +3927,18 @@ document.addEventListener('DOMContentLoaded', function () {
         const addColumn = (table, index) => { Array.from(table.rows).forEach(r => r.insertCell(index).innerHTML = '&nbsp;'); };
         const deleteColumn = (table, index) => { Array.from(table.rows).forEach(r => { if (r.cells.length > 1) r.deleteCell(index); }); };
         const TABLE_THEMES = [
-            { label: 'Azul', class: 'table-theme-blue' },
-            { label: 'Verde', class: 'table-theme-green' },
-            { label: 'Gris', class: 'table-theme-gray' },
-            { label: 'Rojo', class: 'table-theme-red' },
-            { label: 'Morado', class: 'table-theme-purple' },
-            { label: 'Turquesa', class: 'table-theme-teal' }
+            { label: 'Clásico azul', class: 'table-theme-blue', preview: { headerBg: '#bbdefb', headerColor: '#0d47a1', row1: '#ffffff', row2: '#e3f2fd', border: '#2196f3' } },
+            { label: 'Selva vibrante', class: 'table-theme-green', preview: { headerBg: '#c8e6c9', headerColor: '#1b5e20', row1: '#ffffff', row2: '#eaf5eb', border: '#4caf50' } },
+            { label: 'Profesional gris', class: 'table-theme-slate', preview: { headerBg: '#cfd8dc', headerColor: '#29434e', row1: '#ffffff', row2: '#f5f7f8', border: '#607d8b' } },
+            { label: 'Coral suave', class: 'table-theme-rose', preview: { headerBg: '#ffc1e3', headerColor: '#ad1457', row1: '#fff6fb', row2: '#ffe0ef', border: '#f06292' } },
+            { label: 'Amanecer cálido', class: 'table-theme-sunrise', preview: { headerBg: '#ffe0b2', headerColor: '#e65100', row1: '#fffaf5', row2: '#ffe8d9', border: '#ff7043' } },
+            { label: 'Lavanda', class: 'table-theme-purple', preview: { headerBg: '#e1bee7', headerColor: '#4a148c', row1: '#ffffff', row2: '#f5e9f7', border: '#9c27b0' } },
+            { label: 'Turquesa brillante', class: 'table-theme-teal', preview: { headerBg: '#e0f2f1', headerColor: '#004d40', row1: '#ffffff', row2: '#e8fffb', border: '#009688' } },
+            { label: 'Zafiro', class: 'table-theme-indigo', preview: { headerBg: '#c5cae9', headerColor: '#1a237e', row1: '#ffffff', row2: '#e8eaf6', border: '#3949ab' } },
+            { label: 'Arena dorada', class: 'table-theme-amber', preview: { headerBg: '#ffecb3', headerColor: '#ff6f00', row1: '#fffdf5', row2: '#fff5d7', border: '#ffb300' } },
+            { label: 'Esmeralda', class: 'table-theme-emerald', preview: { headerBg: '#b9f6ca', headerColor: '#1b5e20', row1: '#ffffff', row2: '#e6ffef', border: '#2e7d32' } },
+            { label: 'Clásico rojo', class: 'table-theme-red', preview: { headerBg: '#ffcdd2', headerColor: '#b71c1c', row1: '#ffffff', row2: '#ffe7ea', border: '#f44336' } },
+            { label: 'Minimalista gris', class: 'table-theme-gray', preview: { headerBg: '#e0e0e0', headerColor: '#212121', row1: '#ffffff', row2: '#f7f7f7', border: '#9e9e9e' } }
         ];
         const showTableMenu = (table, cell) => {
             currentTable = table;
@@ -3767,43 +3981,90 @@ document.addEventListener('DOMContentLoaded', function () {
                 makeBtn('Eliminar columna', '🗑️', () => deleteColumn(table, cIndex));
             };
 
+            const HEADER_COLORS = [
+                { label: 'Cabecera azul suave', bg: '#bbdefb', color: '#0d47a1', accent: '#2196f3' },
+                { label: 'Cabecera índigo', bg: '#c5cae9', color: '#1a237e', accent: '#3949ab' },
+                { label: 'Cabecera verde lima', bg: '#dcedc8', color: '#33691e', accent: '#8bc34a' },
+                { label: 'Cabecera esmeralda', bg: '#b2f2bb', color: '#1b5e20', accent: '#2e7d32' },
+                { label: 'Cabecera ámbar', bg: '#ffecb3', color: '#ff6f00', accent: '#ffb300' },
+                { label: 'Cabecera coral', bg: '#ffccbc', color: '#bf360c', accent: '#ff7043' },
+                { label: 'Cabecera lavanda', bg: '#e1bee7', color: '#4a148c', accent: '#ab47bc' },
+                { label: 'Cabecera gris azulado', bg: '#cfd8dc', color: '#37474f', accent: '#90a4ae' }
+            ];
+
             const buildStyleTab = () => {
                 tabContent.innerHTML = '';
-                TABLE_THEMES.forEach(t => {
-                    const b = document.createElement('button');
-                    b.className = 'toolbar-btn';
-                    b.textContent = t.label;
-                    b.addEventListener('click', () => {
+                const themeSection = document.createElement('div');
+                themeSection.className = 'table-style-section';
+                const themeTitle = document.createElement('div');
+                themeTitle.className = 'table-style-section-title';
+                themeTitle.textContent = 'Temas completos';
+                themeSection.appendChild(themeTitle);
+                const themeGrid = document.createElement('div');
+                themeGrid.className = 'table-theme-grid';
+                TABLE_THEMES.forEach(theme => {
+                    const option = document.createElement('button');
+                    option.type = 'button';
+                    option.className = 'table-theme-option';
+                    option.innerHTML = `
+                        <div class="table-theme-preview">
+                            <div class="header-row"><span>Aa</span><span>Bb</span><span>Cc</span></div>
+                            <div class="body-row"><div class="cell"></div><div class="cell"></div><div class="cell"></div></div>
+                            <div class="body-row"><div class="cell"></div><div class="cell"></div><div class="cell"></div></div>
+                        </div>
+                        <span class="table-theme-option-label">${theme.label}</span>
+                    `;
+                    option.style.setProperty('--table-preview-border', theme.preview.border);
+                    option.style.setProperty('--table-preview-header-bg', theme.preview.headerBg);
+                    option.style.setProperty('--table-preview-header-color', theme.preview.headerColor);
+                    option.style.setProperty('--table-preview-row1-bg', theme.preview.row1);
+                    option.style.setProperty('--table-preview-row2-bg', theme.preview.row2);
+                    option.addEventListener('click', () => {
                         TABLE_THEMES.forEach(tt => table.classList.remove(tt.class));
-                        table.classList.add(t.class);
+                        table.classList.add(theme.class);
                         hideTableMenu();
                         notesEditor.focus({ preventScroll: true });
                     });
-                    tabContent.appendChild(b);
+                    themeGrid.appendChild(option);
                 });
-                const HEADER_COLORS = [
-                    { label: 'Cabecera azul', bg: '#bbdefb', color: '#0d47a1' },
-                    { label: 'Cabecera verde', bg: '#c8e6c9', color: '#1b5e20' },
-                    { label: 'Cabecera gris', bg: '#e0e0e0', color: '#212121' },
-                    { label: 'Cabecera roja', bg: '#ffcdd2', color: '#b71c1c' },
-                    { label: 'Cabecera morada', bg: '#e1bee7', color: '#4a148c' },
-                    { label: 'Cabecera turquesa', bg: '#e0f2f1', color: '#004d40' }
-                ];
-                HEADER_COLORS.forEach(h => {
-                    const b = document.createElement('button');
-                    b.className = 'toolbar-btn';
-                    b.textContent = h.label;
-                    b.addEventListener('click', () => {
+                themeSection.appendChild(themeGrid);
+                tabContent.appendChild(themeSection);
+
+                const headerSection = document.createElement('div');
+                headerSection.className = 'table-style-section';
+                const headerTitle = document.createElement('div');
+                headerTitle.className = 'table-style-section-title';
+                headerTitle.textContent = 'Cabeceras rápidas';
+                headerSection.appendChild(headerTitle);
+                const headerList = document.createElement('div');
+                headerList.className = 'table-header-list';
+                HEADER_COLORS.forEach(preset => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'table-header-option';
+                    btn.innerHTML = `<span class="table-header-preview">Aa</span><span class="table-header-option-label">${preset.label}</span>`;
+                    btn.style.setProperty('--table-header-bg', preset.bg);
+                    btn.style.setProperty('--table-header-color', preset.color);
+                    btn.style.setProperty('--table-header-border', preset.accent || preset.color);
+                    btn.addEventListener('click', () => {
                         const row = table.rows[0];
-                        if (row) Array.from(row.cells).forEach(c => {
-                            c.style.backgroundColor = h.bg;
-                            c.style.color = h.color;
-                        });
+                        if (row) {
+                            Array.from(row.cells).forEach(c => {
+                                c.style.backgroundColor = preset.bg;
+                                c.style.color = preset.color;
+                                if (preset.accent) {
+                                    c.style.borderBottomColor = preset.accent;
+                                    c.style.borderTopColor = preset.accent;
+                                }
+                            });
+                        }
                         hideTableMenu();
                         notesEditor.focus({ preventScroll: true });
                     });
-                    tabContent.appendChild(b);
+                    headerList.appendChild(btn);
                 });
+                headerSection.appendChild(headerList);
+                tabContent.appendChild(headerSection);
             };
 
             const tabs = [
@@ -4696,6 +4957,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function hideModal(modal) {
         modal.classList.remove('visible');
+        hideTooltipIconSelector();
         if (modal === notesModal) {
             resetEditorModes();
         }
