@@ -440,6 +440,11 @@
     font-size: 0.65rem;
     color: var(--text-secondary, #6b7280);
 }
+
+.toolbar-tooltip-icon-preview {
+    font-size: 1rem;
+    line-height: 1;
+}
         /* Toolbar styles */
         .toolbar-separator {
             border-left: 1px solid var(--border-color);

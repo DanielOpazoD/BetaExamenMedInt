@@ -623,6 +623,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let tooltipIconSelector = null;
     let tooltipIconButtons = [];
     let tooltipIconPickerBtn = null;
+    let tooltipInsertButton = null;
     let tooltipIconOutsideHandler = null;
     let hideTooltipIconSelector = () => {};
     let normalizeTooltipElement = () => {};
@@ -2340,8 +2341,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const updateTooltipIconPickerLabel = (icon) => {
             if (tooltipIconPickerBtn) {
-                tooltipIconPickerBtn.innerHTML = `<span class="tooltip-icon-current" aria-hidden="true">${icon}</span><span class="tooltip-icon-caret" aria-hidden="true">▾</span>`;
+                tooltipIconPickerBtn.innerHTML = `<span class="tooltip-icon-current" aria-hidden="true">${icon}</span><span class="tooltip-icon-caret" aria-hidden="true">⌄</span>`;
             }
+        };
+
+        const updateTooltipInsertButtonIcon = (icon, skipSanitize = false) => {
+            const sanitized = skipSanitize ? icon : sanitizeTooltipIcon(icon);
+            if (tooltipInsertButton) {
+                tooltipInsertButton.innerHTML = `<sup class="toolbar-tooltip-icon-preview" aria-hidden="true">${sanitized}</sup>`;
+                tooltipInsertButton.dataset.icon = sanitized;
+                tooltipInsertButton.setAttribute('aria-label', `Añadir tooltip (${sanitized})`);
+                tooltipInsertButton.title = `Añadir tooltip (${sanitized})`;
+            }
+            return sanitized;
         };
 
         const highlightTooltipIcon = (icon) => {
@@ -2352,6 +2364,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
             });
             updateTooltipIconPickerLabel(sanitized);
+            updateTooltipInsertButtonIcon(sanitized, true);
             return sanitized;
         };
 
@@ -3722,7 +3735,9 @@ document.addEventListener('DOMContentLoaded', function () {
         updateTooltipIconPickerLabel(toolbarSelectedTooltipIcon);
         editorToolbar.appendChild(tooltipIconPickerBtn);
 
-        editorToolbar.appendChild(createButton('Añadir tooltip', '💬', null, null, handleTooltipTool));
+        tooltipInsertButton = createButton('Añadir tooltip', '', null, null, handleTooltipTool);
+        updateTooltipInsertButtonIcon(toolbarSelectedTooltipIcon);
+        editorToolbar.appendChild(tooltipInsertButton);
 
         editorToolbar.appendChild(createSeparator());
 
