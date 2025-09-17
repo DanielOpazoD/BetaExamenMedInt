@@ -117,6 +117,7 @@ export function setupImageTools(editor, toolbar) {
   document.body.appendChild(menu);
 
   const micromoveStep = 4;
+  let activeImg = null;
 
   const sizeGroup = menu.querySelector('.size-group');
   const minusBtn = document.createElement('button');
@@ -224,12 +225,12 @@ export function setupImageTools(editor, toolbar) {
     positionUI();
   }
 
-  const updateMicromoveAvailability = () => {
+  function updateMicromoveAvailability() {
     const enabled = !!activeImg && (activeImg.dataset.layout === 'wrap-left' || activeImg.dataset.layout === 'wrap-right');
     microButtons.forEach(btn => {
       btn.disabled = !enabled;
     });
-  };
+  }
 
   function deleteImage() {
     if (!activeImg) return;
@@ -250,7 +251,6 @@ export function setupImageTools(editor, toolbar) {
     }
   }
 
-  let activeImg = null;
   editor.addEventListener('click', e => {
     if (e.target.tagName === 'IMG') {
       selectImage(e.target);
