@@ -172,7 +172,8 @@
         #notes-editor:focus { outline: none; }
         #notes-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; cursor: pointer; }
         #notes-editor img.selected-for-resize { outline: 2px solid var(--btn-primary-bg); }
-        #notes-editor table.selected-for-move { outline: 2px solid var(--btn-primary-bg); }
+        #notes-editor table.selected-for-move,
+        #notes-editor .resizable-block.selected-for-move { outline: 2px solid var(--btn-primary-bg); }
 
         /* Display multiple images in a row */
         #notes-editor .image-row {
@@ -389,8 +390,9 @@
             padding: 3px;
         }
 
-/* Basic styles for resizable tables */
-table.resizable-table {
+/* Basic styles for resizable tables and custom blocks */
+table.resizable-table,
+.resizable-block {
     position: relative;
 }
 table.resizable-table td,
@@ -398,7 +400,7 @@ table.resizable-table th {
     position: relative;
 }
 
-table.resizable-table .table-resize-handle {
+:is(table.resizable-table, .resizable-block) .table-resize-handle {
     position: absolute;
     width: 8px;
     height: 8px;
@@ -412,9 +414,21 @@ table.resizable-table .table-resize-handle {
     box-sizing: border-box;
     display: none;
 }
-
-table.resizable-table.selected .table-resize-handle {
+:is(table.resizable-table, .resizable-block).selected .table-resize-handle {
     display: block;
+}
+
+.nota-clinica {
+    display: block;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.nota-clinica > .nota-clinica__header,
+.nota-clinica > .nota-clinica__body {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Floating image styles */
