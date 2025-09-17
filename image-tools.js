@@ -133,6 +133,33 @@ export function setupImageTools(editor, toolbar) {
   delBtn.addEventListener('click', deleteImage);
   sizeGroup.append(minusBtn, plusBtn, upBtn, downBtn, delBtn);
 
+  const microGroup = document.createElement('div');
+  microGroup.className = 'micromove-group';
+  const microLabel = document.createElement('span');
+  microLabel.className = 'micromove-label';
+  microLabel.textContent = 'Micromovimientos';
+  const microControls = document.createElement('div');
+  microControls.className = 'micromove-controls';
+  const microUp = document.createElement('button');
+  microUp.textContent = '↥';
+  microUp.title = 'Mover ligeramente hacia arriba';
+  microUp.addEventListener('click', () => nudgeWrappedImage(0, -2));
+  const microLeft = document.createElement('button');
+  microLeft.textContent = '↤';
+  microLeft.title = 'Mover ligeramente a la izquierda';
+  microLeft.addEventListener('click', () => nudgeWrappedImage(-2, 0));
+  const microRight = document.createElement('button');
+  microRight.textContent = '↦';
+  microRight.title = 'Mover ligeramente a la derecha';
+  microRight.addEventListener('click', () => nudgeWrappedImage(2, 0));
+  const microDown = document.createElement('button');
+  microDown.textContent = '↧';
+  microDown.title = 'Mover ligeramente hacia abajo';
+  microDown.addEventListener('click', () => nudgeWrappedImage(0, 2));
+  microControls.append(microUp, microLeft, microRight, microDown);
+  microGroup.append(microLabel, microControls);
+  menu.appendChild(microGroup);
+
   menu.addEventListener('click', e => {
     const layoutBtn = e.target.closest('[data-layout]');
     const alignBtn = e.target.closest('[data-align]');
@@ -176,6 +203,23 @@ export function setupImageTools(editor, toolbar) {
     } else {
       const ref = nodes[nodes.length - 1].nextSibling;
       if (ref) nodes.slice().reverse().forEach(n => parent.insertBefore(n, ref.nextSibling));
+    }
+    positionUI();
+  }
+
+  function nudgeWrappedImage(dx, dy) {
+    if (!activeImg) return;
+    if (!['wrap-left', 'wrap-right'].includes(activeImg.dataset.layout)) return;
+    const currentX = parseFloat(activeImg.dataset.nudgeX || '0');
+    const currentY = parseFloat(activeImg.dataset.nudgeY || '0');
+    const nextX = currentX + dx;
+    const nextY = currentY + dy;
+    activeImg.dataset.nudgeX = String(nextX);
+    activeImg.dataset.nudgeY = String(nextY);
+    activeImg.style.transform = `translate(${nextX}px, ${nextY}px)`;
+    const caption = activeImg.nextElementSibling;
+    if (caption && caption.classList.contains('image-caption')) {
+      caption.style.transform = `translate(${nextX}px, ${nextY}px)`;
     }
     positionUI();
   }
@@ -286,6 +330,13 @@ export function setupImageTools(editor, toolbar) {
     activeImg.style.float = '';
     activeImg.style.display = '';
     activeImg.style.margin = '';
+    activeImg.style.transform = '';
+    delete activeImg.dataset.nudgeX;
+    delete activeImg.dataset.nudgeY;
+    const caption = activeImg.nextElementSibling;
+    if (caption && caption.classList.contains('image-caption')) {
+      caption.style.transform = '';
+    }
     activeImg.dataset.layout = mode;
     if (mode === 'wrap-left') {
       activeImg.style.float = 'left';
