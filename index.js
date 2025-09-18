@@ -2834,6 +2834,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const handleTooltipTool = () => {
             hideTooltipIconSelector();
+            destroyTooltipPopover(true);
             const selection = window.getSelection();
             if (!selection || selection.rangeCount === 0) {
                 notesEditor.focus({ preventScroll: true });
@@ -2848,11 +2849,18 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             const startTooltip = getClosestTooltip(range.startContainer);
             const endTooltip = getClosestTooltip(range.endContainer);
+            const icon = toolbarSelectedTooltipIcon;
             const existingTooltip = (startTooltip && startTooltip === endTooltip)
                 ? startTooltip
                 : (range.collapsed ? (startTooltip || endTooltip) : null);
             if (existingTooltip) {
-                openTooltipEditor(existingTooltip, null);
+                const normalized = ensureTooltipStructure(existingTooltip);
+                setTooltipIconOnElement(normalized, icon);
+                updateTooltipPreview(normalized);
+                setToolbarSelectedTooltipIcon(icon);
+                recordHistory();
+                notifyTooltipChange();
+                saveCurrentNote();
                 return;
             }
             if (range.collapsed) {
@@ -2860,7 +2868,36 @@ document.addEventListener('DOMContentLoaded', function () {
                 showAlert('Selecciona el texto al que deseas agregar un tooltip.');
                 return;
             }
-            openTooltipEditor(null, range);
+            let fragment = null;
+            try {
+                fragment = range.cloneContents();
+            } catch (error) {
+                console.warn('No se pudo clonar la selección del tooltip:', error);
+            }
+            const wrapperEl = createTooltipWrapper(icon, fragment, '<p><br></p>');
+            try {
+                range.deleteContents();
+                range.insertNode(wrapperEl);
+            } catch (error) {
+                console.error('No se pudo crear el tooltip a partir de la selección:', error);
+                showAlert('No se pudo crear el tooltip sobre la selección actual. Intenta seleccionar nuevamente el texto.');
+                return;
+            }
+            const wrapper = ensureTooltipStructure(wrapperEl);
+            setTooltipIconOnElement(wrapper, icon);
+            updateTooltipPreview(wrapper);
+            const collapseSelection = window.getSelection();
+            if (collapseSelection) {
+                const collapseRange = document.createRange();
+                collapseRange.setStartAfter(wrapper);
+                collapseRange.collapse(true);
+                collapseSelection.removeAllRanges();
+                collapseSelection.addRange(collapseRange);
+            }
+            setToolbarSelectedTooltipIcon(icon);
+            recordHistory();
+            notifyTooltipChange();
+            saveCurrentNote();
         };
 
         const onDragStart = (e) => {
