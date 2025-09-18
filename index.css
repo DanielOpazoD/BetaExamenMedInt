@@ -440,6 +440,19 @@
     font-size: 0.65rem;
     color: var(--text-secondary, #6b7280);
 }
+
+.toolbar-btn.tooltip-icon-insert-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    padding: 2px 4px;
+}
+
+.toolbar-btn.tooltip-icon-insert-btn sup {
+    font-size: 1rem;
+    line-height: 1;
+}
         /* Toolbar styles */
         .toolbar-separator {
             border-left: 1px solid var(--border-color);

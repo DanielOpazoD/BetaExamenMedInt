@@ -623,6 +623,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let tooltipIconSelector = null;
     let tooltipIconButtons = [];
     let tooltipIconPickerBtn = null;
+    let tooltipInsertBtn = null;
     let tooltipIconOutsideHandler = null;
     let hideTooltipIconSelector = () => {};
     let normalizeTooltipElement = () => {};
@@ -2344,6 +2345,15 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
 
+        const updateTooltipInsertButtonIcon = (icon) => {
+            if (!tooltipInsertBtn) return;
+            const sanitized = sanitizeTooltipIcon(icon);
+            tooltipInsertBtn.dataset.icon = sanitized;
+            tooltipInsertBtn.innerHTML = `<sup aria-hidden="true">${sanitized}</sup>`;
+            tooltipInsertBtn.setAttribute('aria-label', `Añadir tooltip (${sanitized})`);
+            tooltipInsertBtn.title = `Añadir tooltip (${sanitized})`;
+        };
+
         const highlightTooltipIcon = (icon) => {
             const sanitized = sanitizeTooltipIcon(icon);
             tooltipIconButtons.forEach(btn => {
@@ -2352,6 +2362,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
             });
             updateTooltipIconPickerLabel(sanitized);
+            updateTooltipInsertButtonIcon(sanitized);
             return sanitized;
         };
 
@@ -3722,7 +3733,10 @@ document.addEventListener('DOMContentLoaded', function () {
         updateTooltipIconPickerLabel(toolbarSelectedTooltipIcon);
         editorToolbar.appendChild(tooltipIconPickerBtn);
 
-        editorToolbar.appendChild(createButton('Añadir tooltip', '💬', null, null, handleTooltipTool));
+        tooltipInsertBtn = createButton('Añadir tooltip', '', null, null, handleTooltipTool, 'tooltip-icon-insert-btn');
+        tooltipInsertBtn.setAttribute('aria-label', 'Añadir tooltip');
+        editorToolbar.appendChild(tooltipInsertBtn);
+        updateTooltipInsertButtonIcon(toolbarSelectedTooltipIcon);
 
         editorToolbar.appendChild(createSeparator());
 
