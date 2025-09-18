@@ -623,6 +623,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let tooltipIconSelector = null;
     let tooltipIconButtons = [];
     let tooltipIconPickerBtn = null;
+    let tooltipInsertBtn = null;
     let tooltipIconOutsideHandler = null;
     let hideTooltipIconSelector = () => {};
     let normalizeTooltipElement = () => {};
@@ -2344,6 +2345,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
 
+        const updateTooltipInsertButtonIcon = (icon) => {
+            if (tooltipInsertBtn) {
+                tooltipInsertBtn.innerHTML = `<sup aria-hidden="true">${icon}</sup>`;
+            }
+        };
+
         const highlightTooltipIcon = (icon) => {
             const sanitized = sanitizeTooltipIcon(icon);
             tooltipIconButtons.forEach(btn => {
@@ -2352,6 +2359,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
             });
             updateTooltipIconPickerLabel(sanitized);
+            updateTooltipInsertButtonIcon(sanitized);
             return sanitized;
         };
 
@@ -2826,6 +2834,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const handleTooltipTool = () => {
             hideTooltipIconSelector();
+            destroyTooltipPopover(true);
             const selection = window.getSelection();
             if (!selection || selection.rangeCount === 0) {
                 notesEditor.focus({ preventScroll: true });
@@ -2840,11 +2849,18 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             const startTooltip = getClosestTooltip(range.startContainer);
             const endTooltip = getClosestTooltip(range.endContainer);
+            const icon = toolbarSelectedTooltipIcon;
             const existingTooltip = (startTooltip && startTooltip === endTooltip)
                 ? startTooltip
                 : (range.collapsed ? (startTooltip || endTooltip) : null);
             if (existingTooltip) {
-                openTooltipEditor(existingTooltip, null);
+                const normalized = ensureTooltipStructure(existingTooltip);
+                setTooltipIconOnElement(normalized, icon);
+                updateTooltipPreview(normalized);
+                setToolbarSelectedTooltipIcon(icon);
+                recordHistory();
+                notifyTooltipChange();
+                saveCurrentNote();
                 return;
             }
             if (range.collapsed) {
@@ -2852,7 +2868,36 @@ document.addEventListener('DOMContentLoaded', function () {
                 showAlert('Selecciona el texto al que deseas agregar un tooltip.');
                 return;
             }
-            openTooltipEditor(null, range);
+            let fragment = null;
+            try {
+                fragment = range.cloneContents();
+            } catch (error) {
+                console.warn('No se pudo clonar la selección del tooltip:', error);
+            }
+            const wrapperEl = createTooltipWrapper(icon, fragment, '<p><br></p>');
+            try {
+                range.deleteContents();
+                range.insertNode(wrapperEl);
+            } catch (error) {
+                console.error('No se pudo crear el tooltip a partir de la selección:', error);
+                showAlert('No se pudo crear el tooltip sobre la selección actual. Intenta seleccionar nuevamente el texto.');
+                return;
+            }
+            const wrapper = ensureTooltipStructure(wrapperEl);
+            setTooltipIconOnElement(wrapper, icon);
+            updateTooltipPreview(wrapper);
+            const collapseSelection = window.getSelection();
+            if (collapseSelection) {
+                const collapseRange = document.createRange();
+                collapseRange.setStartAfter(wrapper);
+                collapseRange.collapse(true);
+                collapseSelection.removeAllRanges();
+                collapseSelection.addRange(collapseRange);
+            }
+            setToolbarSelectedTooltipIcon(icon);
+            recordHistory();
+            notifyTooltipChange();
+            saveCurrentNote();
         };
 
         const onDragStart = (e) => {
@@ -3722,7 +3767,10 @@ document.addEventListener('DOMContentLoaded', function () {
         updateTooltipIconPickerLabel(toolbarSelectedTooltipIcon);
         editorToolbar.appendChild(tooltipIconPickerBtn);
 
-        editorToolbar.appendChild(createButton('Añadir tooltip', '💬', null, null, handleTooltipTool));
+        tooltipInsertBtn = createButton('Añadir tooltip', '', null, null, handleTooltipTool, 'tooltip-icon-insert-btn');
+        tooltipInsertBtn.setAttribute('aria-label', 'Insertar tooltip en el texto seleccionado');
+        updateTooltipInsertButtonIcon(toolbarSelectedTooltipIcon);
+        editorToolbar.appendChild(tooltipInsertBtn);
 
         editorToolbar.appendChild(createSeparator());
 
