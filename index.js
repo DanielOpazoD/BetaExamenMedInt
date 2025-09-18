@@ -1484,6 +1484,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentLightboxIndex = 0;
     let currentNoteRow = null;
     let activeSubnoteLink = null;
+    let currentInlineNoteIcon = 'ℹ️';
     let isTooltipEditing = false;
     let activeTooltipState = null;
     let editingQuickNote = false;
@@ -3708,21 +3709,24 @@ document.addEventListener('DOMContentLoaded', function () {
             openNoteStyleModal();
         }));
 
-        tooltipIconPickerBtn = createButton('Seleccionar icono de tooltip', '', null, null, () => {
-            if (!tooltipIconSelector) return;
-            if (tooltipIconSelector.classList.contains('hidden')) {
-                showTooltipIconSelector();
-            } else {
-                hideTooltipIconSelector();
-            }
-        }, 'tooltip-icon-picker-btn');
-        tooltipIconPickerBtn.setAttribute('aria-haspopup', 'true');
-        tooltipIconPickerBtn.setAttribute('aria-expanded', 'false');
-        tooltipIconPickerBtn.setAttribute('aria-label', 'Seleccionar icono de tooltip');
-        updateTooltipIconPickerLabel(toolbarSelectedTooltipIcon);
-        editorToolbar.appendChild(tooltipIconPickerBtn);
+        const inlineNoteBtn = createButton('Insertar nota en línea', currentInlineNoteIcon, null, null, insertInlineNoteIcon);
+        inlineNoteBtn.setAttribute('aria-label', 'Insertar nota en línea');
+        editorToolbar.appendChild(inlineNoteBtn);
 
-        editorToolbar.appendChild(createButton('Añadir tooltip', '💬', null, null, handleTooltipTool));
+        const inlineIconSelect = document.createElement('select');
+        inlineIconSelect.className = 'toolbar-select inline-note-icon-select';
+        ['ℹ️', '❓', '💡', '🔖', '⁎', '🧩', '🗒️'].forEach(icon => {
+            const opt = document.createElement('option');
+            opt.value = icon;
+            opt.textContent = icon;
+            inlineIconSelect.appendChild(opt);
+        });
+        inlineIconSelect.value = currentInlineNoteIcon;
+        inlineIconSelect.addEventListener('change', () => {
+            currentInlineNoteIcon = inlineIconSelect.value;
+            inlineNoteBtn.innerHTML = currentInlineNoteIcon;
+        });
+        editorToolbar.appendChild(inlineIconSelect);
 
         editorToolbar.appendChild(createSeparator());
 
@@ -5891,6 +5895,55 @@ document.addEventListener('DOMContentLoaded', function () {
         selection.addRange(newRange);
         notesEditor.focus({ preventScroll: true });
         // Save a placeholder subnote entry
+        if (currentNotesArray[activeNoteIndex]) {
+            if (!currentNotesArray[activeNoteIndex].postits) {
+                currentNotesArray[activeNoteIndex].postits = {};
+            }
+            currentNotesArray[activeNoteIndex].postits[uniqueId] = { title: '', content: '' };
+            saveCurrentNote();
+        }
+    }
+
+    function insertInlineNoteIcon() {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+
+        const range = selection.getRangeAt(0);
+        if (!range || !notesEditor.contains(range.commonAncestorContainer)) return;
+
+        const insertionRange = range.cloneRange();
+        insertionRange.collapse(true);
+
+        const uniqueId = `inline-note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        const icon = document.createElement('span');
+        icon.className = 'inline-note';
+        icon.dataset.subnoteId = uniqueId;
+        icon.textContent = currentInlineNoteIcon;
+        icon.contentEditable = 'false';
+
+        insertionRange.insertNode(icon);
+
+        const spacer = document.createTextNode('\u00A0');
+        icon.parentNode.insertBefore(spacer, icon.nextSibling);
+
+        const newRange = document.createRange();
+        newRange.setStartAfter(spacer);
+        newRange.collapse(true);
+
+        const deferredRange = newRange.cloneRange();
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+
+        setTimeout(() => {
+            const sel = window.getSelection();
+            if (sel) {
+                sel.removeAllRanges();
+                sel.addRange(deferredRange);
+            }
+            notesEditor.focus({ preventScroll: true });
+        }, 0);
+
         if (currentNotesArray[activeNoteIndex]) {
             if (!currentNotesArray[activeNoteIndex].postits) {
                 currentNotesArray[activeNoteIndex].postits = {};
