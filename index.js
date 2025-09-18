@@ -123,6 +123,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveConfirmation = getElem('save-confirmation');
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
+    let sectionStylesheet = '';
+    if (typeof fetch === 'function') {
+        fetch('index.css').then(resp => resp.text()).then(css => {
+            sectionStylesheet = css;
+        }).catch(() => {
+            sectionStylesheet = '';
+        });
+    }
 
     // --- Undo/Redo History ---
     const historyStack = [];
@@ -1909,7 +1917,6 @@ document.addEventListener('DOMContentLoaded', function () {
             for (let c = 0; c < cols; c++) {
                 const td = document.createElement('td');
                 td.style.border = '1px solid var(--border-color)';
-                td.style.padding = '4px';
                 td.style.minWidth = '30px';
                 td.innerHTML = '&nbsp;';
                 td.contentEditable = true;
@@ -1917,6 +1924,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             table.appendChild(tr);
         }
+        table.dataset.cellLineHeight = '1.4';
+        table.dataset.cellPadding = '6';
+        applyTableSpacing(table, 1.4, 6);
         // Insertar la tabla en la posición actual del cursor mediante Range
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0) {
@@ -1952,6 +1962,7 @@ document.addEventListener('DOMContentLoaded', function () {
      */
     function enableTableEditing(table) {
         if (!table) return;
+        ensureSpacingState(table);
         table.addEventListener('mouseover', (e) => {
             const cell = e.target.closest('td, th');
             if (!cell || !table.contains(cell)) return;
@@ -1992,8 +2003,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 const newCell = newRow.insertCell();
                 newCell.contentEditable = true;
                 newCell.style.border = '1px solid var(--border-color)';
-                newCell.style.padding = '4px';
             }
+            ensureSpacingState(table);
+            const lineHeight = parseFloat(table.dataset.cellLineHeight || '1.4');
+            const padding = parseFloat(table.dataset.cellPadding || '6');
+            applyTableSpacing(table, lineHeight, padding);
             // After inserting, re-add resizers and controls
             initTableResize(table);
             removeTableControls();
@@ -2012,8 +2026,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 const newCell = row.insertCell(colIndex + 1);
                 newCell.contentEditable = true;
                 newCell.style.border = '1px solid var(--border-color)';
-                newCell.style.padding = '4px';
             });
+            ensureSpacingState(table);
+            const lineHeight = parseFloat(table.dataset.cellLineHeight || '1.4');
+            const padding = parseFloat(table.dataset.cellPadding || '6');
+            applyTableSpacing(table, lineHeight, padding);
             initTableResize(table);
             removeTableControls();
         });
@@ -2080,6 +2097,185 @@ document.addEventListener('DOMContentLoaded', function () {
             totalRow: getElem(`total-row-${sectionName}`)
         };
     });
+
+    const sanitizeFileName = (text) => {
+        if (!text) return 'seccion';
+        const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return normalized
+            .replace(/[^a-zA-Z0-9\-\s_]+/g, '')
+            .trim()
+            .replace(/\s+/g, '-')
+            .toLowerCase() || 'seccion';
+    };
+
+    const exportSectionToHtml = (headerRow) => {
+        if (!headerRow) return;
+        const sectionName = headerRow.dataset.sectionHeader;
+        const titleEl = headerRow.querySelector('.section-title');
+        const titleText = titleEl ? titleEl.textContent.trim() : sectionName;
+        const originalTable = headerRow.closest('table');
+        const exportTable = originalTable ? originalTable.cloneNode(false) : document.createElement('table');
+        if (originalTable) {
+            exportTable.className = originalTable.className;
+            if (originalTable.getAttribute('style')) {
+                exportTable.setAttribute('style', originalTable.getAttribute('style'));
+            }
+        }
+        const rows = [headerRow, ...tableBody.querySelectorAll(`tr[data-section="${sectionName}"]`)];
+        const totalRow = getElem(`total-row-${sectionName}`);
+        if (totalRow) rows.push(totalRow);
+        rows.forEach(row => {
+            const clone = row.cloneNode(true);
+            clone.querySelectorAll('.print-section-btn, .section-note-icon, .section-cover-icon, .save-section-html-btn').forEach(el => el.remove());
+            clone.querySelectorAll('button, input').forEach(el => el.remove());
+            clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+            exportTable.appendChild(clone);
+        });
+        const styleBlock = sectionStylesheet ? `<style>${sectionStylesheet}</style>` : '';
+        const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>${titleText || 'Sección'}</title>
+${styleBlock}
+</head>
+<body class="section-export-body">
+<main class="section-export-container">
+<h1 class="section-export-title">${titleText || sectionName}</h1>
+${exportTable.outerHTML}
+</main>
+</body>
+</html>`;
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${sanitizeFileName(titleText || sectionName)}.html`;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+            URL.revokeObjectURL(url);
+            link.remove();
+        }, 0);
+    };
+
+    const ensureSectionExportButtons = () => {
+        tableBody.querySelectorAll('.section-header-row').forEach(row => {
+            if (row.querySelector('.save-section-html-btn')) return;
+            const actionsContainer = row.querySelector('.flex.items-center.gap-2:last-child');
+            if (!actionsContainer) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'toolbar-btn save-section-html-btn';
+            btn.title = 'Guardar sección como HTML';
+            btn.setAttribute('aria-label', 'Guardar sección como HTML');
+            btn.innerHTML = '&lt;/&gt;';
+            actionsContainer.insertBefore(btn, actionsContainer.firstChild);
+        });
+    };
+
+    const sectionNavigation = (() => {
+        const nav = document.createElement('aside');
+        nav.id = 'section-nav';
+        nav.className = 'section-nav-panel';
+        const header = document.createElement('div');
+        header.className = 'section-nav-header';
+        const headerTitle = document.createElement('span');
+        headerTitle.textContent = 'Navegación por temas';
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'section-nav-close';
+        closeBtn.innerHTML = '✕';
+        header.appendChild(headerTitle);
+        header.appendChild(closeBtn);
+        nav.appendChild(header);
+        const list = document.createElement('div');
+        list.className = 'section-nav-list';
+        nav.appendChild(list);
+        document.body.appendChild(nav);
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.id = 'section-nav-toggle';
+        toggleBtn.className = 'section-nav-toggle';
+        toggleBtn.title = 'Mostrar navegación por temas';
+        toggleBtn.setAttribute('aria-label', 'Mostrar navegación por temas');
+        toggleBtn.textContent = '📑';
+        if (printAllBtn && printAllBtn.parentElement) {
+            printAllBtn.parentElement.appendChild(toggleBtn);
+        } else {
+            document.body.appendChild(toggleBtn);
+        }
+
+        const open = () => {
+            nav.classList.add('open');
+            toggleBtn.classList.add('open');
+        };
+        const close = () => {
+            nav.classList.remove('open');
+            toggleBtn.classList.remove('open');
+        };
+        toggleBtn.addEventListener('click', () => {
+            if (nav.classList.contains('open')) {
+                close();
+            } else {
+                open();
+            }
+        });
+        closeBtn.addEventListener('click', close);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') close();
+        });
+
+        const update = () => {
+            ensureSectionExportButtons();
+            list.innerHTML = '';
+            const headers = Array.from(document.querySelectorAll('.section-header-row'));
+            headers.forEach(row => {
+                if (window.getComputedStyle(row).display === 'none') return;
+                const title = row.querySelector('.section-title');
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'section-nav-item';
+                item.dataset.section = row.dataset.sectionHeader;
+                const labelText = title ? title.textContent.trim() : row.dataset.sectionHeader;
+                item.textContent = labelText;
+                item.title = labelText;
+                item.addEventListener('click', () => {
+                    row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    close();
+                });
+                list.appendChild(item);
+            });
+            if (!list.children.length) {
+                close();
+            }
+        };
+
+        const markActiveSection = () => {
+            const headers = Array.from(document.querySelectorAll('.section-header-row'));
+            const midpoint = window.scrollY + window.innerHeight / 2;
+            let activeSection = null;
+            headers.forEach(row => {
+                const rect = row.getBoundingClientRect();
+                const rowTop = window.scrollY + rect.top;
+                if (rowTop <= midpoint) {
+                    activeSection = row.dataset.sectionHeader;
+                }
+            });
+            if (!activeSection && headers.length) {
+                activeSection = headers[0].dataset.sectionHeader;
+            }
+            list.querySelectorAll('.section-nav-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.section === activeSection);
+            });
+        };
+
+        return { update, markActiveSection, close };
+    })();
+
+    ensureSectionExportButtons();
+    sectionNavigation.update();
 
     const EMOJI_CATEGORIES = {
         'Sugeridos': ['🔗', '📄', '📹', '🖼️', '💡', '📌', '✅', '⭐', '📖', '📚'],
@@ -3820,6 +4016,12 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             stylePopup.style.display = 'flex';
             stylePopup.classList.add('visible');
+            const editorRect = notesEditor.getBoundingClientRect();
+            const availableWidth = Math.max(280, editorRect.width - 32);
+            const popupMaxWidth = Math.min(560, availableWidth);
+            const popupMinWidth = Math.min(Math.max(320, availableWidth), popupMaxWidth);
+            stylePopup.style.minWidth = `${popupMinWidth}px`;
+            stylePopup.style.maxWidth = `${popupMaxWidth}px`;
             stylePopup.style.visibility = 'hidden';
             stylePopup.style.top = '0px';
             stylePopup.style.left = '0px';
@@ -3997,11 +4199,99 @@ document.addEventListener('DOMContentLoaded', function () {
         const addRow = (table, index) => {
             const row = table.insertRow(index);
             const cols = table.rows[0] ? table.rows[0].cells.length : 1;
-            for (let i = 0; i < cols; i++) row.insertCell(i).innerHTML = '&nbsp;';
+            for (let i = 0; i < cols; i++) {
+                const cell = row.insertCell(i);
+                cell.innerHTML = '&nbsp;';
+                cell.contentEditable = true;
+                cell.style.border = '1px solid var(--border-color)';
+            }
+            ensureSpacingState(table);
+            const lineHeight = parseFloat(table.dataset.cellLineHeight || '1.4');
+            const padding = parseFloat(table.dataset.cellPadding || '6');
+            applyTableSpacing(table, lineHeight, padding);
+            initTableResize(table);
         };
         const deleteRow = (table, index) => { if (table.rows.length > 1) table.deleteRow(index); };
-        const addColumn = (table, index) => { Array.from(table.rows).forEach(r => r.insertCell(index).innerHTML = '&nbsp;'); };
+        const addColumn = (table, index) => {
+            Array.from(table.rows).forEach(row => {
+                const cell = row.insertCell(index);
+                cell.innerHTML = '&nbsp;';
+                cell.contentEditable = true;
+                cell.style.border = '1px solid var(--border-color)';
+            });
+            ensureSpacingState(table);
+            const lineHeight = parseFloat(table.dataset.cellLineHeight || '1.4');
+            const padding = parseFloat(table.dataset.cellPadding || '6');
+            applyTableSpacing(table, lineHeight, padding);
+            initTableResize(table);
+        };
         const deleteColumn = (table, index) => { Array.from(table.rows).forEach(r => { if (r.cells.length > 1) r.deleteCell(index); }); };
+        const selectColumn = (table, index) => {
+            if (!table || index < 0) return;
+            const rows = Array.from(table.rows);
+            if (!rows.length) return;
+            const cells = rows.map(row => row.cells[index]).filter(Boolean);
+            if (!cells.length) return;
+            const range = document.createRange();
+            range.setStartBefore(cells[0]);
+            range.setEndAfter(cells[cells.length - 1]);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+        };
+        const clearTableInlineStyles = (table) => {
+            if (!table) return;
+            Array.from(table.querySelectorAll('th, td')).forEach(cell => {
+                cell.style.backgroundColor = '';
+                cell.style.color = '';
+                cell.style.borderColor = '';
+                cell.style.borderTopColor = '';
+                cell.style.borderBottomColor = '';
+            });
+        };
+        const applyTableTheme = (table, themeClass) => {
+            if (!table) return;
+            TABLE_THEMES.forEach(tt => table.classList.remove(tt.class));
+            clearTableInlineStyles(table);
+            if (themeClass) {
+                table.classList.add(themeClass);
+            }
+        };
+        const ensureSpacingState = (table) => {
+            if (!table) return;
+            const firstCell = table.querySelector('th, td');
+            if (firstCell) {
+                const computed = window.getComputedStyle(firstCell);
+                if (!table.dataset.cellLineHeight) {
+                    const fontSize = parseFloat(computed.fontSize) || 16;
+                    const lineHeightPx = parseFloat(computed.lineHeight);
+                    if (!Number.isNaN(lineHeightPx) && lineHeightPx > 0 && fontSize > 0) {
+                        const ratio = Math.round((lineHeightPx / fontSize) * 100) / 100;
+                        table.dataset.cellLineHeight = ratio.toFixed(2);
+                    }
+                }
+                if (!table.dataset.cellPadding) {
+                    const padTop = parseFloat(computed.paddingTop);
+                    if (!Number.isNaN(padTop)) {
+                        table.dataset.cellPadding = String(Math.round(padTop));
+                    }
+                }
+            }
+            if (!table.dataset.cellLineHeight) table.dataset.cellLineHeight = '1.4';
+            if (!table.dataset.cellPadding) table.dataset.cellPadding = '6';
+        };
+        const applyTableSpacing = (table, lineHeight, padding) => {
+            if (!table) return;
+            const lh = parseFloat(lineHeight);
+            const pad = parseFloat(padding);
+            Array.from(table.querySelectorAll('th, td')).forEach(cell => {
+                cell.style.lineHeight = isNaN(lh) ? '' : `${lh}`;
+                cell.style.paddingTop = isNaN(pad) ? '' : `${pad}px`;
+                cell.style.paddingBottom = isNaN(pad) ? '' : `${pad}px`;
+            });
+            if (!isNaN(lh)) table.dataset.cellLineHeight = `${lh}`;
+            if (!isNaN(pad)) table.dataset.cellPadding = `${pad}`;
+        };
         const TABLE_THEMES = [
             { label: 'Clásico azul', class: 'table-theme-blue', preview: { headerBg: '#bbdefb', headerColor: '#0d47a1', row1: '#ffffff', row2: '#e3f2fd', border: '#2196f3' } },
             { label: 'Selva vibrante', class: 'table-theme-green', preview: { headerBg: '#c8e6c9', headerColor: '#1b5e20', row1: '#ffffff', row2: '#eaf5eb', border: '#4caf50' } },
@@ -4042,19 +4332,41 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const buildEditTab = () => {
                 tabContent.innerHTML = '';
-                const makeBtn = (label, icon, fn) => {
-                    const b = document.createElement('button');
-                    b.className = 'toolbar-btn';
-                    b.innerHTML = `${icon} ${label}`;
-                    b.addEventListener('click', () => { fn(); hideTableMenu(); notesEditor.focus({ preventScroll: true }); });
-                    tabContent.appendChild(b);
+                const layout = document.createElement('div');
+                layout.className = 'table-edit-layout';
+                const createGroup = (title) => {
+                    const group = document.createElement('div');
+                    group.className = 'table-edit-group';
+                    const heading = document.createElement('div');
+                    heading.className = 'table-edit-group-title';
+                    heading.textContent = title;
+                    group.appendChild(heading);
+                    return group;
                 };
-                makeBtn('Fila arriba', '⬆️', () => addRow(table, rIndex));
-                makeBtn('Fila abajo', '⬇️', () => addRow(table, rIndex + 1));
-                makeBtn('Eliminar fila', '🗑️', () => deleteRow(table, rIndex));
-                makeBtn('Columna izq', '⬅️', () => addColumn(table, cIndex));
-                makeBtn('Columna der', '➡️', () => addColumn(table, cIndex + 1));
-                makeBtn('Eliminar columna', '🗑️', () => deleteColumn(table, cIndex));
+                const createActionButton = (label, icon, handler) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'toolbar-btn table-edit-btn';
+                    btn.innerHTML = `<span class="table-edit-icon">${icon}</span><span>${label}</span>`;
+                    btn.addEventListener('click', () => {
+                        handler();
+                        hideTableMenu();
+                        notesEditor.focus({ preventScroll: true });
+                    });
+                    return btn;
+                };
+                const rowsGroup = createGroup('Filas');
+                rowsGroup.appendChild(createActionButton('Agregar arriba', '⬆️', () => addRow(table, rIndex)));
+                rowsGroup.appendChild(createActionButton('Agregar abajo', '⬇️', () => addRow(table, rIndex + 1)));
+                rowsGroup.appendChild(createActionButton('Eliminar fila', '🗑️', () => deleteRow(table, rIndex)));
+                const colsGroup = createGroup('Columnas');
+                colsGroup.appendChild(createActionButton('Añadir a la izquierda', '⬅️', () => addColumn(table, cIndex)));
+                colsGroup.appendChild(createActionButton('Añadir a la derecha', '➡️', () => addColumn(table, cIndex + 1)));
+                colsGroup.appendChild(createActionButton('Eliminar columna', '🗑️', () => deleteColumn(table, cIndex)));
+                colsGroup.appendChild(createActionButton('Seleccionar columna', '🔎', () => selectColumn(table, cIndex)));
+                layout.appendChild(rowsGroup);
+                layout.appendChild(colsGroup);
+                tabContent.appendChild(layout);
             };
 
             const HEADER_COLORS = [
@@ -4070,6 +4382,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const buildStyleTab = () => {
                 tabContent.innerHTML = '';
+                ensureSpacingState(table);
+                const layout = document.createElement('div');
+                layout.className = 'table-style-layout';
+                const themesColumn = document.createElement('div');
+                themesColumn.className = 'table-style-column';
+                const spacingColumn = document.createElement('div');
+                spacingColumn.className = 'table-style-column table-spacing-column';
+
                 const themeSection = document.createElement('div');
                 themeSection.className = 'table-style-section';
                 const themeTitle = document.createElement('div');
@@ -4096,15 +4416,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     option.style.setProperty('--table-preview-row1-bg', theme.preview.row1);
                     option.style.setProperty('--table-preview-row2-bg', theme.preview.row2);
                     option.addEventListener('click', () => {
-                        TABLE_THEMES.forEach(tt => table.classList.remove(tt.class));
-                        table.classList.add(theme.class);
+                        applyTableTheme(table, theme.class);
                         hideTableMenu();
                         notesEditor.focus({ preventScroll: true });
                     });
                     themeGrid.appendChild(option);
                 });
                 themeSection.appendChild(themeGrid);
-                tabContent.appendChild(themeSection);
+                themesColumn.appendChild(themeSection);
 
                 const headerSection = document.createElement('div');
                 headerSection.className = 'table-style-section';
@@ -4140,7 +4459,99 @@ document.addEventListener('DOMContentLoaded', function () {
                     headerList.appendChild(btn);
                 });
                 headerSection.appendChild(headerList);
-                tabContent.appendChild(headerSection);
+                themesColumn.appendChild(headerSection);
+
+                const spacingSection = document.createElement('div');
+                spacingSection.className = 'table-style-section';
+                const spacingTitle = document.createElement('div');
+                spacingTitle.className = 'table-style-section-title';
+                spacingTitle.textContent = 'Espaciado y altura';
+                spacingSection.appendChild(spacingTitle);
+
+                let currentLineHeight = parseFloat(table.dataset.cellLineHeight || '1.4');
+                let currentPadding = parseFloat(table.dataset.cellPadding || '6');
+                const updateSpacing = (lineHeight, padding) => {
+                    currentLineHeight = parseFloat(lineHeight);
+                    currentPadding = parseFloat(padding);
+                    applyTableSpacing(table, currentLineHeight, currentPadding);
+                };
+
+                const createSlider = (label, min, max, step, value, formatter, onInput) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'table-spacing-control';
+                    const header = document.createElement('div');
+                    header.className = 'table-spacing-label';
+                    const valueDisplay = document.createElement('span');
+                    valueDisplay.className = 'table-spacing-value';
+                    const labelSpan = document.createElement('span');
+                    labelSpan.textContent = label;
+                    valueDisplay.textContent = formatter(value);
+                    header.appendChild(labelSpan);
+                    header.appendChild(valueDisplay);
+                    const input = document.createElement('input');
+                    input.type = 'range';
+                    input.min = String(min);
+                    input.max = String(max);
+                    input.step = String(step);
+                    input.value = String(value);
+                    input.addEventListener('input', () => {
+                        valueDisplay.textContent = formatter(input.value);
+                        onInput(parseFloat(input.value));
+                    });
+                    wrapper.appendChild(header);
+                    wrapper.appendChild(input);
+                    return { element: wrapper, input, valueDisplay };
+                };
+
+                const lineHeightSlider = createSlider('Interlineado', 1, 2.4, 0.05, currentLineHeight, (v) => `${parseFloat(v).toFixed(2)}`, (val) => {
+                    updateSpacing(val, currentPadding);
+                });
+                const paddingSlider = createSlider('Padding vertical', 0, 16, 1, currentPadding, (v) => `${Math.round(parseFloat(v))} px`, (val) => {
+                    updateSpacing(currentLineHeight, val);
+                });
+                spacingSection.appendChild(lineHeightSlider.element);
+                spacingSection.appendChild(paddingSlider.element);
+
+                const presets = [
+                    { label: 'Ultra compacto', lineHeight: 1.1, padding: 2 },
+                    { label: 'Compacto', lineHeight: 1.3, padding: 4 },
+                    { label: 'Equilibrado', lineHeight: 1.5, padding: 6 },
+                    { label: 'Amplio', lineHeight: 1.8, padding: 10 }
+                ];
+                const presetsContainer = document.createElement('div');
+                presetsContainer.className = 'table-spacing-presets';
+                presets.forEach(preset => {
+                    const presetBtn = document.createElement('button');
+                    presetBtn.type = 'button';
+                    presetBtn.className = 'toolbar-btn table-spacing-btn';
+                    presetBtn.textContent = preset.label;
+                    presetBtn.addEventListener('click', () => {
+                        lineHeightSlider.input.value = String(preset.lineHeight);
+                        paddingSlider.input.value = String(preset.padding);
+                        lineHeightSlider.valueDisplay.textContent = `${preset.lineHeight.toFixed(2)}`;
+                        paddingSlider.valueDisplay.textContent = `${preset.padding} px`;
+                        updateSpacing(preset.lineHeight, preset.padding);
+                    });
+                    presetsContainer.appendChild(presetBtn);
+                });
+                const resetBtn = document.createElement('button');
+                resetBtn.type = 'button';
+                resetBtn.className = 'toolbar-btn table-spacing-btn';
+                resetBtn.textContent = 'Restablecer';
+                resetBtn.addEventListener('click', () => {
+                    lineHeightSlider.input.value = '1.4';
+                    paddingSlider.input.value = '6';
+                    lineHeightSlider.valueDisplay.textContent = '1.40';
+                    paddingSlider.valueDisplay.textContent = '6 px';
+                    updateSpacing(1.4, 6);
+                });
+                presetsContainer.appendChild(resetBtn);
+                spacingSection.appendChild(presetsContainer);
+
+                spacingColumn.appendChild(spacingSection);
+                layout.appendChild(themesColumn);
+                layout.appendChild(spacingColumn);
+                tabContent.appendChild(layout);
             };
 
             const tabs = [
@@ -4160,12 +4571,25 @@ document.addEventListener('DOMContentLoaded', function () {
                 tabsBar.appendChild(b);
             });
 
+            const editorRect = notesEditor.getBoundingClientRect();
+            const editorWidth = Math.max(280, editorRect.width - 16);
+            const viewportLimit = Math.max(280, window.innerWidth - 32);
+            const maxWidth = Math.min(editorWidth, viewportLimit);
+            const preferredWidth = Math.max(420, Math.min(maxWidth, 640));
+            const targetWidth = Math.min(preferredWidth, maxWidth);
+            tableMenu.style.maxWidth = `${maxWidth}px`;
+            tableMenu.style.width = `${targetWidth}px`;
             tableMenu.style.display = 'block';
             const rect = table.getBoundingClientRect();
             const menuHeight = tableMenu.offsetHeight;
             const top = rect.top + window.scrollY - menuHeight - 8;
             tableMenu.style.top = `${top < 0 ? 0 : top}px`;
-            tableMenu.style.left = `${rect.left + window.scrollX}px`;
+            let left = rect.left + window.scrollX;
+            const editorRight = window.scrollX + editorRect.right;
+            if (left + tableMenu.offsetWidth > editorRight) {
+                left = Math.max(window.scrollX + 8, editorRight - tableMenu.offsetWidth - 8);
+            }
+            tableMenu.style.left = `${left}px`;
             tableMenu.style.zIndex = 10001;
         };
         notesEditor.addEventListener('click', (e) => {
@@ -4258,9 +4682,9 @@ document.addEventListener('DOMContentLoaded', function () {
         document.body.appendChild(lineStylePopup);
         let currentLine = null;
 
-        const SIMPLE_LINES = [1,3,5].map(t => `border:none; border-top:${t}px solid #000; height:${t}px; margin:20px 0;`);
-        const DASHED_LINES = [1,3,5].map(t => `border:none; border-top:${t}px dashed #000; height:${t}px; margin:20px 0;`);
-        const DOTTED_LINES = [1,3,5].map(t => `border:none; border-top:${t}px dotted #000; height:${t}px; margin:20px 0;`);
+        const SIMPLE_LINES = [1,3,5].map(t => `border:none; border-top:${t}px solid #000; height:${t}px; margin:0;`);
+        const DASHED_LINES = [1,3,5].map(t => `border:none; border-top:${t}px dashed #000; height:${t}px; margin:0;`);
+        const DOTTED_LINES = [1,3,5].map(t => `border:none; border-top:${t}px dotted #000; height:${t}px; margin:0;`);
 
         const applyLineStyle = (style) => {
             if (currentLine) {
@@ -4274,7 +4698,19 @@ document.addEventListener('DOMContentLoaded', function () {
                     selection.removeAllRanges();
                     selection.addRange(savedEditorSelection);
                 }
-                document.execCommand('insertHTML', false, `<hr style="${style}">`);
+                const range = selection.rangeCount ? selection.getRangeAt(0) : null;
+                if (range) {
+                    range.deleteContents();
+                    const hr = document.createElement('hr');
+                    hr.setAttribute('style', style);
+                    range.insertNode(hr);
+                    range.setStartAfter(hr);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                } else {
+                    document.execCommand('insertHTML', false, `<hr style="${style}">`);
+                }
                 savedEditorSelection = null;
             }
             hideLineStylePopup();
@@ -4301,7 +4737,7 @@ document.addEventListener('DOMContentLoaded', function () {
             addGroup('Sólidas', SIMPLE_LINES);
             addGroup('Segmentadas', DASHED_LINES);
             addGroup('Punteadas', DOTTED_LINES);
-            const gradientsGroup = LINE_GRADIENTS.map(([c1,c2]) => `height:4px; border:none; margin:20px 0; border-radius:2px; background:linear-gradient(to right, ${c1}, ${c2});`);
+            const gradientsGroup = LINE_GRADIENTS.map(([c1,c2]) => `height:4px; border:none; margin:0; border-radius:2px; background:linear-gradient(to right, ${c1}, ${c2});`);
             addGroup('Degradadas', gradientsGroup);
         };
 
@@ -5024,6 +5460,8 @@ document.addEventListener('DOMContentLoaded', function () {
             updateSectionHeaderCounts();
             filterTable();
             recordHistory();
+            sectionNavigation.update();
+            sectionNavigation.markActiveSection();
         }
     }
 
@@ -5395,7 +5833,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const sectionName = headerRow.dataset.sectionHeader;
             const totalRow = document.getElementById(`total-row-${sectionName}`);
             const isCollapsed = headerRow.classList.contains('collapsed');
-            
+
             let hasVisibleChildren = false;
 
             document.querySelectorAll(`tr[data-section="${sectionName}"]`).forEach(row => {
@@ -5422,6 +5860,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         });
+
+        sectionNavigation.update();
+        sectionNavigation.markActiveSection();
     }
 
 
@@ -6563,16 +7004,27 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
+        tableBody.addEventListener('input', (e) => {
+            if (e.target.closest('.section-header-row')) {
+                sectionNavigation.update();
+                sectionNavigation.markActiveSection();
+            }
+        });
+
         // Section header collapse/expand
         tableBody.addEventListener('click', (e) => {
             const headerRow = e.target.closest('.section-header-row');
             if (!headerRow) return;
 
             // Prevent toggle when clicking on note or print icons
-            if(e.target.closest('.note-icon') || e.target.closest('.print-section-btn')) {
+            if (
+                e.target.closest('.note-icon') ||
+                e.target.closest('.print-section-btn') ||
+                e.target.closest('.save-section-html-btn')
+            ) {
                 return;
             }
-            
+
             headerRow.classList.toggle('collapsed');
             const isCollapsed = headerRow.classList.contains('collapsed');
             const sectionName = headerRow.dataset.sectionHeader;
@@ -6586,6 +7038,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 totalRow.style.display = isCollapsed ? 'none' : '';
             }
             saveState();
+            sectionNavigation.markActiveSection();
         });
 
         // Section print button
@@ -6595,6 +7048,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 e.stopPropagation();
                 const sectionHeaderRow = printBtn.closest('.section-header-row');
                 handlePrintSection(sectionHeaderRow);
+            }
+        });
+
+        tableBody.addEventListener('click', (e) => {
+            const exportBtn = e.target.closest('.save-section-html-btn');
+            if (exportBtn) {
+                e.stopPropagation();
+                const sectionHeaderRow = exportBtn.closest('.section-header-row');
+                exportSectionToHtml(sectionHeaderRow);
             }
         });
 
@@ -6626,6 +7088,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             settingsDropdown.classList.add('hidden');
         });
+
+        window.addEventListener('scroll', () => sectionNavigation.markActiveSection());
+        window.addEventListener('resize', () => {
+            sectionNavigation.update();
+            sectionNavigation.markActiveSection();
+        });
+        setTimeout(() => sectionNavigation.markActiveSection(), 200);
 
         toggleAllSectionsBtn.addEventListener('click', () => {
             const allHeaders = document.querySelectorAll('.section-header-row');
