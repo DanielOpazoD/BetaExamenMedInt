@@ -511,6 +511,20 @@ document.addEventListener('DOMContentLoaded', function () {
         '➤','⇒','⮕','▸','▹','✦','✱','✪','✽','~'
     ];
 
+    const NOTE_STYLES = [
+        { label: '💡 Nota Azul Suave', style: 'border-left:6px solid #b3e5fc; background:#f7fcff' },
+        { label: '✅ Nota Verde Pastel', style: 'border:1px solid #c8e6c9; background:#fbfffb' },
+        { label: '🟣 Nota Lila Punteada', style: 'border:2px dotted #d1c4e9; background:#fcfbff' },
+        { label: '🍑 Nota Durazno', style: 'border:2px dashed #ffccbc; background:#fffaf7' },
+        { label: '📌 Nota Banda Superior', style: 'border-top:6px solid #b2ebf2; background:#f8ffff' },
+        { label: '🌸 Nota Rosa Doble', style: 'border-left:8px double #f8bbd0; background:#fff8fb' },
+        { label: '🟨 Nota Esquina Acentuada', style: 'border:1px solid #fff9c4; background:#fffffb' },
+        { label: '🎨 Nota Borde Degradado', style: 'border:1px solid #ede7f6; background:#ffffff' },
+        { label: '🌿 Nota Menta Inferior', style: 'border-bottom:6px solid #c8e6c9; background:#fbfffb' },
+        { label: '🔎 Nota Violeta Ultraligera', style: 'border:1px solid #e6e0f8; background:#fdfcff; box-shadow:0 1px 3px rgba(0,0,0,.03)' },
+        { label: '⚪ Nota Gris', style: 'border:1px solid #e0e0e0; background:#f9f9f9' }
+    ];
+
     // Multi-note panel elements
     const notesPanelToggle = getElem('notes-panel-toggle');
     const notesSidePanel = getElem('notes-side-panel');
@@ -3789,6 +3803,91 @@ document.addEventListener('DOMContentLoaded', function () {
         const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
         editorToolbar.appendChild(lineHighlightPalette);
         editorToolbar.appendChild(createPresetStyleDropdown());
+
+        const noteBtn = createButton('Insertar nota', '📝', null, null, () => {
+            const sel = window.getSelection();
+            if (!sel || sel.isCollapsed) return;
+            showNoteStyleMenu();
+        });
+        editorToolbar.appendChild(noteBtn);
+
+        const noteStyleMenu = document.createElement('div');
+        noteStyleMenu.className = 'preset-style-popup';
+        document.body.appendChild(noteStyleMenu);
+        let currentNote = null;
+
+        const hideNoteStyleMenu = () => {
+            noteStyleMenu.style.display = 'none';
+            currentNote = null;
+        };
+
+        const applyNoteStyle = (style) => {
+            if (currentNote) {
+                currentNote.style.cssText = `resize:both;overflow:auto;${style}`;
+            } else {
+                const sel = window.getSelection();
+                if (!sel.rangeCount) return;
+                const range = sel.getRangeAt(0);
+                const frag = range.extractContents();
+                const div = document.createElement('div');
+                div.className = 'nota';
+                div.style.cssText = `resize:both;overflow:auto;${style}`;
+                div.appendChild(frag);
+                range.insertNode(div);
+            }
+            recordHistory();
+        };
+
+        const showNoteStyleMenu = (note = null) => {
+            currentNote = note;
+            noteStyleMenu.innerHTML = '';
+            NOTE_STYLES.forEach(s => {
+                const btn = document.createElement('button');
+                btn.className = 'toolbar-btn';
+                btn.innerHTML = `<span style="${s.style}">${s.label}</span>`;
+                btn.addEventListener('click', () => {
+                    applyNoteStyle(s.style);
+                    hideNoteStyleMenu();
+                    notesEditor.focus();
+                });
+                noteStyleMenu.appendChild(btn);
+            });
+            const customBtn = document.createElement('button');
+            customBtn.className = 'toolbar-btn';
+            customBtn.textContent = '🎨 Personalizado';
+            customBtn.addEventListener('click', () => {
+                const bg = prompt('Color de fondo', '#ffffff') || '#ffffff';
+                const border = prompt('Color de borde', '#000000') || '#000000';
+                const text = prompt('Color de texto', '#000000') || '#000000';
+                const style = `background:${bg};border:1px solid ${border};color:${text}`;
+                applyNoteStyle(style);
+                hideNoteStyleMenu();
+                notesEditor.focus();
+            });
+            noteStyleMenu.appendChild(customBtn);
+            let rect;
+            if (note) {
+                rect = note.getBoundingClientRect();
+            } else {
+                const sel = window.getSelection();
+                rect = sel.getRangeAt(0).getBoundingClientRect();
+            }
+            noteStyleMenu.style.top = `${window.scrollY + rect.bottom + 4}px`;
+            noteStyleMenu.style.left = `${window.scrollX + rect.left}px`;
+            noteStyleMenu.style.display = 'block';
+        };
+
+        notesEditor.addEventListener('click', e => {
+            const note = e.target.closest('.nota');
+            if (note) {
+                showNoteStyleMenu(note);
+                e.stopPropagation();
+            }
+        });
+
+        document.addEventListener('click', e => {
+            if (!noteStyleMenu.contains(e.target)) hideNoteStyleMenu();
+        });
 
         // Popup to change existing preset styles
         const stylePopup = document.createElement('div');

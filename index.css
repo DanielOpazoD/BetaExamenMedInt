@@ -1739,3 +1739,23 @@ table.resizable-table th {
   margin-top: 4px;
   display: block;
 }
+
+/* Base styles for custom note blocks */
+.nota {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.1;
+  padding: 10px 12px;
+  margin: 20px 0;
+  background: #fff;
+  border-radius: 8px;
+  resize: both;
+  overflow: auto;
+}
+.nota h4 {
+  margin: 0 0 6px 0;
+  font-size: 14px;
+}
+.muted {
+  opacity: 0.85;
+}
