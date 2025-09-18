@@ -3728,22 +3728,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         editorToolbar.appendChild(inlineIconSelect);
 
-        tooltipIconPickerBtn = createButton('Seleccionar icono de tooltip', '', null, null, () => {
-            if (!tooltipIconSelector) return;
-            if (tooltipIconSelector.classList.contains('hidden')) {
-                showTooltipIconSelector();
-            } else {
-                hideTooltipIconSelector();
-            }
-        }, 'tooltip-icon-picker-btn');
-        tooltipIconPickerBtn.setAttribute('aria-haspopup', 'true');
-        tooltipIconPickerBtn.setAttribute('aria-expanded', 'false');
-        tooltipIconPickerBtn.setAttribute('aria-label', 'Seleccionar icono de tooltip');
-        updateTooltipIconPickerLabel(toolbarSelectedTooltipIcon);
-        editorToolbar.appendChild(tooltipIconPickerBtn);
-
-        editorToolbar.appendChild(createButton('Añadir tooltip', '💬', null, null, handleTooltipTool));
-
         editorToolbar.appendChild(createSeparator());
 
         // --- Color Palettes ---
