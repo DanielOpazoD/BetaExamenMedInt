@@ -623,6 +623,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let tooltipIconSelector = null;
     let tooltipIconButtons = [];
     let tooltipIconPickerBtn = null;
+    let addTooltipBtn = null;
     let tooltipIconOutsideHandler = null;
     let hideTooltipIconSelector = () => {};
     let normalizeTooltipElement = () => {};
@@ -2338,6 +2339,13 @@ document.addEventListener('DOMContentLoaded', function () {
             return TOOLTIP_ICON_OPTIONS.includes(icon) ? icon : DEFAULT_TOOLTIP_ICON;
         };
 
+        const updateAddTooltipButtonIcon = (icon) => {
+            if (!addTooltipBtn) return;
+            addTooltipBtn.innerHTML = `<span class="tooltip-icon-current" aria-hidden="true">${icon}</span>`;
+            addTooltipBtn.setAttribute('aria-label', `Añadir tooltip (${icon})`);
+            addTooltipBtn.title = `Añadir tooltip (${icon})`;
+        };
+
         const updateTooltipIconPickerLabel = (icon) => {
             if (tooltipIconPickerBtn) {
                 tooltipIconPickerBtn.innerHTML = `<span class="tooltip-icon-current" aria-hidden="true">${icon}</span><span class="tooltip-icon-caret" aria-hidden="true">▾</span>`;
@@ -2352,6 +2360,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
             });
             updateTooltipIconPickerLabel(sanitized);
+            updateAddTooltipButtonIcon(sanitized);
             return sanitized;
         };
 
@@ -2612,8 +2621,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (fragment && fragment.childNodes && fragment.childNodes.length) {
                 target.appendChild(fragment);
                 target.hidden = false;
+                target.removeAttribute('aria-hidden');
             } else {
                 target.hidden = true;
+                target.setAttribute('aria-hidden', 'true');
             }
             wrapperEl.appendChild(target);
             const iconSup = document.createElement('sup');
@@ -2714,19 +2725,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 wrapper = normalized;
             } else if (activeTooltipState.range) {
                 const range = activeTooltipState.range.cloneRange ? activeTooltipState.range.cloneRange() : activeTooltipState.range;
-                if (!range || range.collapsed) {
-                    showAlert('Selecciona el texto al que deseas agregar un tooltip.');
+                if (!range) {
+                    showAlert('Coloca el cursor dentro del texto para insertar un tooltip.');
                     return;
                 }
                 let fragment = null;
-                try {
-                    fragment = range.cloneContents();
-                } catch (error) {
-                    console.warn('No se pudo clonar la selección del tooltip:', error);
+                if (!range.collapsed) {
+                    try {
+                        fragment = range.cloneContents();
+                    } catch (error) {
+                        console.warn('No se pudo clonar la selección del tooltip:', error);
+                    }
                 }
                 const wrapperEl = createTooltipWrapper(icon, fragment, html);
                 try {
-                    range.deleteContents();
+                    if (!range.collapsed) {
+                        range.deleteContents();
+                    }
                     range.insertNode(wrapperEl);
                 } catch (error) {
                     console.error('No se pudo crear el tooltip a partir de la selección:', error);
@@ -2745,7 +2760,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     selection.addRange(collapseRange);
                 }
             } else {
-                showAlert('Selecciona el texto al que deseas agregar un tooltip.');
+                showAlert('Coloca el cursor dentro del texto para insertar un tooltip.');
                 return;
             }
             setToolbarSelectedTooltipIcon(icon);
@@ -2847,12 +2862,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 openTooltipEditor(existingTooltip, null);
                 return;
             }
-            if (range.collapsed) {
-                notesEditor.focus({ preventScroll: true });
-                showAlert('Selecciona el texto al que deseas agregar un tooltip.');
-                return;
-            }
-            openTooltipEditor(null, range);
+            openTooltipEditor(null, range.cloneRange ? range.cloneRange() : range);
         };
 
         const onDragStart = (e) => {
@@ -3722,7 +3732,10 @@ document.addEventListener('DOMContentLoaded', function () {
         updateTooltipIconPickerLabel(toolbarSelectedTooltipIcon);
         editorToolbar.appendChild(tooltipIconPickerBtn);
 
-        editorToolbar.appendChild(createButton('Añadir tooltip', '💬', null, null, handleTooltipTool));
+        addTooltipBtn = createButton('Añadir tooltip', '', null, null, handleTooltipTool);
+        addTooltipBtn.classList.add('tooltip-insert-btn');
+        updateAddTooltipButtonIcon(toolbarSelectedTooltipIcon);
+        editorToolbar.appendChild(addTooltipBtn);
 
         editorToolbar.appendChild(createSeparator());
 
