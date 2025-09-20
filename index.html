@@ -25,10 +25,11 @@
             <div id="note-tabs"></div>
         </div>
         <button id="tabs-next" class="tab-nav hidden">▶</button>
+        <button id="tab-help-btn" class="tab-nav" title="Guía de herramientas" aria-label="Guía de herramientas">❔</button>
         <button id="tab-config-btn" class="tab-nav" title="Configuración">⚙️</button>
         <div id="tab-config-panel" class="hidden">
             <label><input type="checkbox" id="tab-bar-toggle" checked> Mostrar barra</label>
-            <label>Color: 
+            <label>Color:
                 <select id="tab-color-select">
                     <option value="#1f2937">Oscuro</option>
                     <option value="#1e3a8a">Azul</option>
@@ -44,6 +45,52 @@
                     <option value="right">Derecha</option>
                 </select>
             </label>
+        </div>
+    </div>
+
+    <div id="tool-help-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="tool-help-title" aria-hidden="true">
+        <div class="modal-content tool-help-content w-full max-w-5xl">
+            <div class="flex items-start justify-between gap-4 mb-4">
+                <div>
+                    <h2 id="tool-help-title" class="text-2xl font-bold text-primary">Guía de botones y ventanas</h2>
+                    <p class="text-sm text-gray-600 dark:text-gray-300">Consulta el nombre corto, código y función de cada herramienta para poder pedir cambios con precisión.</p>
+                </div>
+                <button id="tool-help-close-btn" class="toolbar-btn close-modal-btn" title="Cerrar" aria-label="Cerrar">✖</button>
+            </div>
+            <div class="tool-help-scroll space-y-6">
+                <section class="tool-help-section">
+                    <h3 class="text-lg font-semibold text-primary">Barra de edición de texto</h3>
+                    <div class="tool-help-table-wrapper">
+                        <table class="tool-help-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Icono</th>
+                                    <th scope="col">Nombre corto</th>
+                                    <th scope="col">Nombre código</th>
+                                    <th scope="col">Función</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tool-help-toolbar-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="tool-help-section">
+                    <h3 class="text-lg font-semibold text-primary">Ventanas y paneles</h3>
+                    <div class="tool-help-table-wrapper">
+                        <table class="tool-help-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Icono</th>
+                                    <th scope="col">Nombre corto</th>
+                                    <th scope="col">Nombre código</th>
+                                    <th scope="col">Función</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tool-help-windows-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
         </div>
     </div>
 
