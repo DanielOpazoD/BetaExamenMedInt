@@ -262,8 +262,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const tabColorSelect = getElem('tab-color-select');
     const tabPositionSelect = getElem('tab-position-select');
     const showTabBarBtn = getElem('show-tab-bar-btn');
+    const fullscreenBgBtn = getElem('fullscreen-bg-btn');
+    const fullscreenBgInput = getElem('fullscreen-bg-input');
     const minimizeNoteBtn = getElem('minimize-note-btn');
     const restoreNoteBtn = getElem('restore-note-btn');
+    const lockNoteBtn = getElem('lock-note-btn');
 
     let openNoteTabs = [];
     let activeTabId = null;
@@ -272,6 +275,107 @@ document.addEventListener('DOMContentLoaded', function () {
     let fullscreenEnabled = false;
     let savedEditorWidth = 0;
     let draggedBlock = null;
+    let isNoteLocked = false;
+    let wasReadonlyBeforeLock = false;
+    let fullscreenBgColor = '#f8fbfd';
+    const FULLSCREEN_BG_KEY = 'notesFullscreenBgColor';
+    let stylePopup = null;
+    let hideStylePopup = () => {};
+    let hidePresetIndicator = () => {};
+    let presetStyleIndicator = null;
+    let pillTextPopup = null;
+    let hidePillTextPopup = () => {};
+    let lineStylePopup = null;
+    let hideLineStylePopup = () => {};
+    let tableMenu = null;
+    let hideTableMenu = () => {};
+    let eraseLineBtn = null;
+
+    const normalizeHexColor = (color) => {
+        if (!color || typeof color !== 'string') return null;
+        let hex = color.trim();
+        if (/^#[0-9a-fA-F]{3}$/.test(hex)) {
+            hex = `#${hex.slice(1).split('').map(ch => ch + ch).join('')}`;
+        }
+        if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return null;
+        return `#${hex.slice(1).toLowerCase()}`;
+    };
+
+    const hexToRgb = (hex) => {
+        const normalized = normalizeHexColor(hex);
+        if (!normalized) return null;
+        const value = normalized.slice(1);
+        return {
+            r: parseInt(value.slice(0, 2), 16),
+            g: parseInt(value.slice(2, 4), 16),
+            b: parseInt(value.slice(4, 6), 16)
+        };
+    };
+
+    const rgbToHex = ({ r, g, b }) => {
+        const clamp = (v) => Math.min(255, Math.max(0, Math.round(v)));
+        return `#${[clamp(r), clamp(g), clamp(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+    };
+
+    const mixHexColors = (hex1, hex2, weight = 0.5) => {
+        const rgb1 = hexToRgb(hex1);
+        const rgb2 = hexToRgb(hex2);
+        if (!rgb1 || !rgb2) return hex1;
+        const w = Math.min(1, Math.max(0, weight));
+        return rgbToHex({
+            r: rgb1.r * (1 - w) + rgb2.r * w,
+            g: rgb1.g * (1 - w) + rgb2.g * w,
+            b: rgb1.b * (1 - w) + rgb2.b * w
+        });
+    };
+
+    const getContrastTextColor = (hex) => {
+        const rgb = hexToRgb(hex);
+        if (!rgb) return '#1f2937';
+        const yiq = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+        return yiq >= 150 ? '#1f2937' : '#f8fafc';
+    };
+
+    function updateFullscreenBackground(color, { persist = true } = {}) {
+        const normalized = normalizeHexColor(color);
+        if (!normalized) return;
+        fullscreenBgColor = normalized;
+        const rootStyle = document.documentElement.style;
+        rootStyle.setProperty('--fullscreen-bg', normalized);
+        const isDark = document.documentElement.classList.contains('dark');
+        const editorTarget = isDark ? '#0f172a' : '#ffffff';
+        const blendWeight = isDark ? 0.6 : 0.78;
+        const editorBg = mixHexColors(normalized, editorTarget, blendWeight);
+        rootStyle.setProperty('--fullscreen-editor-bg', editorBg);
+        if (fullscreenBgBtn) {
+            fullscreenBgBtn.style.backgroundColor = normalized;
+            fullscreenBgBtn.style.color = getContrastTextColor(normalized);
+            fullscreenBgBtn.style.borderColor = mixHexColors(normalized, isDark ? '#94a3b8' : '#1f2937', 0.85);
+        }
+        if (fullscreenBgInput && fullscreenBgInput.value !== normalized) {
+            fullscreenBgInput.value = normalized;
+        }
+        if (persist) {
+            try {
+                localStorage.setItem(FULLSCREEN_BG_KEY, normalized);
+            } catch (err) {
+                console.warn('No se pudo guardar el color de pantalla completa:', err);
+            }
+        }
+    }
+
+    const storedFullscreenBg = (() => {
+        try {
+            return localStorage.getItem(FULLSCREEN_BG_KEY);
+        } catch (err) {
+            return null;
+        }
+    })();
+    if (storedFullscreenBg) {
+        updateFullscreenBackground(storedFullscreenBg, { persist: false });
+    } else {
+        updateFullscreenBackground(fullscreenBgColor, { persist: false });
+    }
 
     if (minimizeNoteBtn && restoreNoteBtn) {
         minimizeNoteBtn.addEventListener('click', () => {
@@ -304,6 +408,19 @@ document.addEventListener('DOMContentLoaded', function () {
             tabBarToggle.checked = true;
             noteTabsBar.classList.toggle('hidden', openNoteTabs.length === 0);
             showTabBarBtn.classList.add('hidden');
+        });
+    }
+
+    if (fullscreenBgBtn && fullscreenBgInput) {
+        fullscreenBgBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            fullscreenBgInput.click();
+        });
+        fullscreenBgInput.addEventListener('input', (e) => {
+            if (e.target.value) {
+                updateFullscreenBackground(e.target.value);
+                saveState();
+            }
         });
     }
 
@@ -597,6 +714,8 @@ document.addEventListener('DOMContentLoaded', function () {
         importNote: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-upload w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>`,
         exportNote: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>`,
         minimize: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-minus w-5 h-5"><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+        lock: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock w-5 h-5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+        unlock: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-unlock w-5 h-5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`,
         type: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-type w-4 h-4"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>`,
         highlighter: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-highlighter w-4 h-4"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>`,
         highlightSize: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up-down w-4 h-4"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>`,
@@ -1698,6 +1817,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     notesEditor.addEventListener('click', (e) => {
+        if (isNoteLocked) return;
         if (!lineEraseMode) return;
         const block = e.target.closest('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details');
         if (block && notesEditor.contains(block)) {
@@ -1873,7 +1993,9 @@ document.addEventListener('DOMContentLoaded', function () {
             sel.addRange(newRange);
         }
         // Focus back to editor
-        notesEditor.focus({ preventScroll: true });
+        if (!isNoteLocked) {
+            notesEditor.focus({ preventScroll: true });
+        }
     }
 
     /**
@@ -2661,6 +2783,60 @@ ${exportTable.outerHTML}
         }
     }
 
+    function updateNoteEditingState() {
+        if (!notesEditor || !notesModalTitle) return;
+        const modalContent = notesModalContent;
+        const readonlyMode = modalContent?.classList.contains('readonly-mode') || false;
+        const allowEditing = !readonlyMode && !isNoteLocked;
+        notesEditor.contentEditable = allowEditing;
+        notesModalTitle.contentEditable = allowEditing;
+    }
+
+    function applyNoteLockState() {
+        if (notesModalContent) {
+            notesModalContent.classList.toggle('locked-note', isNoteLocked);
+            if (isNoteLocked) {
+                notesModalContent.classList.add('readonly-mode');
+            } else if (!wasReadonlyBeforeLock) {
+                notesModalContent.classList.remove('readonly-mode');
+            }
+        }
+        if (lockNoteBtn) {
+            lockNoteBtn.innerHTML = isNoteLocked ? UI_ICON_STRINGS.lock : UI_ICON_STRINGS.unlock;
+            lockNoteBtn.title = isNoteLocked ? 'Desbloquear nota' : 'Bloquear nota';
+            lockNoteBtn.setAttribute('aria-pressed', isNoteLocked ? 'true' : 'false');
+            lockNoteBtn.disabled = currentNotesArray.length === 0;
+        }
+        if (editorToolbar) {
+            editorToolbar.classList.toggle('locked', isNoteLocked);
+        }
+        if (toggleReadOnlyBtn) {
+            toggleReadOnlyBtn.classList.toggle('disabled', isNoteLocked);
+            toggleReadOnlyBtn.setAttribute('aria-disabled', isNoteLocked ? 'true' : 'false');
+            toggleReadOnlyBtn.disabled = isNoteLocked;
+        }
+        hideStylePopup();
+        hidePresetIndicator();
+        hidePillTextPopup();
+        hideLineStylePopup();
+        hideTableMenu();
+        if (presetStyleIndicator) {
+            presetStyleIndicator.classList.remove('visible');
+        }
+        document.querySelectorAll('.preset-style-popup').forEach(el => {
+            el.classList.remove('visible');
+            el.style.display = 'none';
+        });
+        if (notesEditor) {
+            notesEditor.style.cursor = '';
+        }
+        if (eraseLineBtn) {
+            eraseLineBtn.classList.remove('active');
+        }
+        lineEraseMode = false;
+        updateNoteEditingState();
+    }
+
     function setupEditorToolbar() {
         editorToolbar.innerHTML = ''; // Clear existing toolbar
 
@@ -3185,6 +3361,7 @@ ${exportTable.outerHTML}
         });
 
         notesEditor.addEventListener('click', (e) => {
+            if (isNoteLocked) return;
             const icon = e.target.closest('.editor-tooltip-icon');
             if (icon && notesEditor.contains(icon)) {
                 e.preventDefault();
@@ -3197,6 +3374,7 @@ ${exportTable.outerHTML}
         });
 
         notesEditor.addEventListener('dblclick', (e) => {
+            if (isNoteLocked) return;
             const tooltip = e.target.closest('.editor-tooltip');
             if (tooltip && notesEditor.contains(tooltip)) {
                 openTooltipEditor(tooltip, null);
@@ -4125,31 +4303,44 @@ ${exportTable.outerHTML}
             }
             elements.forEach((block, index) => {
                 if (block && notesEditor.contains(block)) {
-                    if (color === 'transparent') {
-                        // Remove highlight and reset borders and margins on clear
-                        block.style.backgroundColor = '';
-                        block.style.paddingLeft = '';
-                        block.style.paddingRight = '';
-                        block.style.marginTop = '';
-                        block.style.marginBottom = '';
+                    const isTableElement = ['TABLE', 'TD', 'TH'].includes(block.tagName);
+                    const insideTable = isTableElement || (!!block.closest && !!block.closest('table'));
+                    const resetRadii = () => {
                         block.style.borderTopLeftRadius = '';
                         block.style.borderTopRightRadius = '';
                         block.style.borderBottomLeftRadius = '';
                         block.style.borderBottomRightRadius = '';
+                    };
+                    if (color === 'transparent') {
+                        // Remove highlight and reset borders and margins on clear
+                        block.style.backgroundColor = '';
+                        block.style.marginTop = '';
+                        block.style.marginBottom = '';
+                        if (!insideTable) {
+                            block.style.paddingLeft = '';
+                            block.style.paddingRight = '';
+                        }
+                        resetRadii();
                     } else {
                         block.style.backgroundColor = color;
-                        block.style.paddingLeft = '6px';
-                        block.style.paddingRight = '6px';
-                        // Remove default margins to fuse adjacent highlighted lines
-                        block.style.marginTop = '0px';
-                        block.style.marginBottom = '0px';
-                        // Set border radius based on position in selection
-                        const first = index === 0;
-                        const last = index === elements.length - 1;
-                        block.style.borderTopLeftRadius = first ? '6px' : '0';
-                        block.style.borderTopRightRadius = first ? '6px' : '0';
-                        block.style.borderBottomLeftRadius = last ? '6px' : '0';
-                        block.style.borderBottomRightRadius = last ? '6px' : '0';
+                        if (insideTable) {
+                            block.style.paddingLeft = '';
+                            block.style.paddingRight = '';
+                            resetRadii();
+                        } else {
+                            block.style.paddingLeft = '6px';
+                            block.style.paddingRight = '6px';
+                            // Remove default margins to fuse adjacent highlighted lines
+                            block.style.marginTop = '0px';
+                            block.style.marginBottom = '0px';
+                            // Set border radius based on position in selection
+                            const first = index === 0;
+                            const last = index === elements.length - 1;
+                            block.style.borderTopLeftRadius = first ? '6px' : '0';
+                            block.style.borderTopRightRadius = first ? '6px' : '0';
+                            block.style.borderBottomLeftRadius = last ? '6px' : '0';
+                            block.style.borderBottomRightRadius = last ? '6px' : '0';
+                        }
                     }
                 }
             });
@@ -4169,16 +4360,27 @@ ${exportTable.outerHTML}
         editorToolbar.appendChild(createPresetStyleDropdown());
 
         // Popup to change existing preset styles
-        const stylePopup = document.createElement('div');
-        stylePopup.className = 'preset-style-popup symbol-dropdown-content preset-style-panel';
+        stylePopup = document.createElement('div');
+        stylePopup.className = 'preset-style-popup symbol-dropdown-content';
+        const stylePopupContent = document.createElement('div');
+        stylePopupContent.className = 'preset-style-panel';
+        stylePopup.appendChild(stylePopupContent);
         document.body.appendChild(stylePopup);
+        presetStyleIndicator = document.createElement('button');
+        presetStyleIndicator.type = 'button';
+        presetStyleIndicator.className = 'preset-style-indicator';
+        presetStyleIndicator.innerHTML = '▾';
+        presetStyleIndicator.setAttribute('aria-label', 'Cambiar estilo de texto');
+        document.body.appendChild(presetStyleIndicator);
         let currentStyledSpan = null;
         let currentStyleListControls = null;
+        let indicatorTargetSpan = null;
 
-        const hideStylePopup = () => {
+        hideStylePopup = () => {
             stylePopup.style.display = 'none';
             stylePopup.style.visibility = 'hidden';
             stylePopup.classList.remove('visible');
+            stylePopupContent.innerHTML = '';
             currentStyledSpan = null;
             if (currentStyleListControls) {
                 currentStyleListControls.closeAll();
@@ -4186,60 +4388,149 @@ ${exportTable.outerHTML}
             }
         };
 
+        hidePresetIndicator = () => {
+            if (indicatorTargetSpan) {
+                indicatorTargetSpan.classList.remove('preset-style-target');
+            }
+            indicatorTargetSpan = null;
+            presetStyleIndicator.classList.remove('visible');
+        };
+
+        const positionPresetIndicator = (span) => {
+            if (!span || !document.body.contains(span)) {
+                hidePresetIndicator();
+                return;
+            }
+            indicatorTargetSpan?.classList.remove('preset-style-target');
+            indicatorTargetSpan = span;
+            indicatorTargetSpan.classList.add('preset-style-target');
+            const rect = span.getBoundingClientRect();
+            const indicatorSize = presetStyleIndicator.offsetWidth || 24;
+            let top = rect.top + window.scrollY - indicatorSize - 6;
+            const minTop = window.scrollY + 6;
+            if (top < minTop) {
+                top = rect.bottom + window.scrollY + 6;
+            }
+            let left = rect.right + window.scrollX - indicatorSize;
+            const minLeft = window.scrollX + 6;
+            const maxLeft = window.scrollX + window.innerWidth - indicatorSize - 6;
+            if (left < minLeft) left = minLeft;
+            if (left > maxLeft) left = maxLeft;
+            presetStyleIndicator.style.top = `${top}px`;
+            presetStyleIndicator.style.left = `${left}px`;
+            presetStyleIndicator.classList.add('visible');
+        };
+
         const showStylePopup = (span) => {
+            if (!span) return;
             currentStyledSpan = span;
-            currentStyleListControls = renderPresetStyleList(stylePopup, {
+            stylePopupContent.innerHTML = '';
+            currentStyleListControls = renderPresetStyleList(stylePopupContent, {
                 onSelectStyle: (style) => {
                     if (!currentStyledSpan) return;
                     applyPresetStyle(style, currentStyledSpan);
                     hideStylePopup();
+                    hidePresetIndicator();
                     notesEditor.focus({ preventScroll: true });
                 }
             });
             stylePopup.style.display = 'flex';
             stylePopup.classList.add('visible');
-            const editorRect = notesEditor.getBoundingClientRect();
-            const availableWidth = Math.max(280, editorRect.width - 32);
-            const popupMaxWidth = Math.min(560, availableWidth);
-            const popupMinWidth = Math.min(Math.max(320, availableWidth), popupMaxWidth);
-            stylePopup.style.minWidth = `${popupMinWidth}px`;
-            stylePopup.style.maxWidth = `${popupMaxWidth}px`;
             stylePopup.style.visibility = 'hidden';
             stylePopup.style.top = '0px';
             stylePopup.style.left = '0px';
+            const editorRect = notesEditor.getBoundingClientRect();
+            const availableWidth = Math.max(240, editorRect.width - 32);
+            const popupMaxWidth = Math.min(560, availableWidth);
+            const popupMinWidth = Math.min(Math.max(280, availableWidth), popupMaxWidth);
+            stylePopup.style.minWidth = `${popupMinWidth}px`;
+            stylePopup.style.maxWidth = `${popupMaxWidth}px`;
             requestAnimationFrame(() => {
-                if (!currentStyledSpan) return;
-                const rect = span.getBoundingClientRect();
+                const anchorRect = presetStyleIndicator.classList.contains('visible')
+                    ? presetStyleIndicator.getBoundingClientRect()
+                    : span.getBoundingClientRect();
                 const popupRect = stylePopup.getBoundingClientRect();
-                let top = rect.bottom + window.scrollY + 8;
+                let top = anchorRect.bottom + window.scrollY + 8;
                 if (top + popupRect.height > window.scrollY + window.innerHeight) {
-                    top = rect.top + window.scrollY - popupRect.height - 8;
+                    top = anchorRect.top + window.scrollY - popupRect.height - 8;
                 }
-                let left = rect.left + window.scrollX;
-                if (left + popupRect.width > window.scrollX + window.innerWidth) {
-                    left = window.scrollX + window.innerWidth - popupRect.width - 8;
-                }
+                let left = anchorRect.left + window.scrollX - popupRect.width / 2 + anchorRect.width / 2;
+                const minLeft = window.scrollX + 8;
+                const maxLeft = window.scrollX + window.innerWidth - popupRect.width - 8;
+                if (left < minLeft) left = minLeft;
+                if (left > maxLeft) left = maxLeft;
                 stylePopup.style.top = `${Math.max(window.scrollY + 8, top)}px`;
-                stylePopup.style.left = `${Math.max(window.scrollX + 8, left)}px`;
+                stylePopup.style.left = `${left}px`;
                 stylePopup.style.visibility = 'visible';
             });
         };
 
         hideStylePopup();
+        hidePresetIndicator();
 
-        notesEditor.addEventListener('click', (e) => {
-            const span = e.target.closest('span[data-preset-style]');
-            if (span) {
-                currentStyledSpan = span;
-                showStylePopup(span);
-                e.stopPropagation();
-            } else {
+        presetStyleIndicator.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (isNoteLocked) return;
+            if (!indicatorTargetSpan) return;
+            if (stylePopup.classList.contains('visible') && currentStyledSpan === indicatorTargetSpan) {
                 hideStylePopup();
+            } else {
+                showStylePopup(indicatorTargetSpan);
             }
         });
-        document.addEventListener('click', (e) => {
-            if (!stylePopup.contains(e.target)) hideStylePopup();
+
+        notesEditor.addEventListener('click', (e) => {
+            if (isNoteLocked) {
+                hideStylePopup();
+                hidePresetIndicator();
+                return;
+            }
+            const span = e.target.closest('span[data-preset-style]');
+            if (span) {
+                positionPresetIndicator(span);
+                e.stopPropagation();
+            } else if (!e.target.closest('.preset-style-popup')) {
+                hideStylePopup();
+                hidePresetIndicator();
+            }
         });
+
+        notesEditor.addEventListener('keydown', () => {
+            hideStylePopup();
+            hidePresetIndicator();
+        });
+
+        document.addEventListener('selectionchange', () => {
+            if (isNoteLocked) {
+                hideStylePopup();
+                hidePresetIndicator();
+                return;
+            }
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount) {
+                hideStylePopup();
+                hidePresetIndicator();
+                return;
+            }
+            let node = sel.anchorNode;
+            if (node && node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+            const span = node?.closest?.('span[data-preset-style]');
+            if (!span || span !== indicatorTargetSpan) {
+                hideStylePopup();
+                hidePresetIndicator();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (stylePopup.contains(e.target) || e.target === presetStyleIndicator) return;
+            hideStylePopup();
+            hidePresetIndicator();
+        });
+        document.addEventListener('scroll', () => {
+            hideStylePopup();
+            hidePresetIndicator();
+        }, true);
 
         // --- Pills text styles ---
         const PILL_TEXT_STYLES = [
@@ -4255,12 +4546,12 @@ ${exportTable.outerHTML}
             ['#ffcdd2', '#f44336', '#b71c1c']
         ];
 
-        const pillTextPopup = document.createElement('div');
+        pillTextPopup = document.createElement('div');
         pillTextPopup.className = 'preset-style-popup';
         document.body.appendChild(pillTextPopup);
         let currentPillSpan = null;
 
-        const hidePillTextPopup = () => {
+        hidePillTextPopup = () => {
             pillTextPopup.style.display = 'none';
             currentPillSpan = null;
         };
@@ -4354,6 +4645,10 @@ ${exportTable.outerHTML}
         editorToolbar.appendChild(pillTextBtn);
 
         notesEditor.addEventListener('click', (e) => {
+            if (isNoteLocked) {
+                hidePillTextPopup();
+                return;
+            }
             const span = e.target.closest('span[data-pill-text]');
             if (span) {
                 e.stopPropagation();
@@ -4368,24 +4663,63 @@ ${exportTable.outerHTML}
         });
 
         // Floating menu for table tools
-        const tableMenu = document.createElement('div');
+        tableMenu = document.createElement('div');
         tableMenu.className = 'table-menu-popup';
         document.body.appendChild(tableMenu);
         let currentTable = null;
         let editingTable = null;
         let tableEditMode = false;
-        const hideTableMenu = () => {
+        hideTableMenu = () => {
             tableMenu.style.display = 'none';
             currentTable = null;
         };
+        const tableHasTheme = (table) => TABLE_THEMES.some(tt => table.classList.contains(tt.class));
+        const cloneTableCellStructure = (target, template, themed) => {
+            if (!target) return;
+            Array.from(target.attributes).forEach(attr => {
+                if (attr.name !== 'contenteditable') target.removeAttribute(attr.name);
+            });
+            target.className = '';
+            target.innerHTML = '&nbsp;';
+            if (template) {
+                Array.from(template.attributes).forEach(attr => {
+                    if (attr.name === 'contenteditable' || attr.name === 'id') return;
+                    target.setAttribute(attr.name, attr.value);
+                });
+                target.className = template.className;
+                const styleText = template.getAttribute('style');
+                if (styleText) {
+                    target.setAttribute('style', styleText);
+                } else {
+                    target.removeAttribute('style');
+                }
+            } else {
+                target.removeAttribute('style');
+            }
+            if (themed) {
+                target.style.border = '';
+            } else if (!target.style.border) {
+                target.style.border = '1px solid var(--border-color)';
+            }
+            target.contentEditable = true;
+        };
         const addRow = (table, index) => {
-            const row = table.insertRow(index);
-            const cols = table.rows[0] ? table.rows[0].cells.length : 1;
-            for (let i = 0; i < cols; i++) {
-                const cell = row.insertCell(i);
-                cell.innerHTML = '&nbsp;';
-                cell.contentEditable = true;
-                cell.style.border = '1px solid var(--border-color)';
+            const hasTheme = tableHasTheme(table);
+            const rowCount = table.rows.length;
+            const referenceRowIndex = rowCount > 0 ? Math.min(Math.max(index - 1, 0), rowCount - 1) : -1;
+            const referenceRow = referenceRowIndex >= 0 ? table.rows[referenceRowIndex] : null;
+            const fallbackRow = table.rows[0] || null;
+            const newRow = table.insertRow(index);
+            const columnCount = referenceRow ? referenceRow.cells.length : (fallbackRow ? fallbackRow.cells.length : 1);
+            for (let i = 0; i < columnCount; i++) {
+                const cell = newRow.insertCell(i);
+                let templateCell = null;
+                if (referenceRow && referenceRow.cells.length) {
+                    templateCell = referenceRow.cells[Math.min(i, referenceRow.cells.length - 1)];
+                } else if (fallbackRow && fallbackRow.cells.length) {
+                    templateCell = fallbackRow.cells[Math.min(i, fallbackRow.cells.length - 1)];
+                }
+                cloneTableCellStructure(cell, templateCell, hasTheme);
             }
             ensureSpacingState(table);
             const lineHeight = parseFloat(table.dataset.cellLineHeight || '1.4');
@@ -4395,11 +4729,12 @@ ${exportTable.outerHTML}
         };
         const deleteRow = (table, index) => { if (table.rows.length > 1) table.deleteRow(index); };
         const addColumn = (table, index) => {
+            const hasTheme = tableHasTheme(table);
             Array.from(table.rows).forEach(row => {
-                const cell = row.insertCell(index);
-                cell.innerHTML = '&nbsp;';
-                cell.contentEditable = true;
-                cell.style.border = '1px solid var(--border-color)';
+                const existingCells = Array.from(row.cells);
+                const templateCell = existingCells[index] || existingCells[index - 1] || existingCells[existingCells.length - 1] || null;
+                const newCell = row.insertCell(index);
+                cloneTableCellStructure(newCell, templateCell, hasTheme);
             });
             ensureSpacingState(table);
             const lineHeight = parseFloat(table.dataset.cellLineHeight || '1.4');
@@ -4429,6 +4764,11 @@ ${exportTable.outerHTML}
                 cell.style.borderColor = '';
                 cell.style.borderTopColor = '';
                 cell.style.borderBottomColor = '';
+                cell.style.borderRadius = '';
+                cell.style.borderTopLeftRadius = '';
+                cell.style.borderTopRightRadius = '';
+                cell.style.borderBottomLeftRadius = '';
+                cell.style.borderBottomRightRadius = '';
             });
         };
         const applyTableTheme = (table, themeClass) => {
@@ -4489,6 +4829,10 @@ ${exportTable.outerHTML}
             { label: 'Minimalista gris', class: 'table-theme-gray', preview: { headerBg: '#e0e0e0', headerColor: '#212121', row1: '#ffffff', row2: '#f7f7f7', border: '#9e9e9e' } }
         ];
         const showTableMenu = (table, cell) => {
+            if (!table || isNoteLocked) {
+                hideTableMenu();
+                return;
+            }
             currentTable = table;
             tableMenu.innerHTML = '';
 
@@ -4754,12 +5098,13 @@ ${exportTable.outerHTML}
             });
 
             const editorRect = notesEditor.getBoundingClientRect();
-            const editorWidth = Math.max(280, editorRect.width - 16);
-            const viewportLimit = Math.max(280, window.innerWidth - 32);
+            const editorWidth = Math.max(220, editorRect.width - 24);
+            const viewportLimit = Math.max(220, window.innerWidth - 48);
             const maxWidth = Math.min(editorWidth, viewportLimit);
-            const preferredWidth = Math.max(420, Math.min(maxWidth, 640));
+            const preferredWidth = Math.min(Math.max(260, maxWidth), 420);
             const targetWidth = Math.min(preferredWidth, maxWidth);
             tableMenu.style.maxWidth = `${maxWidth}px`;
+            tableMenu.style.minWidth = `${Math.min(240, maxWidth)}px`;
             tableMenu.style.width = `${targetWidth}px`;
             tableMenu.style.display = 'block';
             const rect = table.getBoundingClientRect();
@@ -4775,6 +5120,10 @@ ${exportTable.outerHTML}
             tableMenu.style.zIndex = 10001;
         };
         notesEditor.addEventListener('click', (e) => {
+            if (isNoteLocked) {
+                hideTableMenu();
+                return;
+            }
             if (tableEditMode) return;
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
@@ -4858,7 +5207,7 @@ ${exportTable.outerHTML}
             ['#f5f5f5','#9e9e9e'],
             ['#ffcdd2','#f44336']
         ];
-        const lineStylePopup = document.createElement('div');
+        lineStylePopup = document.createElement('div');
         lineStylePopup.className = 'preset-style-popup';
         document.body.appendChild(lineStylePopup);
         let currentLine = null;
@@ -4948,7 +5297,7 @@ ${exportTable.outerHTML}
             }
         };
 
-        const hideLineStylePopup = () => {
+        hideLineStylePopup = () => {
             lineStylePopup.style.display = 'none';
             currentLine = null;
         };
@@ -4972,6 +5321,10 @@ ${exportTable.outerHTML}
         editorToolbar.appendChild(lineBtn);
         editorToolbar.appendChild(createSeparator());
         notesEditor.addEventListener('click', (e) => {
+            if (isNoteLocked) {
+                hideLineStylePopup();
+                return;
+            }
             if (e.target.tagName === 'HR') {
                 e.stopPropagation();
                 showLineStylePopup(e.target);
@@ -5006,7 +5359,7 @@ ${exportTable.outerHTML}
 
         editorToolbar.appendChild(createButton('Insertar línea en blanco arriba', '⬆️⏎', null, null, insertBlankLineAbove));
 
-        const eraseLineBtn = createButton('Borrar contenido con clic', '🧹', null, null, () => {
+        eraseLineBtn = createButton('Borrar contenido con clic', '🧹', null, null, () => {
             lineEraseMode = !lineEraseMode;
             notesEditor.style.cursor = lineEraseMode ? 'crosshair' : '';
             eraseLineBtn.classList.toggle('active', lineEraseMode);
@@ -5462,6 +5815,7 @@ ${exportTable.outerHTML}
             settings: {
                 theme: document.documentElement.dataset.theme,
                 iconStyle: document.documentElement.dataset.iconStyle,
+                fullscreenBgColor: fullscreenBgColor,
             },
             headers: {}
         };
@@ -5501,6 +5855,11 @@ ${exportTable.outerHTML}
         if(state.settings) {
             applyTheme(state.settings.theme || 'default');
             applyIconStyle(state.settings.iconStyle || 'solid');
+            if (state.settings.fullscreenBgColor) {
+                updateFullscreenBackground(state.settings.fullscreenBgColor);
+            } else {
+                updateFullscreenBackground(fullscreenBgColor, { persist: false });
+            }
         }
 
         if(state.headers) {
@@ -6055,6 +6414,7 @@ ${exportTable.outerHTML}
         } else {
             document.documentElement.classList.remove('dark');
         }
+        updateFullscreenBackground(fullscreenBgColor, { persist: false });
     }
 
     function applyIconStyle(styleName) {
@@ -6168,25 +6528,34 @@ ${exportTable.outerHTML}
         activeNoteIndex = 0;
         activeTabId = null;
         resetHistory('<p><br></p>');
+        isNoteLocked = false;
+        wasReadonlyBeforeLock = false;
+        applyNoteLockState();
     }
 
-    function saveCurrentNote(index = activeNoteIndex) {
+    function saveCurrentNote(index = activeNoteIndex, options = {}) {
+        const { skipTimestamp = false } = options;
         if (!currentNoteRow || !currentNotesArray || currentNotesArray.length === 0) return;
         if (index < 0 || index >= currentNotesArray.length) return;
 
         const currentContent = notesEditor.innerHTML;
         const currentTitle = notesModalTitle.textContent.trim();
 
-        // Keep existing postits and quick note data
-        const existingPostits = currentNotesArray[index].postits || {};
-        const existingQuickNote = currentNotesArray[index].quickNote || '';
-        currentNotesArray[index] = {
+        const existingNote = currentNotesArray[index] || {};
+        const existingPostits = existingNote.postits || {};
+        const existingQuickNote = existingNote.quickNote || '';
+        const lockedState = index === activeNoteIndex ? isNoteLocked : !!existingNote.locked;
+        const updatedNote = {
+            ...existingNote,
             title: currentTitle,
             content: currentContent,
-            lastEdited: new Date().toISOString(),
             postits: existingPostits,
-            quickNote: existingQuickNote
+            quickNote: existingQuickNote,
+            locked: lockedState
         };
+        const previousEdited = existingNote.lastEdited;
+        updatedNote.lastEdited = skipTimestamp && previousEdited ? previousEdited : new Date().toISOString();
+        currentNotesArray[index] = updatedNote;
 
         const noteType = activeNoteIcon.dataset.noteType;
         if (noteType === 'section') {
@@ -6344,14 +6713,24 @@ ${exportTable.outerHTML}
 
         const currentTab = openNoteTabs.find(t => t.id === activeTabId);
         if (currentTab) currentTab.activeIndex = index;
-        
+
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
         initAllResizableElements(notesEditor);
         resetHistory(notesEditor.innerHTML);
 
+        const lockedClassActive = notesModalContent?.classList.contains('locked-note');
+        wasReadonlyBeforeLock = !lockedClassActive && (notesModalContent?.classList.contains('readonly-mode') || false);
+        isNoteLocked = !!note.locked;
+        if (!isNoteLocked && lockedClassActive && notesModalContent) {
+            notesModalContent.classList.remove('readonly-mode');
+        }
+        applyNoteLockState();
+
         renderNotesList();
-        notesEditor.focus({ preventScroll: true });
+        if (!isNoteLocked) {
+            notesEditor.focus({ preventScroll: true });
+        }
         updateNoteInfo();
     }
     
@@ -6366,9 +6745,10 @@ ${exportTable.outerHTML}
             content: '<p><br></p>',
             lastEdited: new Date().toISOString(),
             postits: {},
-            quickNote: ''
+            quickNote: '',
+            locked: false
         });
-        
+
         loadNoteIntoEditor(newIndex);
     }
     
@@ -7137,6 +7517,7 @@ ${exportTable.outerHTML}
                 } catch (err) {
                     console.error("Error parsing notes data:", err);
                 }
+                parsed = Array.isArray(parsed) ? parsed.map(note => ({ ...note, locked: !!note?.locked })) : [];
 
                 let tab = openNoteTabs.find(t => t.id === noteId);
                 const title = currentNoteRow.cells[1]?.textContent.trim() || 'Nota';
@@ -7155,11 +7536,6 @@ ${exportTable.outerHTML}
                 notesPanelToggle.classList.remove('open');
                 notesMainContent.style.width = '';
                 notesSidePanel.style.width = '220px';
-
-                const modalContent = notesModal.querySelector('.notes-modal-content');
-                modalContent.classList.remove('readonly-mode');
-                notesEditor.contentEditable = true;
-                notesModalTitle.contentEditable = true;
 
                 showModal(notesModal);
                 return;
@@ -7374,12 +7750,32 @@ ${exportTable.outerHTML}
         });
 
         toggleReadOnlyBtn.addEventListener('click', () => {
-            const modalContent = notesModal.querySelector('.notes-modal-content');
-            modalContent.classList.toggle('readonly-mode');
-            const isReadOnly = modalContent.classList.contains('readonly-mode');
-            notesEditor.contentEditable = !isReadOnly;
-            notesModalTitle.contentEditable = !isReadOnly;
+            if (isNoteLocked) return;
+            if (!notesModalContent) return;
+            notesModalContent.classList.toggle('readonly-mode');
+            wasReadonlyBeforeLock = notesModalContent.classList.contains('readonly-mode');
+            updateNoteEditingState();
         });
+
+        if (lockNoteBtn) {
+            lockNoteBtn.addEventListener('click', () => {
+                if (!currentNotesArray.length) return;
+                if (!isNoteLocked) {
+                    wasReadonlyBeforeLock = notesModalContent?.classList.contains('readonly-mode') || false;
+                    isNoteLocked = true;
+                } else {
+                    isNoteLocked = false;
+                }
+                applyNoteLockState();
+                if (!isNoteLocked) {
+                    wasReadonlyBeforeLock = notesModalContent?.classList.contains('readonly-mode') || false;
+                }
+                if (currentNotesArray[activeNoteIndex]) {
+                    currentNotesArray[activeNoteIndex].locked = isNoteLocked;
+                    saveCurrentNote(activeNoteIndex, { skipTimestamp: true });
+                }
+            });
+        }
 
         notesPanelToggle.addEventListener('click', () => {
             notesSidePanel.classList.toggle('open');
@@ -7924,6 +8320,7 @@ ${exportTable.outerHTML}
     function init() {
         initializeCells();
         setupEditorToolbar();
+        applyNoteLockState();
         setupImageTools(notesEditor, editorToolbar);
         populateIconPicker();
         loadState();

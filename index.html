@@ -27,9 +27,11 @@
         <button id="tabs-next" class="tab-nav hidden">▶</button>
         <button id="tab-guide-btn" class="tab-nav" title="Guía de controles">❔</button>
         <button id="tab-config-btn" class="tab-nav" title="Configuración">⚙️</button>
+        <button id="fullscreen-bg-btn" class="tab-nav" title="Color de fondo pantalla amplia" aria-label="Color de fondo en pantalla amplia">🎨</button>
+        <input type="color" id="fullscreen-bg-input" class="hidden" value="#f8fbfd">
         <div id="tab-config-panel" class="hidden">
             <label><input type="checkbox" id="tab-bar-toggle" checked> Mostrar barra</label>
-            <label>Color: 
+            <label>Color:
                 <select id="tab-color-select">
                     <option value="#1f2937">Oscuro</option>
                     <option value="#1e3a8a">Azul</option>
@@ -386,6 +388,9 @@
                             </button>
                             <button id="toggle-readonly-btn" class="toolbar-btn" title="Modo Lectura/Edición">
                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye w-5 h-5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                            <button id="lock-note-btn" class="toolbar-btn" title="Bloquear nota" aria-pressed="false">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-unlock w-5 h-5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
                             </button>
                             <button id="import-note-btn" class="toolbar-btn" title="Importar desde HTML">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-upload w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
