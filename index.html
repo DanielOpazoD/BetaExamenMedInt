@@ -29,13 +29,16 @@
         <button id="tab-config-btn" class="tab-nav" title="Configuración">⚙️</button>
         <div id="tab-config-panel" class="hidden">
             <label><input type="checkbox" id="tab-bar-toggle" checked> Mostrar barra</label>
-            <label>Color: 
+            <label>Color:
                 <select id="tab-color-select">
                     <option value="#1f2937">Oscuro</option>
                     <option value="#1e3a8a">Azul</option>
                     <option value="#14532d">Verde</option>
                     <option value="#7f1d1d">Rojo</option>
                 </select>
+            </label>
+            <label>Fondo pantalla amplia:
+                <input type="color" id="fullscreen-bg-color" value="#f8fbfd">
             </label>
             <label>Posición:
                 <select id="tab-position-select">
@@ -384,6 +387,7 @@
                                 <!-- Icono de nota adhesiva -->
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sticky-note w-5 h-5"><path d="M3 3h12l6 6v12H3z"/><path d="M15 3v6h6"/></svg>
                             </button>
+                            <button id="lock-note-btn" class="toolbar-btn" title="Bloquear nota"></button>
                             <button id="toggle-readonly-btn" class="toolbar-btn" title="Modo Lectura/Edición">
                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye w-5 h-5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                             </button>

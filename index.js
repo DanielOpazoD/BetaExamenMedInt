@@ -122,6 +122,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const statusFiltersContainer = getElem('status-filters');
     const saveConfirmation = getElem('save-confirmation');
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
+    const lockNoteBtn = getElem('lock-note-btn');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
     let sectionStylesheet = '';
     if (typeof fetch === 'function') {
@@ -260,10 +261,26 @@ document.addEventListener('DOMContentLoaded', function () {
     const tabConfigPanel = getElem('tab-config-panel');
     const tabBarToggle = getElem('tab-bar-toggle');
     const tabColorSelect = getElem('tab-color-select');
+    const fullscreenBgColorInput = getElem('fullscreen-bg-color');
     const tabPositionSelect = getElem('tab-position-select');
     const showTabBarBtn = getElem('show-tab-bar-btn');
     const minimizeNoteBtn = getElem('minimize-note-btn');
     const restoreNoteBtn = getElem('restore-note-btn');
+
+    const DEFAULT_FULLSCREEN_BG = '#f8fbfd';
+
+    function setFullscreenBackground(color) {
+        const value = (color || DEFAULT_FULLSCREEN_BG).trim() || DEFAULT_FULLSCREEN_BG;
+        document.documentElement.style.setProperty('--fullscreen-editor-bg', value);
+    }
+
+    if (fullscreenBgColorInput) {
+        const initialColor = fullscreenBgColorInput.value || DEFAULT_FULLSCREEN_BG;
+        setFullscreenBackground(initialColor);
+        fullscreenBgColorInput.addEventListener('input', (e) => {
+            setFullscreenBackground(e.target.value);
+        });
+    }
 
     let openNoteTabs = [];
     let activeTabId = null;
@@ -272,6 +289,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let fullscreenEnabled = false;
     let savedEditorWidth = 0;
     let draggedBlock = null;
+    let isNoteLocked = false;
+    let isReadOnlyMode = false;
 
     if (minimizeNoteBtn && restoreNoteBtn) {
         minimizeNoteBtn.addEventListener('click', () => {
@@ -594,6 +613,8 @@ document.addEventListener('DOMContentLoaded', function () {
         noteInfo: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-info w-5 h-5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`,
         quickNote: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sticky-note w-5 h-5"><path d="M3 3h12l6 6v12H3z"/><path d="M15 3v6h6"/></svg>`,
         readonly: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye w-5 h-5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`,
+        lock: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock w-5 h-5"><rect width="14" height="10" x="5" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+        unlock: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock-open w-5 h-5"><rect width="14" height="10" x="5" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`,
         importNote: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-upload w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>`,
         exportNote: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>`,
         minimize: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-minus w-5 h-5"><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
@@ -1618,6 +1639,9 @@ document.addEventListener('DOMContentLoaded', function () {
     let savedSelectedHtml = '';
     let currentCallout = null;
     let lineEraseMode = false;
+    let hideColorEditControls = () => {};
+    let refreshEditorEditableState = () => {};
+    let setNoteLockState = () => {};
 
     // Image selection handling within the sub-note editor
     if (subNoteEditor) {
@@ -2573,43 +2597,62 @@ ${exportTable.outerHTML}
         });
     }
 
-    function getSelectedBlockElements() {
+    const BLOCK_ELEMENTS = new Set(['P','DIV','LI','BLOCKQUOTE','PRE','H1','H2','H3','H4','H5','H6','TABLE','UL','OL','DETAILS','SECTION','ARTICLE','ASIDE','HEADER','FOOTER','TD','TH']);
+
+    function getSelectedBlockElements(root = notesEditor) {
+        if (!root) return [];
         const selection = window.getSelection();
         if (!selection.rangeCount) return [];
 
         const range = selection.getRangeAt(0);
-        let commonAncestor = range.commonAncestorContainer;
-        if (!notesEditor.contains(commonAncestor)) return [];
-        
-        let startNode = range.startContainer;
-        let endNode = range.endContainer;
+        if (!root.contains(range.commonAncestorContainer)) return [];
 
-        const findBlock = (node) => {
-             while (node && node !== notesEditor) {
-                if (node.nodeType === 1 && getComputedStyle(node).display !== 'inline') {
-                    return node;
-                }
-                node = node.parentNode;
-            }
-            return startNode.nodeType === 1 ? startNode : startNode.parentNode;
+        const blocks = [];
+        const isBlockElement = (element) => {
+            if (!element || element === root || element.nodeType !== Node.ELEMENT_NODE) return false;
+            if (BLOCK_ELEMENTS.has(element.tagName)) return true;
+            const display = window.getComputedStyle(element).display;
+            return display !== 'inline' && display !== 'inline-block' && display !== 'contents';
         };
-        
-        let startBlock = findBlock(startNode);
-        let endBlock = findBlock(endNode);
 
-        if (startBlock === endBlock) {
-             return [startBlock];
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+            acceptNode(node) {
+                if (node === root) return NodeFilter.FILTER_SKIP;
+                let intersects = false;
+                try {
+                    intersects = range.intersectsNode(node);
+                } catch (err) {
+                    const nodeRange = document.createRange();
+                    nodeRange.selectNodeContents(node);
+                    intersects = range.compareBoundaryPoints(Range.END_TO_START, nodeRange) < 0 &&
+                        range.compareBoundaryPoints(Range.START_TO_END, nodeRange) > 0;
+                }
+                if (!intersects) return NodeFilter.FILTER_REJECT;
+                if (isBlockElement(node)) return NodeFilter.FILTER_ACCEPT;
+                return NodeFilter.FILTER_SKIP;
+            }
+        });
+
+        let current = walker.nextNode();
+        while (current) {
+            if (!blocks.some(existing => existing.contains(current))) {
+                blocks.push(current);
+            }
+            current = walker.nextNode();
         }
 
-        const allBlocks = Array.from(notesEditor.querySelectorAll('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details'));
-        const startIndex = allBlocks.indexOf(startBlock);
-        const endIndex = allBlocks.indexOf(endBlock);
-
-        if (startIndex !== -1 && endIndex !== -1) {
-            return allBlocks.slice(startIndex, endIndex + 1);
+        if (!blocks.length) {
+            let fallback = range.startContainer;
+            if (fallback.nodeType === Node.TEXT_NODE) fallback = fallback.parentElement;
+            while (fallback && fallback !== root && !isBlockElement(fallback)) {
+                fallback = fallback.parentElement;
+            }
+            if (fallback && root.contains(fallback)) {
+                blocks.push(fallback);
+            }
         }
 
-        return [startBlock]; // Fallback
+        return blocks;
     }
 
     async function improveSelectedText() {
@@ -3341,6 +3384,75 @@ ${exportTable.outerHTML}
 
         resetEditorModes();
 
+        refreshEditorEditableState = () => {
+            const disableEditing = isNoteLocked || isReadOnlyMode;
+            if (notesModalContent) {
+                notesModalContent.classList.toggle('note-locked', isNoteLocked);
+                notesModalContent.classList.toggle('readonly-mode', isReadOnlyMode);
+            }
+            if (notesEditor) {
+                notesEditor.contentEditable = (!disableEditing).toString();
+            }
+            if (notesModalTitle) {
+                notesModalTitle.contentEditable = (!disableEditing).toString();
+            }
+            if (editorToolbar) {
+                const controls = editorToolbar.querySelectorAll('button, select, input, textarea');
+                controls.forEach(control => {
+                    control.disabled = disableEditing;
+                });
+                editorToolbar.classList.toggle('toolbar-disabled', disableEditing);
+            }
+            if (lockNoteBtn) {
+                lockNoteBtn.innerHTML = isNoteLocked ? UI_ICON_STRINGS.lock : UI_ICON_STRINGS.unlock;
+                lockNoteBtn.title = isNoteLocked ? 'Desbloquear nota' : 'Bloquear nota';
+                lockNoteBtn.setAttribute('aria-pressed', String(isNoteLocked));
+                lockNoteBtn.classList.toggle('active', isNoteLocked);
+            }
+            if (toggleReadOnlyBtn) {
+                toggleReadOnlyBtn.disabled = isNoteLocked;
+                toggleReadOnlyBtn.setAttribute('aria-pressed', String(isReadOnlyMode));
+                toggleReadOnlyBtn.classList.toggle('active', isReadOnlyMode && !isNoteLocked);
+            }
+            if (unmarkNoteBtn) {
+                unmarkNoteBtn.disabled = disableEditing;
+                unmarkNoteBtn.classList.toggle('disabled', disableEditing);
+            }
+            if (disableEditing) {
+                lineEraseMode = false;
+                hideColorEditControls();
+                notesEditor.style.cursor = '';
+            }
+        };
+
+        refreshEditorEditableState();
+
+        setNoteLockState = (locked, { persist = true } = {}) => {
+            isNoteLocked = !!locked;
+            refreshEditorEditableState();
+            if (!currentNotesArray || currentNotesArray.length === 0) return;
+            if (activeNoteIndex < 0 || activeNoteIndex >= currentNotesArray.length) return;
+            currentNotesArray[activeNoteIndex].locked = isNoteLocked;
+            if (!persist) return;
+            if (currentNoteRow && activeNoteIcon) {
+                const noteType = activeNoteIcon.dataset.noteType;
+                if (noteType === 'section') {
+                    currentNoteRow.dataset.sectionNote = JSON.stringify(currentNotesArray);
+                } else if (noteType === 'topic') {
+                    currentNoteRow.dataset.notes = JSON.stringify(currentNotesArray);
+                }
+            } else if (currentNoteRow) {
+                if (currentNoteRow.dataset.sectionNote !== undefined) {
+                    currentNoteRow.dataset.sectionNote = JSON.stringify(currentNotesArray);
+                } else if (currentNoteRow.dataset.notes !== undefined) {
+                    currentNoteRow.dataset.notes = JSON.stringify(currentNotesArray);
+                }
+            }
+            const currentTab = openNoteTabs.find(t => t.id === activeTabId);
+            if (currentTab) currentTab.notesArray = currentNotesArray;
+            saveState();
+        };
+
         const adjustIndent = (delta, root) => {
             const sel = window.getSelection();
             if (!sel.rangeCount) return;
@@ -3351,19 +3463,7 @@ ${exportTable.outerHTML}
             const callout = node.closest('.note-callout-content');
             sanitizeCalloutContent(callout);
 
-            const blocks = [];
-            const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
-                acceptNode(n) {
-                    if (!range.intersectsNode(n)) return NodeFilter.FILTER_SKIP;
-                    if (!n.matches('p, li, div, table')) return NodeFilter.FILTER_SKIP;
-                    if (n.closest('table') && n.tagName !== 'TABLE') return NodeFilter.FILTER_SKIP;
-                    return NodeFilter.FILTER_ACCEPT;
-                }
-            });
-            let current;
-            while ((current = walker.nextNode())) {
-                if (!blocks.some(b => b.contains(current))) blocks.push(current);
-            }
+            let blocks = getSelectedBlockElements(root);
             if (!blocks.length) {
                 let block = range.startContainer;
                 if (block.nodeType === Node.TEXT_NODE) block = block.parentElement;
@@ -3371,20 +3471,13 @@ ${exportTable.outerHTML}
                     block = block.parentElement;
                 }
                 if (block && block !== root) {
-                    blocks.push(block);
+                    blocks = [block];
                 } else {
                     const newBlock = document.createElement('p');
                     range.surroundContents(newBlock);
-                    blocks.push(newBlock);
+                    blocks = [newBlock];
                 }
             }
-
-            let endBlock = range.endContainer;
-            if (endBlock.nodeType === Node.TEXT_NODE) endBlock = endBlock.parentElement;
-            while (endBlock && endBlock !== root && !endBlock.matches('p, li, div, table')) {
-                endBlock = endBlock.parentElement;
-            }
-            if (endBlock && !blocks.includes(endBlock)) blocks.push(endBlock);
 
             blocks.forEach(block => {
                 const currentClass = Array.from(block.classList).find(c => c.startsWith('indent-'));
@@ -3486,14 +3579,37 @@ ${exportTable.outerHTML}
             return sep;
         };
         
-        const createColorPalette = (title, action, mainColors, extraColors, iconSVG) => {
+        const createColorPalette = (title, action, mainColors, extraColors, iconSVG, options = {}) => {
             const group = document.createElement('div');
             group.className = 'color-palette-group';
-            
+
+            const restoreSavedSelection = () => {
+                if (savedEditorSelection) {
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(savedEditorSelection);
+                }
+            };
+
+            const finalizeColorSelection = (after) => {
+                if (typeof after === 'function') after();
+                savedEditorSelection = null;
+                if (typeof options.onColorSelected === 'function') {
+                    options.onColorSelected();
+                }
+                notesEditor.focus({ preventScroll: true });
+            };
+
+            const applyPaletteColor = (color, after) => {
+                restoreSavedSelection();
+                withEditorSelection(() => action(color));
+                finalizeColorSelection(after);
+            };
+
             mainColors.forEach(color => {
                 const swatch = document.createElement('button');
                 swatch.className = 'color-swatch toolbar-btn';
-                 if (color === 'transparent') {
+                if (color === 'transparent') {
                     swatch.style.backgroundImage = 'linear-gradient(to top left, transparent calc(50% - 1px), red, transparent calc(50% + 1px))';
                     swatch.style.backgroundColor = 'var(--bg-secondary)';
                     swatch.title = 'Sin color';
@@ -3503,8 +3619,7 @@ ${exportTable.outerHTML}
                 }
                 swatch.addEventListener('click', (e) => {
                     e.preventDefault();
-                    withEditorSelection(() => action(color));
-                    notesEditor.focus({ preventScroll: true });
+                    applyPaletteColor(color);
                 });
                 group.appendChild(swatch);
             });
@@ -3531,15 +3646,7 @@ ${exportTable.outerHTML}
                 swatch.addEventListener('mousedown', (e) => e.preventDefault());
                 swatch.addEventListener('click', (e) => {
                     e.preventDefault();
-                    if (savedEditorSelection) {
-                        const selection = window.getSelection();
-                        selection.removeAllRanges();
-                        selection.addRange(savedEditorSelection);
-                    }
-                    withEditorSelection(() => action(color));
-                    submenu.classList.remove('visible');
-                    savedEditorSelection = null;
-                    notesEditor.focus({ preventScroll: true });
+                    applyPaletteColor(color, () => submenu.classList.remove('visible'));
                 });
                 submenu.appendChild(swatch);
             });
@@ -3558,28 +3665,21 @@ ${exportTable.outerHTML}
             customColorLabel.appendChild(customColorInput);
             
             customColorInput.addEventListener('input', (e) => {
-                if (savedEditorSelection) {
-                    const selection = window.getSelection();
-                    selection.removeAllRanges();
-                    selection.addRange(savedEditorSelection);
-                }
-                withEditorSelection(() => action(e.target.value));
-                savedEditorSelection = null;
-                notesEditor.focus({ preventScroll: true });
+                applyPaletteColor(e.target.value);
             });
-             customColorInput.addEventListener('click', (e) => e.stopPropagation());
+            customColorInput.addEventListener('click', (e) => e.stopPropagation());
             submenu.appendChild(customColorLabel);
 
             group.appendChild(submenu);
             
             otherBtn.addEventListener('mousedown', (e) => {
-                 e.preventDefault();
-                 const selection = window.getSelection();
-                 if (selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
-                     savedEditorSelection = selection.getRangeAt(0).cloneRange();
-                 } else {
-                     savedEditorSelection = null;
-                 }
+                e.preventDefault();
+                const selection = window.getSelection();
+                if (selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
+                    savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                } else {
+                    savedEditorSelection = null;
+                }
             });
 
             otherBtn.addEventListener('click', (e) => {
@@ -4125,6 +4225,7 @@ ${exportTable.outerHTML}
             }
             elements.forEach((block, index) => {
                 if (block && notesEditor.contains(block)) {
+                    const isTableBlock = block.tagName === 'TABLE';
                     if (color === 'transparent') {
                         // Remove highlight and reset borders and margins on clear
                         block.style.backgroundColor = '';
@@ -4138,18 +4239,29 @@ ${exportTable.outerHTML}
                         block.style.borderBottomRightRadius = '';
                     } else {
                         block.style.backgroundColor = color;
-                        block.style.paddingLeft = '6px';
-                        block.style.paddingRight = '6px';
-                        // Remove default margins to fuse adjacent highlighted lines
-                        block.style.marginTop = '0px';
-                        block.style.marginBottom = '0px';
-                        // Set border radius based on position in selection
-                        const first = index === 0;
-                        const last = index === elements.length - 1;
-                        block.style.borderTopLeftRadius = first ? '6px' : '0';
-                        block.style.borderTopRightRadius = first ? '6px' : '0';
-                        block.style.borderBottomLeftRadius = last ? '6px' : '0';
-                        block.style.borderBottomRightRadius = last ? '6px' : '0';
+                        if (isTableBlock) {
+                            block.style.paddingLeft = '';
+                            block.style.paddingRight = '';
+                            block.style.marginTop = '';
+                            block.style.marginBottom = '';
+                            block.style.borderTopLeftRadius = '0';
+                            block.style.borderTopRightRadius = '0';
+                            block.style.borderBottomLeftRadius = '0';
+                            block.style.borderBottomRightRadius = '0';
+                        } else {
+                            block.style.paddingLeft = '6px';
+                            block.style.paddingRight = '6px';
+                            // Remove default margins to fuse adjacent highlighted lines
+                            block.style.marginTop = '0px';
+                            block.style.marginBottom = '0px';
+                            // Set border radius based on position in selection
+                            const first = index === 0;
+                            const last = index === elements.length - 1;
+                            block.style.borderTopLeftRadius = first ? '6px' : '0';
+                            block.style.borderTopRightRadius = first ? '6px' : '0';
+                            block.style.borderBottomLeftRadius = last ? '6px' : '0';
+                            block.style.borderBottomRightRadius = last ? '6px' : '0';
+                        }
                     }
                 }
             });
@@ -4167,6 +4279,169 @@ ${exportTable.outerHTML}
         const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
         editorToolbar.appendChild(lineHighlightPalette);
         editorToolbar.appendChild(createPresetStyleDropdown());
+
+        const colorEditTrigger = document.createElement('button');
+        colorEditTrigger.type = 'button';
+        colorEditTrigger.className = 'color-edit-trigger';
+        colorEditTrigger.setAttribute('aria-label', 'Cambiar color');
+        colorEditTrigger.textContent = '⏷';
+        document.body.appendChild(colorEditTrigger);
+        colorEditTrigger.style.display = 'none';
+
+        const colorEditPopup = document.createElement('div');
+        colorEditPopup.className = 'color-edit-popup preset-style-popup';
+        document.body.appendChild(colorEditPopup);
+        colorEditPopup.style.display = 'none';
+
+        let currentColorTarget = null;
+
+        hideColorEditControls = () => {
+            colorEditTrigger.style.display = 'none';
+            colorEditPopup.style.display = 'none';
+            colorEditPopup.innerHTML = '';
+            currentColorTarget = null;
+            savedEditorSelection = null;
+            delete colorEditTrigger.dataset.mode;
+        };
+
+        const positionColorEditTrigger = (element) => {
+            const rect = element.getBoundingClientRect();
+            colorEditTrigger.style.display = 'flex';
+            requestAnimationFrame(() => {
+                const triggerRect = colorEditTrigger.getBoundingClientRect();
+                let top = window.scrollY + rect.top - triggerRect.height - 6;
+                if (top < window.scrollY + 4) {
+                    top = window.scrollY + rect.bottom + 6;
+                }
+                let left = window.scrollX + rect.right - triggerRect.width;
+                if (left + triggerRect.width > window.scrollX + window.innerWidth - 4) {
+                    left = window.scrollX + window.innerWidth - triggerRect.width - 4;
+                }
+                if (left < window.scrollX + 4) {
+                    left = window.scrollX + 4;
+                }
+                colorEditTrigger.style.top = `${top}px`;
+                colorEditTrigger.style.left = `${left}px`;
+            });
+        };
+
+        const positionColorEditPopup = (element) => {
+            const rect = element.getBoundingClientRect();
+            requestAnimationFrame(() => {
+                const popupRect = colorEditPopup.getBoundingClientRect();
+                let top = window.scrollY + rect.bottom + 6;
+                if (top + popupRect.height > window.scrollY + window.innerHeight) {
+                    top = window.scrollY + rect.top - popupRect.height - 6;
+                }
+                if (top < window.scrollY + 8) {
+                    top = window.scrollY + rect.bottom + 6;
+                }
+                let left = window.scrollX + rect.left;
+                if (left + popupRect.width > window.scrollX + window.innerWidth - 8) {
+                    left = window.scrollX + window.innerWidth - popupRect.width - 8;
+                }
+                if (left < window.scrollX + 8) {
+                    left = window.scrollX + 8;
+                }
+                colorEditPopup.style.top = `${top}px`;
+                colorEditPopup.style.left = `${left}px`;
+            });
+        };
+
+        const findColorStyledElement = (target) => {
+            let node = target instanceof Node ? target : null;
+            while (node && node !== notesEditor) {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const el = node;
+                    const inlineColor = el.style && el.style.color;
+                    const colorAttr = el.getAttribute && el.getAttribute('color');
+                    const background = el.style && el.style.backgroundColor;
+                    if (background && background !== '' && background !== 'transparent') {
+                        return { element: el, mode: 'highlight' };
+                    }
+                    if ((inlineColor && inlineColor !== '') || colorAttr) {
+                        return { element: el, mode: 'text' };
+                    }
+                }
+                node = node.parentElement;
+            }
+            return null;
+        };
+
+        const openColorEditPalette = (mode) => {
+            if (!currentColorTarget || isNoteLocked || isReadOnlyMode) return;
+            const targetElement = currentColorTarget.element;
+            if (!targetElement || !notesEditor.contains(targetElement)) {
+                hideColorEditControls();
+                return;
+            }
+            const range = document.createRange();
+            range.selectNodeContents(targetElement);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            savedEditorSelection = range.cloneRange();
+            colorEditPopup.innerHTML = '';
+            const palette = mode === 'highlight'
+                ? createColorPalette('Color de Resaltado', applyHiliteColor, highlightColors, extraHighlightColors, highlighterIcon, { onColorSelected: hideColorEditControls })
+                : createColorPalette('Color de Texto', applyForeColor, textColors, extraTextColors, typeIcon, { onColorSelected: hideColorEditControls });
+            colorEditPopup.appendChild(palette);
+            colorEditPopup.style.display = 'block';
+            positionColorEditPopup(targetElement);
+        };
+
+        colorEditTrigger.addEventListener('mousedown', (e) => e.preventDefault());
+        colorEditTrigger.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!currentColorTarget) return;
+            openColorEditPalette(currentColorTarget.mode);
+        });
+
+        const showColorEditTrigger = (info) => {
+            if (!info || !info.element || isNoteLocked || isReadOnlyMode) {
+                hideColorEditControls();
+                return;
+            }
+            if (!notesEditor.contains(info.element)) {
+                hideColorEditControls();
+                return;
+            }
+            currentColorTarget = info;
+            colorEditPopup.style.display = 'none';
+            colorEditTrigger.dataset.mode = info.mode;
+            colorEditTrigger.title = info.mode === 'highlight' ? 'Editar resaltado' : 'Editar color de texto';
+            colorEditTrigger.style.display = 'flex';
+            positionColorEditTrigger(info.element);
+        };
+
+        notesEditor.addEventListener('click', (e) => {
+            if (lineEraseMode || isNoteLocked || isReadOnlyMode) {
+                hideColorEditControls();
+                return;
+            }
+            const info = findColorStyledElement(e.target);
+            if (info) {
+                showColorEditTrigger(info);
+            } else {
+                hideColorEditControls();
+            }
+        });
+
+        notesEditor.addEventListener('input', hideColorEditControls);
+        notesEditor.addEventListener('blur', hideColorEditControls);
+        notesModalContent?.addEventListener('scroll', hideColorEditControls);
+        window.addEventListener('resize', hideColorEditControls);
+        document.addEventListener('scroll', hideColorEditControls, true);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') hideColorEditControls();
+        });
+        document.addEventListener('click', (event) => {
+            if (colorEditTrigger.contains(event.target) || colorEditPopup.contains(event.target)) return;
+            if (notesEditor.contains(event.target)) return;
+            hideColorEditControls();
+        });
+        colorEditPopup.addEventListener('click', (event) => event.stopPropagation());
 
         // Popup to change existing preset styles
         const stylePopup = document.createElement('div');
@@ -4374,6 +4649,68 @@ ${exportTable.outerHTML}
         let currentTable = null;
         let editingTable = null;
         let tableEditMode = false;
+        const convertCellTag = (cell, tagName) => {
+            if (!cell) return null;
+            const desiredTag = tagName.toUpperCase();
+            if (cell.tagName === desiredTag) return cell;
+            const replacement = document.createElement(desiredTag);
+            replacement.innerHTML = cell.innerHTML;
+            replacement.className = cell.className;
+            Array.from(cell.attributes).forEach(attr => {
+                if (attr.name === 'class') return;
+                replacement.setAttribute(attr.name, attr.value);
+            });
+            Object.entries(cell.dataset || {}).forEach(([key, value]) => {
+                replacement.dataset[key] = value;
+            });
+            replacement.colSpan = cell.colSpan;
+            replacement.rowSpan = cell.rowSpan;
+            cell.replaceWith(replacement);
+            return replacement;
+        };
+
+        const normalizeTableStructure = (table) => {
+            if (!table) return;
+            const rows = Array.from(table.rows);
+            if (!rows.length) return;
+            const headerRow = rows[0];
+            Array.from(headerRow.cells).forEach(cell => {
+                const th = convertCellTag(cell, 'th');
+                if (th) {
+                    th.scope = 'col';
+                    th.contentEditable = true;
+                }
+            });
+            for (let i = 1; i < rows.length; i++) {
+                Array.from(rows[i].cells).forEach(cell => {
+                    const td = convertCellTag(cell, 'td');
+                    if (td) td.contentEditable = true;
+                });
+            }
+        };
+
+        const applyThemeClassToTable = (table, themeClass) => {
+            if (!table) return;
+            TABLE_THEMES.forEach(tt => table.classList.remove(tt.class));
+            if (themeClass) table.classList.add(themeClass);
+        };
+
+        const prepareTableCell = (cell, table) => {
+            if (!cell) return;
+            if (!cell.innerHTML || cell.innerHTML.trim() === '') {
+                cell.innerHTML = '&nbsp;';
+            }
+            cell.contentEditable = true;
+            cell.style.minWidth = '40px';
+            cell.style.borderRadius = '';
+            if (table && table.dataset && table.dataset.themeClass) {
+                cell.style.border = '';
+                cell.style.borderColor = '';
+                cell.style.backgroundColor = '';
+            } else {
+                cell.style.border = '1px solid var(--border-color)';
+            }
+        };
         const hideTableMenu = () => {
             tableMenu.style.display = 'none';
             currentTable = null;
@@ -4383,31 +4720,47 @@ ${exportTable.outerHTML}
             const cols = table.rows[0] ? table.rows[0].cells.length : 1;
             for (let i = 0; i < cols; i++) {
                 const cell = row.insertCell(i);
-                cell.innerHTML = '&nbsp;';
-                cell.contentEditable = true;
-                cell.style.border = '1px solid var(--border-color)';
+                prepareTableCell(cell, table);
             }
             ensureSpacingState(table);
             const lineHeight = parseFloat(table.dataset.cellLineHeight || '1.4');
             const padding = parseFloat(table.dataset.cellPadding || '6');
             applyTableSpacing(table, lineHeight, padding);
+            refreshTableTheme(table);
             initTableResize(table);
         };
-        const deleteRow = (table, index) => { if (table.rows.length > 1) table.deleteRow(index); };
+        const deleteRow = (table, index) => {
+            if (table.rows.length > 1) {
+                table.deleteRow(index);
+                const lineHeight = parseFloat(table.dataset?.cellLineHeight || '1.4');
+                const padding = parseFloat(table.dataset?.cellPadding || '6');
+                applyTableSpacing(table, lineHeight, padding);
+                refreshTableTheme(table);
+                initTableResize(table);
+            }
+        };
         const addColumn = (table, index) => {
             Array.from(table.rows).forEach(row => {
                 const cell = row.insertCell(index);
-                cell.innerHTML = '&nbsp;';
-                cell.contentEditable = true;
-                cell.style.border = '1px solid var(--border-color)';
+                prepareTableCell(cell, table);
             });
             ensureSpacingState(table);
             const lineHeight = parseFloat(table.dataset.cellLineHeight || '1.4');
             const padding = parseFloat(table.dataset.cellPadding || '6');
             applyTableSpacing(table, lineHeight, padding);
+            refreshTableTheme(table);
             initTableResize(table);
         };
-        const deleteColumn = (table, index) => { Array.from(table.rows).forEach(r => { if (r.cells.length > 1) r.deleteCell(index); }); };
+        const deleteColumn = (table, index) => {
+            Array.from(table.rows).forEach(r => {
+                if (r.cells.length > 1) r.deleteCell(index);
+            });
+            const lineHeight = parseFloat(table.dataset?.cellLineHeight || '1.4');
+            const padding = parseFloat(table.dataset?.cellPadding || '6');
+            applyTableSpacing(table, lineHeight, padding);
+            refreshTableTheme(table);
+            initTableResize(table);
+        };
         const selectColumn = (table, index) => {
             if (!table || index < 0) return;
             const rows = Array.from(table.rows);
@@ -4424,20 +4777,37 @@ ${exportTable.outerHTML}
         const clearTableInlineStyles = (table) => {
             if (!table) return;
             Array.from(table.querySelectorAll('th, td')).forEach(cell => {
+                cell.style.background = '';
                 cell.style.backgroundColor = '';
+                cell.style.backgroundImage = '';
                 cell.style.color = '';
                 cell.style.borderColor = '';
                 cell.style.borderTopColor = '';
                 cell.style.borderBottomColor = '';
+                cell.style.borderLeftColor = '';
+                cell.style.borderRightColor = '';
+                cell.style.border = '';
+                cell.style.boxShadow = '';
+                cell.style.borderRadius = '';
             });
+            table.style.borderRadius = '';
+            table.style.backgroundColor = '';
+            table.style.boxShadow = '';
+        };
+        const refreshTableTheme = (table, themeClass = table?.dataset.themeClass) => {
+            if (!table) return;
+            const appliedTheme = themeClass || '';
+            table.dataset.themeClass = appliedTheme;
+            if (!appliedTheme) {
+                applyThemeClassToTable(table, '');
+                return;
+            }
+            normalizeTableStructure(table);
+            clearTableInlineStyles(table);
+            applyThemeClassToTable(table, appliedTheme);
         };
         const applyTableTheme = (table, themeClass) => {
-            if (!table) return;
-            TABLE_THEMES.forEach(tt => table.classList.remove(tt.class));
-            clearTableInlineStyles(table);
-            if (themeClass) {
-                table.classList.add(themeClass);
-            }
+            refreshTableTheme(table, themeClass);
         };
         const ensureSpacingState = (table) => {
             if (!table) return;
@@ -5008,6 +5378,9 @@ ${exportTable.outerHTML}
 
         const eraseLineBtn = createButton('Borrar contenido con clic', '🧹', null, null, () => {
             lineEraseMode = !lineEraseMode;
+            if (lineEraseMode) {
+                hideColorEditControls();
+            }
             notesEditor.style.cursor = lineEraseMode ? 'crosshair' : '';
             eraseLineBtn.classList.toggle('active', lineEraseMode);
         });
@@ -5654,6 +6027,7 @@ ${exportTable.outerHTML}
         modal.classList.remove('visible');
         hideTooltipIconSelector();
         if (modal === notesModal) {
+            hideColorEditControls();
             resetEditorModes();
         }
         if (modal === subNoteModal && isTooltipEditing) {
@@ -6167,6 +6541,9 @@ ${exportTable.outerHTML}
         currentNotesArray = [];
         activeNoteIndex = 0;
         activeTabId = null;
+        isNoteLocked = false;
+        isReadOnlyMode = false;
+        refreshEditorEditableState();
         resetHistory('<p><br></p>');
     }
 
@@ -6180,12 +6557,14 @@ ${exportTable.outerHTML}
         // Keep existing postits and quick note data
         const existingPostits = currentNotesArray[index].postits || {};
         const existingQuickNote = currentNotesArray[index].quickNote || '';
+        const lockedState = index === activeNoteIndex ? isNoteLocked : !!currentNotesArray[index].locked;
         currentNotesArray[index] = {
             title: currentTitle,
             content: currentContent,
             lastEdited: new Date().toISOString(),
             postits: existingPostits,
-            quickNote: existingQuickNote
+            quickNote: existingQuickNote,
+            locked: lockedState
         };
 
         const noteType = activeNoteIcon.dataset.noteType;
@@ -6301,15 +6680,23 @@ ${exportTable.outerHTML}
             const btn = document.createElement('button');
             btn.className = 'note-item-btn w-full';
             btn.dataset.index = index;
-            
+
             if (index === activeNoteIndex) {
                 btn.classList.add('active');
             }
-            
+
+            if (note.locked) {
+                btn.classList.add('note-item-locked');
+                const lockIndicator = document.createElement('span');
+                lockIndicator.className = 'note-lock-indicator';
+                lockIndicator.textContent = '🔒';
+                btn.appendChild(lockIndicator);
+            }
+
             const titleSpan = document.createElement('span');
             titleSpan.className = 'note-title-text';
             titleSpan.textContent = note.title || `Nota ${index + 1}`;
-            
+
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-note-btn toolbar-btn';
             deleteBtn.innerHTML = '🗑️';
@@ -6348,6 +6735,7 @@ ${exportTable.outerHTML}
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
         initAllResizableElements(notesEditor);
+        setNoteLockState(!!note.locked, { persist: false });
         resetHistory(notesEditor.innerHTML);
 
         renderNotesList();
@@ -6366,9 +6754,10 @@ ${exportTable.outerHTML}
             content: '<p><br></p>',
             lastEdited: new Date().toISOString(),
             postits: {},
-            quickNote: ''
+            quickNote: '',
+            locked: false
         });
-        
+
         loadNoteIntoEditor(newIndex);
     }
     
@@ -7373,12 +7762,17 @@ ${exportTable.outerHTML}
             }
         });
 
+        if (lockNoteBtn) {
+            lockNoteBtn.addEventListener('click', () => {
+                if (!currentNotesArray || currentNotesArray.length === 0) return;
+                setNoteLockState(!isNoteLocked);
+            });
+        }
+
         toggleReadOnlyBtn.addEventListener('click', () => {
-            const modalContent = notesModal.querySelector('.notes-modal-content');
-            modalContent.classList.toggle('readonly-mode');
-            const isReadOnly = modalContent.classList.contains('readonly-mode');
-            notesEditor.contentEditable = !isReadOnly;
-            notesModalTitle.contentEditable = !isReadOnly;
+            if (isNoteLocked) return;
+            isReadOnlyMode = !isReadOnlyMode;
+            refreshEditorEditableState();
         });
 
         notesPanelToggle.addEventListener('click', () => {
