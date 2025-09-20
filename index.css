@@ -548,25 +548,10 @@
         .color-submenu { display: none; position: absolute; top: 110%; left: 0; background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 8px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 1010; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 180px; }
         .color-submenu.visible { display: grid; }
 
-        .inline-color-trigger {
-            position: absolute;
-            display: none;
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
-            border: 1px solid var(--border-color);
-            background: var(--bg-secondary);
-            box-shadow: 0 8px 16px rgba(15, 23, 42, 0.2);
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            line-height: 1;
-            z-index: 10002;
-        }
-
         .inline-color-menu {
             position: absolute;
             display: none;
+            flex-direction: column;
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
             border-radius: 8px;
@@ -610,7 +595,7 @@
         .symbol-dropdown-content.preset-style-panel {
             display: none;
             flex-direction: column;
-            gap: 0.2rem;
+            gap: 0.5rem;
             padding: 6px 8px;
             min-width: 280px;
             max-height: 75vh;
@@ -624,11 +609,38 @@
 .preset-style-popup.preset-style-panel {
     display: none;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.5rem;
     min-width: 280px;
     max-height: 75vh;
     overflow-y: auto;
     padding: 6px 8px;
+}
+
+.preset-style-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.35rem 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #475569);
+}
+
+.preset-style-panel-icon {
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+.preset-style-panel-title {
+    flex: 1;
+}
+
+.preset-style-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
 }
 
 .preset-style-option {

@@ -4041,6 +4041,33 @@ ${exportTable.outerHTML}
             return { closeAll };
         };
 
+        const buildPresetStylePanel = (container, onSelectStyle) => {
+            container.innerHTML = '';
+            const header = document.createElement('div');
+            header.className = 'preset-style-panel-header';
+            const icon = document.createElement('span');
+            icon.className = 'preset-style-panel-icon';
+            icon.textContent = '🖌️';
+            header.appendChild(icon);
+            const title = document.createElement('span');
+            title.className = 'preset-style-panel-title';
+            title.textContent = 'Estilos de texto';
+            header.appendChild(title);
+            container.appendChild(header);
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'preset-style-options';
+            container.appendChild(optionsContainer);
+
+            return renderPresetStyleList(optionsContainer, {
+                onSelectStyle: (style, helpers) => {
+                    if (typeof onSelectStyle === 'function') {
+                        onSelectStyle(style, helpers);
+                    }
+                }
+            });
+        };
+
         const createPresetStyleDropdown = () => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
@@ -4048,13 +4075,11 @@ ${exportTable.outerHTML}
             dropdown.appendChild(btn);
             const content = document.createElement('div');
             content.className = 'symbol-dropdown-content preset-style-panel';
-            const listControls = renderPresetStyleList(content, {
-                onSelectStyle: (style, { closeAll }) => {
-                    applyPresetStyle(style);
-                    closeAll();
-                    content.classList.remove('visible');
-                    notesEditor.focus({ preventScroll: true });
-                }
+            const listControls = buildPresetStylePanel(content, (style, { closeAll }) => {
+                applyPresetStyle(style);
+                closeAll();
+                content.classList.remove('visible');
+                notesEditor.focus({ preventScroll: true });
             });
             dropdown.appendChild(content);
             btn.addEventListener('click', (e) => {
@@ -4207,11 +4232,6 @@ ${exportTable.outerHTML}
         editorToolbar.appendChild(lineHighlightPalette);
         editorToolbar.appendChild(createPresetStyleDropdown());
 
-        const inlineColorTrigger = document.createElement('button');
-        inlineColorTrigger.type = 'button';
-        inlineColorTrigger.className = 'inline-color-trigger';
-        inlineColorTrigger.textContent = '⬇️';
-        document.body.appendChild(inlineColorTrigger);
         const inlineColorMenu = document.createElement('div');
         inlineColorMenu.className = 'inline-color-menu';
         document.body.appendChild(inlineColorMenu);
@@ -4225,7 +4245,6 @@ ${exportTable.outerHTML}
         };
         const hideInlineColorControls = () => {
             hideInlineColorMenu();
-            inlineColorTrigger.style.display = 'none';
             inlineColorTarget = null;
             inlineColorRange = null;
             inlineColorType = null;
@@ -4307,67 +4326,27 @@ ${exportTable.outerHTML}
             return null;
         };
 
-        const showInlineColorTrigger = (target) => {
-            if (!target) return;
-            inlineColorTrigger.style.display = 'flex';
+        const positionInlineColorMenu = () => {
+            if (!inlineColorTarget) return;
             requestAnimationFrame(() => {
-                const rect = target.getBoundingClientRect();
-                const triggerRect = inlineColorTrigger.getBoundingClientRect();
-                let top = window.scrollY + rect.top - triggerRect.height - 6;
-                if (top < window.scrollY + 4) {
-                    top = window.scrollY + rect.bottom + 6;
-                }
-                let left = window.scrollX + rect.right - triggerRect.width;
-                const maxLeft = window.scrollX + window.innerWidth - triggerRect.width - 8;
-                if (left > maxLeft) left = maxLeft;
-                if (left < window.scrollX + 4) left = window.scrollX + 4;
-                inlineColorTrigger.style.top = `${top}px`;
-                inlineColorTrigger.style.left = `${left}px`;
-            });
-        };
-
-        const showInlineColorMenu = () => {
-            inlineColorMenu.style.display = 'block';
-            requestAnimationFrame(() => {
-                const triggerRect = inlineColorTrigger.getBoundingClientRect();
+                const rect = inlineColorTarget.getBoundingClientRect();
                 const menuRect = inlineColorMenu.getBoundingClientRect();
-                let top = window.scrollY + triggerRect.bottom + 6;
-                let left = window.scrollX + triggerRect.left + (triggerRect.width / 2) - (menuRect.width / 2);
+                let top = window.scrollY + rect.bottom + 6;
+                if (top + menuRect.height > window.scrollY + window.innerHeight - 8) {
+                    top = window.scrollY + rect.top - menuRect.height - 6;
+                }
+                let left = window.scrollX + rect.left + (rect.width / 2) - (menuRect.width / 2);
+                const minLeft = window.scrollX + 4;
                 const maxLeft = window.scrollX + window.innerWidth - menuRect.width - 8;
+                if (left < minLeft) left = minLeft;
                 if (left > maxLeft) left = maxLeft;
-                if (left < window.scrollX + 4) left = window.scrollX + 4;
-                inlineColorMenu.style.top = `${top}px`;
+                inlineColorMenu.style.top = `${Math.max(window.scrollY + 4, top)}px`;
                 inlineColorMenu.style.left = `${left}px`;
             });
         };
 
-        const actionWithInlineSelection = (fn) => (value) => {
-            restoreInlineSelection();
-            fn(value);
-            recordHistory();
-            const selection = window.getSelection();
-            inlineColorRange = selection && selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
-            const anchor = selection && selection.anchorNode ? selection.anchorNode : inlineColorTarget;
-            const updated = detectInlineColorContext(anchor);
-            hideInlineColorMenu();
-            if (updated) {
-                inlineColorTarget = updated.target;
-                inlineColorType = updated.type;
-                requestAnimationFrame(() => showInlineColorTrigger(inlineColorTarget));
-            } else {
-                hideInlineColorControls();
-            }
-            notesEditor.focus({ preventScroll: true });
-        };
-
-        inlineColorTrigger.addEventListener('mousedown', (e) => e.preventDefault());
-        inlineColorMenu.addEventListener('mousedown', (e) => e.preventDefault());
-        inlineColorMenu.addEventListener('click', (e) => e.stopPropagation());
-
-        inlineColorTrigger.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!inlineColorTarget) return;
+        const showInlineColorMenu = () => {
+            if (!inlineColorTarget || !inlineColorType) return;
             inlineColorMenu.innerHTML = '';
             const range = getInlineRange();
             savedEditorSelection = range ? range.cloneRange() : null;
@@ -4383,8 +4362,30 @@ ${exportTable.outerHTML}
             document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
                 if (!inlineColorMenu.contains(d)) d.classList.remove('visible');
             });
-            showInlineColorMenu();
-        });
+            inlineColorMenu.style.display = 'flex';
+            positionInlineColorMenu();
+        };
+
+        const actionWithInlineSelection = (fn) => (value) => {
+            restoreInlineSelection();
+            fn(value);
+            recordHistory();
+            const selection = window.getSelection();
+            inlineColorRange = selection && selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
+            const anchor = selection && selection.anchorNode ? selection.anchorNode : inlineColorTarget;
+            const updated = detectInlineColorContext(anchor);
+            if (updated) {
+                inlineColorTarget = updated.target;
+                inlineColorType = updated.type;
+                showInlineColorMenu();
+            } else {
+                hideInlineColorControls();
+            }
+            notesEditor.focus({ preventScroll: true });
+        };
+
+        inlineColorMenu.addEventListener('mousedown', (e) => e.preventDefault());
+        inlineColorMenu.addEventListener('click', (e) => e.stopPropagation());
 
         const handleInlineColorClick = (e) => {
             if (!notesEditor.isContentEditable) {
@@ -4397,8 +4398,8 @@ ${exportTable.outerHTML}
                 inlineColorType = context.type;
                 const selection = window.getSelection();
                 inlineColorRange = selection && selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
-                hideInlineColorMenu();
-                showInlineColorTrigger(inlineColorTarget);
+                showInlineColorMenu();
+                e.stopPropagation();
             } else {
                 hideInlineColorControls();
             }
@@ -4450,12 +4451,14 @@ ${exportTable.outerHTML}
             }
 
             if (context) {
-                inlineColorTarget = context.target;
-                inlineColorType = context.type;
-                inlineColorRange = range.cloneRange();
-                hideInlineColorMenu();
-                showInlineColorTrigger(inlineColorTarget);
-            } else {
+                if (inlineColorMenu.style.display === 'flex' && inlineColorTarget === context.target) {
+                    inlineColorRange = range.cloneRange();
+                    inlineColorType = context.type;
+                    positionInlineColorMenu();
+                } else {
+                    hideInlineColorControls();
+                }
+            } else if (inlineColorMenu.style.display === 'flex') {
                 hideInlineColorControls();
             }
         };
@@ -4465,7 +4468,7 @@ ${exportTable.outerHTML}
         notesEditor.addEventListener('input', hideInlineColorControls);
 
         document.addEventListener('click', (event) => {
-            if (inlineColorMenu.contains(event.target) || inlineColorTrigger.contains(event.target) || notesEditor.contains(event.target)) {
+            if (inlineColorMenu.contains(event.target) || notesEditor.contains(event.target)) {
                 return;
             }
             hideInlineColorControls();
@@ -4498,13 +4501,11 @@ ${exportTable.outerHTML}
 
         const showStylePopup = (span) => {
             currentStyledSpan = span;
-            currentStyleListControls = renderPresetStyleList(stylePopup, {
-                onSelectStyle: (style) => {
-                    if (!currentStyledSpan) return;
-                    applyPresetStyle(style, currentStyledSpan);
-                    hideStylePopup();
-                    notesEditor.focus({ preventScroll: true });
-                }
+            currentStyleListControls = buildPresetStylePanel(stylePopup, (style) => {
+                if (!currentStyledSpan) return;
+                applyPresetStyle(style, currentStyledSpan);
+                hideStylePopup();
+                notesEditor.focus({ preventScroll: true });
             });
             stylePopup.style.display = 'flex';
             stylePopup.classList.add('visible');
