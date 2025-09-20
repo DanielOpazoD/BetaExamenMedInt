@@ -252,12 +252,184 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentHtmlEditor = null;
     let editingFavoriteIndex = null;
 
+    const toolbarToolRegistry = [];
+
+    function buildCodeName(raw, fallbackPrefix = 'item') {
+        if (typeof raw === 'string') {
+            const trimmed = raw.trim();
+            if (trimmed) {
+                if (/^[A-Za-z0-9]+$/.test(trimmed)) {
+                    return trimmed;
+                }
+                const normalized = trimmed.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const parts = normalized.match(/[A-Za-z0-9]+/g);
+                if (parts && parts.length) {
+                    return parts.map((part, index) => {
+                        const lower = part.toLowerCase();
+                        if (index === 0) return lower;
+                        return lower.charAt(0).toUpperCase() + lower.slice(1);
+                    }).join('');
+                }
+            }
+        }
+        return fallbackPrefix;
+    }
+
+    const rawWindowInfo = [
+        { icon: '📚', shortName: 'Gestor de referencias', codeName: 'referencesModal', description: 'Agrega o edita las referencias asociadas a un tema.' },
+        { icon: '😀', shortName: 'Selector de iconos', codeName: 'iconPickerModal', description: 'Elige emojis y símbolos para pestañas y elementos personalizados.' },
+        { icon: '🗂️', shortName: 'Administrador de iconos', codeName: 'iconManagerModal', description: 'Organiza la librería de iconos rápidos usados en la barra de símbolos.' },
+        { icon: '🔤', shortName: 'Administrador de caracteres', codeName: 'charManagerModal', description: 'Gestiona los caracteres especiales disponibles desde la barra.' },
+        { icon: '🔗', shortName: 'Enlaces rápidos', codeName: 'linkModal', description: 'Inserta o modifica enlaces en la nota seleccionada.' },
+        { icon: '📝', shortName: 'Editor de notas', codeName: 'notesModal', description: 'Ventana principal para escribir, editar y organizar las notas del temario.' },
+        { icon: '🧾', shortName: 'Insertar HTML', codeName: 'htmlCodeModal', description: 'Permite pegar bloques HTML personalizados y guardarlos como plantillas reutilizables.' },
+        { icon: '🧩', shortName: 'HTML seleccionado', codeName: 'selectedHtmlModal', description: 'Muestra el HTML del contenido seleccionado para revisión rápida.' },
+        { icon: 'ℹ️', shortName: 'Detalles de nota', codeName: 'noteInfoModal', description: 'Resume metadatos y atajos útiles sobre la nota actual.' },
+        { icon: '❗', shortName: 'Confirmación', codeName: 'confirmationModal', description: 'Solicita confirmación antes de ejecutar acciones críticas.' },
+        { icon: '🖼️', shortName: 'Galería de imágenes', codeName: 'imageGalleryLinkModal', description: 'Construye o edita galerías de imágenes enlazadas.' },
+        { icon: '🔍', shortName: 'Visor de imagen', codeName: 'imageLightboxModal', description: 'Amplía una imagen seleccionada para verla en detalle.' },
+        { icon: '⚠️', shortName: 'Alertas', codeName: 'alertModal', description: 'Muestra mensajes importantes que requieren atención inmediata.' },
+        { icon: '📌', shortName: 'Nota adhesiva', codeName: 'postitNoteModal', description: 'Inserta notas tipo post-it que se pueden posicionar libremente.' },
+        { icon: '📄', shortName: 'Subnota', codeName: 'subnoteModal', description: 'Permite editar sub-notas vinculadas a un bloque principal.' },
+        { icon: '🎨', shortName: 'Estilos de nota', codeName: 'noteStyleModal', description: 'Configura colores y formato de las notas destacadas.' }
+    ];
+
+    const windowCodeSet = new Set();
+    const TOOL_WINDOWS_INFO = rawWindowInfo.map((entry) => {
+        const candidate = entry.codeName || entry.shortName;
+        let code = buildCodeName(candidate, 'window');
+        const base = code;
+        let suffix = 2;
+        while (windowCodeSet.has(code)) {
+            code = `${base}${suffix++}`;
+        }
+        windowCodeSet.add(code);
+        return { ...entry, codeName: code };
+    });
+
+    function refreshToolHelpTable() {
+        if (toolHelpToolbarBody) {
+            toolHelpToolbarBody.innerHTML = '';
+            if (toolbarToolRegistry.length === 0) {
+                const emptyRow = document.createElement('tr');
+                const emptyCell = document.createElement('td');
+                emptyCell.colSpan = 4;
+                emptyCell.className = 'tool-help-empty';
+                emptyCell.textContent = 'La barra de edición aún no está disponible.';
+                emptyRow.appendChild(emptyCell);
+                toolHelpToolbarBody.appendChild(emptyRow);
+            } else {
+                toolbarToolRegistry.forEach((tool) => {
+                    const row = document.createElement('tr');
+                    row.dataset.codeName = tool.codeName;
+                    const iconCell = document.createElement('td');
+                    iconCell.className = 'tool-help-icon-cell';
+                    const iconWrapper = document.createElement('span');
+                    iconWrapper.innerHTML = tool.icon || '';
+                    iconCell.appendChild(iconWrapper);
+                    row.appendChild(iconCell);
+
+                    const nameCell = document.createElement('td');
+                    nameCell.textContent = tool.shortName;
+                    row.appendChild(nameCell);
+
+                    const codeCell = document.createElement('td');
+                    const codeBadge = document.createElement('span');
+                    codeBadge.className = 'tool-help-code';
+                    codeBadge.textContent = tool.codeName;
+                    codeCell.appendChild(codeBadge);
+                    row.appendChild(codeCell);
+
+                    const descCell = document.createElement('td');
+                    descCell.textContent = tool.description;
+                    row.appendChild(descCell);
+
+                    toolHelpToolbarBody.appendChild(row);
+                });
+            }
+        }
+
+        if (toolHelpWindowsBody) {
+            toolHelpWindowsBody.innerHTML = '';
+            TOOL_WINDOWS_INFO.forEach((win) => {
+                const row = document.createElement('tr');
+                row.dataset.codeName = win.codeName;
+                const iconCell = document.createElement('td');
+                iconCell.className = 'tool-help-icon-cell';
+                const iconWrapper = document.createElement('span');
+                iconWrapper.innerHTML = win.icon || '';
+                iconCell.appendChild(iconWrapper);
+                row.appendChild(iconCell);
+
+                const nameCell = document.createElement('td');
+                nameCell.textContent = win.shortName;
+                row.appendChild(nameCell);
+
+                const codeCell = document.createElement('td');
+                const codeBadge = document.createElement('span');
+                codeBadge.className = 'tool-help-code';
+                codeBadge.textContent = win.codeName;
+                codeCell.appendChild(codeBadge);
+                row.appendChild(codeCell);
+
+                const descCell = document.createElement('td');
+                descCell.textContent = win.description;
+                row.appendChild(descCell);
+
+                toolHelpWindowsBody.appendChild(row);
+            });
+        }
+    }
+
+    function openToolHelpModal() {
+        if (!toolHelpModal) return;
+        refreshToolHelpTable();
+        toolHelpModal.classList.add('visible');
+        toolHelpModal.setAttribute('aria-hidden', 'false');
+        toolHelpCloseBtn?.focus({ preventScroll: true });
+    }
+
+    function closeToolHelpModal() {
+        if (!toolHelpModal) return;
+        toolHelpModal.classList.remove('visible');
+        toolHelpModal.setAttribute('aria-hidden', 'true');
+    }
+
+    if (tabHelpBtn && toolHelpModal) {
+        tabHelpBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            openToolHelpModal();
+        });
+    }
+
+    toolHelpCloseBtn?.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeToolHelpModal();
+    });
+
+    toolHelpModal?.addEventListener('click', (e) => {
+        if (e.target === toolHelpModal) {
+            closeToolHelpModal();
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && toolHelpModal?.classList.contains('visible')) {
+            closeToolHelpModal();
+        }
+    });
+
     const noteTabsBar = getElem('note-tabs-bar');
     const noteTabs = getElem('note-tabs');
     const tabsPrev = getElem('tabs-prev');
     const tabsNext = getElem('tabs-next');
     const tabConfigBtn = getElem('tab-config-btn');
     const tabConfigPanel = getElem('tab-config-panel');
+    const tabHelpBtn = getElem('tab-help-btn');
+    const toolHelpModal = getElem('tool-help-modal');
+    const toolHelpCloseBtn = getElem('tool-help-close-btn');
+    const toolHelpToolbarBody = getElem('tool-help-toolbar-body');
+    const toolHelpWindowsBody = getElem('tool-help-windows-body');
     const tabBarToggle = getElem('tab-bar-toggle');
     const tabColorSelect = getElem('tab-color-select');
     const tabPositionSelect = getElem('tab-position-select');
@@ -863,6 +1035,12 @@ document.addEventListener('DOMContentLoaded', function () {
             otherBtn.innerHTML = iconSVG;
             otherBtn.title = title;
             group.appendChild(otherBtn);
+            registerToolbarTool(otherBtn, {
+                icon: iconSVG,
+                shortName: title,
+                codeName: buildCodeName(title, 'palette'),
+                description: `Abre opciones de ${title.toLowerCase()}.`
+            });
             const submenu = document.createElement('div');
             submenu.className = 'color-submenu';
             extraColors.forEach(color => {
@@ -953,6 +1131,14 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.title = title;
             btn.innerHTML = icon;
             dropdown.appendChild(btn);
+            registerToolbarTool(btn, {
+                icon,
+                shortName: title,
+                codeName: isChar ? 'charMenu' : 'symbolMenu',
+                description: isChar
+                    ? 'Inserta caracteres especiales guardados.'
+                    : 'Inserta símbolos personalizados guardados.'
+            });
             const content = document.createElement('div');
             content.className = 'symbol-dropdown-content';
             const renderSNSyms = () => {
@@ -2481,6 +2667,43 @@ ${exportTable.outerHTML}
 
     function setupEditorToolbar() {
         editorToolbar.innerHTML = ''; // Clear existing toolbar
+        toolbarToolRegistry.length = 0;
+        const usedToolbarCodes = new Set();
+
+        const ensureUniqueCode = (candidate, fallbackPrefix = 'tool') => {
+            let base = (candidate && candidate.trim()) ? candidate.trim() : fallbackPrefix;
+            if (!base) base = fallbackPrefix;
+            let unique = base;
+            let suffix = 2;
+            while (usedToolbarCodes.has(unique)) {
+                unique = `${base}${suffix++}`;
+            }
+            usedToolbarCodes.add(unique);
+            return unique;
+        };
+
+        const registerToolbarTool = (element, meta = {}) => {
+            if (!element) return null;
+            const shortName = (typeof meta.shortName === 'string' && meta.shortName.trim())
+                ? meta.shortName.trim()
+                : (element.title || '').trim() || 'Acción';
+            const description = (typeof meta.description === 'string' && meta.description.trim())
+                ? meta.description.trim()
+                : (element.title || shortName);
+            const baseCode = meta.codeName || meta.code || element.dataset.toolCode || meta.command || '';
+            const codeCandidate = buildCodeName(baseCode || shortName, 'tool');
+            const codeName = ensureUniqueCode(codeCandidate, 'tool');
+            element.dataset.toolCode = codeName;
+            const iconMarkup = meta.icon !== undefined ? meta.icon : element.innerHTML;
+            const entry = {
+                icon: iconMarkup,
+                shortName,
+                codeName,
+                description
+            };
+            toolbarToolRegistry.push(entry);
+            return entry;
+        };
 
         // Run a callback while preserving the current text selection
         const withEditorSelection = (fn) => {
@@ -2497,7 +2720,15 @@ ${exportTable.outerHTML}
             notesModalContent.scrollTop = modalScroll;
         };
 
-        const createButton = (title, content, command, value = null, action = null, extraClass = '') => {
+        const createButton = (title, content, command, value = null, action = null, extra = '') => {
+            let extraClass = '';
+            let meta = {};
+            if (typeof extra === 'string' || extra instanceof String) {
+                extraClass = extra;
+            } else if (extra && typeof extra === 'object') {
+                extraClass = extra.extraClass || extra.className || '';
+                meta = extra;
+            }
             const btn = document.createElement('button');
             btn.className = 'toolbar-btn' + (extraClass ? ` ${extraClass}` : '');
             btn.title = title;
@@ -2515,6 +2746,14 @@ ${exportTable.outerHTML}
                 });
                 notesEditor.focus({ preventScroll: true });
             });
+            if (!meta.skipRegistry) {
+                registerToolbarTool(btn, {
+                    icon: meta.icon ?? content,
+                    shortName: meta.shortName || title,
+                    codeName: meta.codeName || meta.code || command,
+                    description: meta.description || title
+                });
+            }
             return btn;
         };
 
@@ -3326,12 +3565,18 @@ ${exportTable.outerHTML}
                 });
                 group.appendChild(swatch);
             });
-            
+
             const otherBtn = document.createElement('button');
             otherBtn.className = 'other-colors-btn toolbar-btn';
             otherBtn.innerHTML = iconSVG;
             otherBtn.title = title;
             group.appendChild(otherBtn);
+            registerToolbarTool(otherBtn, {
+                icon: iconSVG,
+                shortName: title,
+                codeName: buildCodeName(title, 'palette'),
+                description: `Abre opciones de ${title.toLowerCase()}.`
+            });
 
             const submenu = document.createElement('div');
             submenu.className = 'color-submenu';
@@ -3430,6 +3675,14 @@ ${exportTable.outerHTML}
             btn.title = title;
             btn.innerHTML = icon;
             dropdown.appendChild(btn);
+            registerToolbarTool(btn, {
+                icon,
+                shortName: title,
+                codeName: isChar ? 'charMenu' : 'symbolMenu',
+                description: isChar
+                    ? 'Inserta caracteres especiales guardados.'
+                    : 'Inserta símbolos personalizados guardados.'
+            });
             const content = document.createElement('div');
             content.className = 'symbol-dropdown-content';
             // Render symbols list without deletion or add buttons.  The
@@ -3438,7 +3691,7 @@ ${exportTable.outerHTML}
             const renderSymbols = () => {
                 content.innerHTML = '';
                 symbols.forEach((sym) => {
-                    const symBtn = createButton(sym, sym, 'insertText', sym);
+                    const symBtn = createButton(sym, sym, 'insertText', sym, null, { skipRegistry: true });
                     symBtn.classList.add('symbol-btn');
                     symBtn.addEventListener('click', () => {
                         content.classList.remove('visible');
@@ -4864,6 +5117,12 @@ ${exportTable.outerHTML}
             notesModalContent.scrollTop = modalScroll;
             notesEditor.focus({ preventScroll: true });
         });
+        registerToolbarTool(deleteLineBtn, {
+            icon: '🗑️⏎',
+            shortName: 'Eliminar línea',
+            codeName: 'deleteLine',
+            description: 'Quita por completo la línea donde está el cursor.'
+        });
         editorToolbar.appendChild(deleteLineBtn);
 
         const collapsibleListSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-tree w-5 h-5"><path d="M21 7H9"/><path d="M21 12H9"/><path d="M21 17H9"/><path d="M3 17v-6a4 4 0 0 1 4-4h4"/></svg>`;
@@ -5015,6 +5274,12 @@ ${exportTable.outerHTML}
             wrapSelectedImage(lastFloatAlign);
             notesEditor.focus({ preventScroll: true });
         });
+        registerToolbarTool(floatImageBtn, {
+            icon: '🖼️',
+            shortName: 'Imagen flotante',
+            codeName: 'floatImage',
+            description: 'Alterna la alineación cuadrada de la imagen seleccionada.'
+        });
         editorToolbar.appendChild(floatImageBtn);
 
         const sideBySideBtn = createButton('Alinear imágenes en fila', '🖼️🖼️', null, null, wrapSelectedImagesSideBySide);
@@ -5068,6 +5333,8 @@ ${exportTable.outerHTML}
             },
             true
         ));
+
+        refreshToolHelpTable();
     }
 
     function rgbToHex(rgb) {
