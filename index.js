@@ -122,6 +122,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const statusFiltersContainer = getElem('status-filters');
     const saveConfirmation = getElem('save-confirmation');
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
+    const lockNoteBtn = getElem('lock-note-btn');
+    const lockClosedIcon = lockNoteBtn?.querySelector('.lock-closed-icon');
+    const lockOpenIcon = lockNoteBtn?.querySelector('.lock-open-icon');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
     let sectionStylesheet = '';
     if (typeof fetch === 'function') {
@@ -260,6 +263,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const tabConfigPanel = getElem('tab-config-panel');
     const tabBarToggle = getElem('tab-bar-toggle');
     const tabColorSelect = getElem('tab-color-select');
+    const fullscreenBgInput = getElem('fullscreen-bg-color');
     const tabPositionSelect = getElem('tab-position-select');
     const showTabBarBtn = getElem('show-tab-bar-btn');
     const minimizeNoteBtn = getElem('minimize-note-btn');
@@ -272,6 +276,9 @@ document.addEventListener('DOMContentLoaded', function () {
     let fullscreenEnabled = false;
     let savedEditorWidth = 0;
     let draggedBlock = null;
+    let manualReadOnly = false;
+    let noteLocked = false;
+    let hideInlineColorControlsFn = null;
 
     if (minimizeNoteBtn && restoreNoteBtn) {
         minimizeNoteBtn.addEventListener('click', () => {
@@ -314,6 +321,16 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         noteTabsBar.style.setProperty('--tab-bar-bg', tabColorSelect.value);
         showTabBarBtn.style.backgroundColor = tabColorSelect.value;
+    }
+
+    if (fullscreenBgInput) {
+        const initialFullscreenBg = getComputedStyle(document.documentElement).getPropertyValue('--fullscreen-bg-color').trim();
+        if (initialFullscreenBg) {
+            fullscreenBgInput.value = initialFullscreenBg;
+        }
+        fullscreenBgInput.addEventListener('input', (e) => {
+            document.documentElement.style.setProperty('--fullscreen-bg-color', e.target.value);
+        });
     }
 
     const H_BAR_SIZE = 32;
@@ -2585,13 +2602,17 @@ ${exportTable.outerHTML}
         let endNode = range.endContainer;
 
         const findBlock = (node) => {
-             while (node && node !== notesEditor) {
-                if (node.nodeType === 1 && getComputedStyle(node).display !== 'inline') {
-                    return node;
+            let current = node;
+            while (current && current !== notesEditor) {
+                if (current.nodeType === 1 && getComputedStyle(current).display !== 'inline') {
+                    return current;
                 }
-                node = node.parentNode;
+                current = current.parentNode;
             }
-            return startNode.nodeType === 1 ? startNode : startNode.parentNode;
+            if (node && node.nodeType === 1) {
+                return node;
+            }
+            return node?.parentNode || notesEditor;
         };
         
         let startBlock = findBlock(startNode);
@@ -2606,7 +2627,9 @@ ${exportTable.outerHTML}
         const endIndex = allBlocks.indexOf(endBlock);
 
         if (startIndex !== -1 && endIndex !== -1) {
-            return allBlocks.slice(startIndex, endIndex + 1);
+            const from = Math.min(startIndex, endIndex);
+            const to = Math.max(startIndex, endIndex);
+            return allBlocks.slice(from, to + 1);
         }
 
         return [startBlock]; // Fallback
@@ -4125,6 +4148,7 @@ ${exportTable.outerHTML}
             }
             elements.forEach((block, index) => {
                 if (block && notesEditor.contains(block)) {
+                    const inTable = !!block.closest('table');
                     if (color === 'transparent') {
                         // Remove highlight and reset borders and margins on clear
                         block.style.backgroundColor = '';
@@ -4136,20 +4160,35 @@ ${exportTable.outerHTML}
                         block.style.borderTopRightRadius = '';
                         block.style.borderBottomLeftRadius = '';
                         block.style.borderBottomRightRadius = '';
+                        delete block.dataset.lineHighlight;
+                        delete block.dataset.lineHighlightColor;
                     } else {
                         block.style.backgroundColor = color;
-                        block.style.paddingLeft = '6px';
-                        block.style.paddingRight = '6px';
-                        // Remove default margins to fuse adjacent highlighted lines
-                        block.style.marginTop = '0px';
-                        block.style.marginBottom = '0px';
-                        // Set border radius based on position in selection
-                        const first = index === 0;
-                        const last = index === elements.length - 1;
-                        block.style.borderTopLeftRadius = first ? '6px' : '0';
-                        block.style.borderTopRightRadius = first ? '6px' : '0';
-                        block.style.borderBottomLeftRadius = last ? '6px' : '0';
-                        block.style.borderBottomRightRadius = last ? '6px' : '0';
+                        block.dataset.lineHighlight = 'true';
+                        block.dataset.lineHighlightColor = color;
+                        if (inTable) {
+                            block.style.paddingLeft = '';
+                            block.style.paddingRight = '';
+                            block.style.marginTop = '';
+                            block.style.marginBottom = '';
+                            block.style.borderTopLeftRadius = '0';
+                            block.style.borderTopRightRadius = '0';
+                            block.style.borderBottomLeftRadius = '0';
+                            block.style.borderBottomRightRadius = '0';
+                        } else {
+                            block.style.paddingLeft = '6px';
+                            block.style.paddingRight = '6px';
+                            // Remove default margins to fuse adjacent highlighted lines
+                            block.style.marginTop = '0px';
+                            block.style.marginBottom = '0px';
+                            // Set border radius based on position in selection
+                            const first = index === 0;
+                            const last = index === elements.length - 1;
+                            block.style.borderTopLeftRadius = first ? '6px' : '0';
+                            block.style.borderTopRightRadius = first ? '6px' : '0';
+                            block.style.borderBottomLeftRadius = last ? '6px' : '0';
+                            block.style.borderBottomRightRadius = last ? '6px' : '0';
+                        }
                     }
                 }
             });
@@ -4167,6 +4206,277 @@ ${exportTable.outerHTML}
         const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
         editorToolbar.appendChild(lineHighlightPalette);
         editorToolbar.appendChild(createPresetStyleDropdown());
+
+        const inlineColorTrigger = document.createElement('button');
+        inlineColorTrigger.type = 'button';
+        inlineColorTrigger.className = 'inline-color-trigger';
+        inlineColorTrigger.textContent = '⬇️';
+        document.body.appendChild(inlineColorTrigger);
+        const inlineColorMenu = document.createElement('div');
+        inlineColorMenu.className = 'inline-color-menu';
+        document.body.appendChild(inlineColorMenu);
+        let inlineColorTarget = null;
+        let inlineColorRange = null;
+        let inlineColorType = null;
+
+        const hideInlineColorMenu = () => {
+            inlineColorMenu.style.display = 'none';
+            inlineColorMenu.innerHTML = '';
+        };
+        const hideInlineColorControls = () => {
+            hideInlineColorMenu();
+            inlineColorTrigger.style.display = 'none';
+            inlineColorTarget = null;
+            inlineColorRange = null;
+            inlineColorType = null;
+        };
+        hideInlineColorControlsFn = hideInlineColorControls;
+
+        const getInlineRange = () => {
+            if (inlineColorRange) {
+                return inlineColorRange.cloneRange();
+            }
+            if (inlineColorTarget) {
+                const range = document.createRange();
+                range.selectNodeContents(inlineColorTarget);
+                return range;
+            }
+            return null;
+        };
+
+        const restoreInlineSelection = () => {
+            const range = getInlineRange();
+            if (!range) return;
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+        };
+
+        const isMeaningfulColor = (value) => {
+            if (!value) return false;
+            const normalized = String(value).trim().toLowerCase();
+            if (!normalized) return false;
+            const condensed = normalized.replace(/\s+/g, '');
+            if (!condensed || condensed.startsWith('var(')) return false;
+            return ![
+                'transparent',
+                'rgba(0,0,0,0)',
+                'rgb(0,0,0,0)',
+                '#00000000',
+                'inherit',
+                'initial',
+                'unset',
+                'currentcolor'
+            ].includes(condensed);
+        };
+
+        const detectInlineColorContext = (node) => {
+            if (!node) return null;
+            let current = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+            while (current && current !== notesEditor) {
+                if (current.nodeType === Node.ELEMENT_NODE) {
+                    const attrColor = typeof current.getAttribute === 'function' ? current.getAttribute('color') : null;
+                    const inlineColor = current.style?.color;
+                    if (isMeaningfulColor(inlineColor) || isMeaningfulColor(attrColor)) {
+                        return { target: current, type: 'fore' };
+                    }
+
+                    const computed = window.getComputedStyle(current);
+                    const datasetLine = current.dataset?.lineHighlight === 'true' &&
+                        isMeaningfulColor(current.dataset.lineHighlightColor) &&
+                        isMeaningfulColor(computed.backgroundColor);
+                    if (datasetLine) {
+                        return { target: current, type: 'line' };
+                    }
+
+                    const inlineBackground = current.style?.backgroundColor;
+                    if (isMeaningfulColor(inlineBackground)) {
+                        const isInline = computed.display.includes('inline');
+                        return { target: current, type: isInline ? 'highlight' : 'line' };
+                    }
+
+                    if (current.tagName === 'MARK') {
+                        const markBg = computed.backgroundColor;
+                        if (isMeaningfulColor(markBg)) {
+                            return { target: current, type: 'highlight' };
+                        }
+                    }
+                }
+                current = current.parentElement;
+            }
+            return null;
+        };
+
+        const showInlineColorTrigger = (target) => {
+            if (!target) return;
+            inlineColorTrigger.style.display = 'flex';
+            requestAnimationFrame(() => {
+                const rect = target.getBoundingClientRect();
+                const triggerRect = inlineColorTrigger.getBoundingClientRect();
+                let top = window.scrollY + rect.top - triggerRect.height - 6;
+                if (top < window.scrollY + 4) {
+                    top = window.scrollY + rect.bottom + 6;
+                }
+                let left = window.scrollX + rect.right - triggerRect.width;
+                const maxLeft = window.scrollX + window.innerWidth - triggerRect.width - 8;
+                if (left > maxLeft) left = maxLeft;
+                if (left < window.scrollX + 4) left = window.scrollX + 4;
+                inlineColorTrigger.style.top = `${top}px`;
+                inlineColorTrigger.style.left = `${left}px`;
+            });
+        };
+
+        const showInlineColorMenu = () => {
+            inlineColorMenu.style.display = 'block';
+            requestAnimationFrame(() => {
+                const triggerRect = inlineColorTrigger.getBoundingClientRect();
+                const menuRect = inlineColorMenu.getBoundingClientRect();
+                let top = window.scrollY + triggerRect.bottom + 6;
+                let left = window.scrollX + triggerRect.left + (triggerRect.width / 2) - (menuRect.width / 2);
+                const maxLeft = window.scrollX + window.innerWidth - menuRect.width - 8;
+                if (left > maxLeft) left = maxLeft;
+                if (left < window.scrollX + 4) left = window.scrollX + 4;
+                inlineColorMenu.style.top = `${top}px`;
+                inlineColorMenu.style.left = `${left}px`;
+            });
+        };
+
+        const actionWithInlineSelection = (fn) => (value) => {
+            restoreInlineSelection();
+            fn(value);
+            recordHistory();
+            const selection = window.getSelection();
+            inlineColorRange = selection && selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
+            const anchor = selection && selection.anchorNode ? selection.anchorNode : inlineColorTarget;
+            const updated = detectInlineColorContext(anchor);
+            hideInlineColorMenu();
+            if (updated) {
+                inlineColorTarget = updated.target;
+                inlineColorType = updated.type;
+                requestAnimationFrame(() => showInlineColorTrigger(inlineColorTarget));
+            } else {
+                hideInlineColorControls();
+            }
+            notesEditor.focus({ preventScroll: true });
+        };
+
+        inlineColorTrigger.addEventListener('mousedown', (e) => e.preventDefault());
+        inlineColorMenu.addEventListener('mousedown', (e) => e.preventDefault());
+        inlineColorMenu.addEventListener('click', (e) => e.stopPropagation());
+
+        inlineColorTrigger.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!inlineColorTarget) return;
+            inlineColorMenu.innerHTML = '';
+            const range = getInlineRange();
+            savedEditorSelection = range ? range.cloneRange() : null;
+            let paletteGroup;
+            if (inlineColorType === 'fore') {
+                paletteGroup = createColorPalette('Color de Texto', actionWithInlineSelection(applyForeColor), textColors, extraTextColors, typeIcon);
+            } else if (inlineColorType === 'highlight') {
+                paletteGroup = createColorPalette('Color de Resaltado', actionWithInlineSelection(applyHiliteColor), highlightColors, extraHighlightColors, highlighterIcon);
+            } else {
+                paletteGroup = createColorPalette('Color de fondo de línea', actionWithInlineSelection(applyLineHighlight), ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
+            }
+            inlineColorMenu.appendChild(paletteGroup);
+            document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                if (!inlineColorMenu.contains(d)) d.classList.remove('visible');
+            });
+            showInlineColorMenu();
+        });
+
+        const handleInlineColorClick = (e) => {
+            if (!notesEditor.isContentEditable) {
+                hideInlineColorControls();
+                return;
+            }
+            const context = detectInlineColorContext(e.target);
+            if (context) {
+                inlineColorTarget = context.target;
+                inlineColorType = context.type;
+                const selection = window.getSelection();
+                inlineColorRange = selection && selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
+                hideInlineColorMenu();
+                showInlineColorTrigger(inlineColorTarget);
+            } else {
+                hideInlineColorControls();
+            }
+        };
+        const selectionInsideEditor = (node) => {
+            if (!node) return false;
+            if (node === notesEditor) return true;
+            let current = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+            while (current) {
+                if (current === notesEditor) return true;
+                current = current.parentElement;
+            }
+            return false;
+        };
+
+        const handleSelectionChange = () => {
+            if (!notesEditor.isContentEditable) {
+                hideInlineColorControls();
+                return;
+            }
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) {
+                hideInlineColorControls();
+                return;
+            }
+            const range = selection.getRangeAt(0);
+            if (!selectionInsideEditor(selection.anchorNode) &&
+                !selectionInsideEditor(selection.focusNode) &&
+                !selectionInsideEditor(range.commonAncestorContainer)) {
+                hideInlineColorControls();
+                return;
+            }
+
+            let context = null;
+            if (selection.isCollapsed) {
+                context = detectInlineColorContext(selection.focusNode || selection.anchorNode);
+            } else {
+                const startContext = detectInlineColorContext(range.startContainer);
+                const endContext = detectInlineColorContext(range.endContainer);
+                if (startContext && endContext && startContext.target === endContext.target && startContext.type === endContext.type) {
+                    context = startContext;
+                } else if (startContext && !endContext) {
+                    context = startContext;
+                } else if (!startContext && endContext) {
+                    context = endContext;
+                } else {
+                    context = detectInlineColorContext(range.commonAncestorContainer);
+                }
+            }
+
+            if (context) {
+                inlineColorTarget = context.target;
+                inlineColorType = context.type;
+                inlineColorRange = range.cloneRange();
+                hideInlineColorMenu();
+                showInlineColorTrigger(inlineColorTarget);
+            } else {
+                hideInlineColorControls();
+            }
+        };
+
+        notesEditor.addEventListener('click', handleInlineColorClick);
+        document.addEventListener('selectionchange', handleSelectionChange);
+        notesEditor.addEventListener('input', hideInlineColorControls);
+
+        document.addEventListener('click', (event) => {
+            if (inlineColorMenu.contains(event.target) || inlineColorTrigger.contains(event.target) || notesEditor.contains(event.target)) {
+                return;
+            }
+            hideInlineColorControls();
+        });
+        window.addEventListener('scroll', hideInlineColorControls, true);
+        notesModalContent?.addEventListener('scroll', hideInlineColorControls);
+        notesEditor.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                hideInlineColorControls();
+            }
+        });
 
         // Popup to change existing preset styles
         const stylePopup = document.createElement('div');
@@ -4378,14 +4688,44 @@ ${exportTable.outerHTML}
             tableMenu.style.display = 'none';
             currentTable = null;
         };
+        const cloneCellTemplate = (templateCell) => {
+            const tagName = templateCell && templateCell.tagName === 'TH' ? 'th' : 'td';
+            const cell = document.createElement(tagName);
+            if (templateCell) {
+                cell.className = templateCell.className;
+                Array.from(templateCell.attributes).forEach(attr => {
+                    if (!['id', 'style', 'rowspan', 'colspan', 'contenteditable'].includes(attr.name)) {
+                        cell.setAttribute(attr.name, attr.value);
+                    }
+                });
+                if (templateCell.style && templateCell.style.cssText) {
+                    cell.style.cssText = templateCell.style.cssText;
+                }
+                Object.entries(templateCell.dataset || {}).forEach(([key, value]) => {
+                    cell.dataset[key] = value;
+                });
+            }
+            cell.removeAttribute('rowspan');
+            cell.removeAttribute('colspan');
+            cell.contentEditable = true;
+            cell.innerHTML = '&nbsp;';
+            return cell;
+        };
+
         const addRow = (table, index) => {
+            const existingRows = Array.from(table.rows);
+            const templateRow = existingRows.length ? existingRows[Math.min(index, existingRows.length - 1)] : null;
             const row = table.insertRow(index);
-            const cols = table.rows[0] ? table.rows[0].cells.length : 1;
-            for (let i = 0; i < cols; i++) {
-                const cell = row.insertCell(i);
+            if (templateRow && templateRow.cells.length) {
+                Array.from(templateRow.cells).forEach(templateCell => {
+                    const newCell = cloneCellTemplate(templateCell);
+                    row.appendChild(newCell);
+                });
+            } else {
+                const cell = document.createElement('td');
                 cell.innerHTML = '&nbsp;';
                 cell.contentEditable = true;
-                cell.style.border = '1px solid var(--border-color)';
+                row.appendChild(cell);
             }
             ensureSpacingState(table);
             const lineHeight = parseFloat(table.dataset.cellLineHeight || '1.4');
@@ -4396,10 +4736,15 @@ ${exportTable.outerHTML}
         const deleteRow = (table, index) => { if (table.rows.length > 1) table.deleteRow(index); };
         const addColumn = (table, index) => {
             Array.from(table.rows).forEach(row => {
-                const cell = row.insertCell(index);
-                cell.innerHTML = '&nbsp;';
-                cell.contentEditable = true;
-                cell.style.border = '1px solid var(--border-color)';
+                const cells = Array.from(row.cells);
+                const referenceIndex = Math.min(index, Math.max(cells.length - 1, 0));
+                const templateCell = cells[referenceIndex] || null;
+                const newCell = cloneCellTemplate(templateCell);
+                if (index >= row.cells.length) {
+                    row.appendChild(newCell);
+                } else {
+                    row.insertBefore(newCell, row.cells[index]);
+                }
             });
             ensureSpacingState(table);
             const lineHeight = parseFloat(table.dataset.cellLineHeight || '1.4');
@@ -4429,15 +4774,37 @@ ${exportTable.outerHTML}
                 cell.style.borderColor = '';
                 cell.style.borderTopColor = '';
                 cell.style.borderBottomColor = '';
+                cell.style.borderRadius = '';
             });
+        };
+        const convertCellTag = (cell, tagName) => {
+            if (!cell || cell.tagName === tagName.toUpperCase()) return cell;
+            const newCell = document.createElement(tagName);
+            Array.from(cell.attributes).forEach(attr => {
+                if (attr.name !== 'id') {
+                    newCell.setAttribute(attr.name, attr.value);
+                }
+            });
+            newCell.innerHTML = cell.innerHTML;
+            newCell.contentEditable = cell.contentEditable;
+            cell.parentNode.replaceChild(newCell, cell);
+            return newCell;
         };
         const applyTableTheme = (table, themeClass) => {
             if (!table) return;
             TABLE_THEMES.forEach(tt => table.classList.remove(tt.class));
             clearTableInlineStyles(table);
+            const rows = Array.from(table.rows);
+            if (rows.length) {
+                Array.from(rows[0].cells).forEach(cell => convertCellTag(cell, 'th'));
+                rows.slice(1).forEach(row => {
+                    Array.from(row.cells).forEach(cell => convertCellTag(cell, 'td'));
+                });
+            }
             if (themeClass) {
                 table.classList.add(themeClass);
             }
+            initTableResize(table);
         };
         const ensureSpacingState = (table) => {
             if (!table) return;
@@ -6168,6 +6535,9 @@ ${exportTable.outerHTML}
         activeNoteIndex = 0;
         activeTabId = null;
         resetHistory('<p><br></p>');
+        manualReadOnly = false;
+        noteLocked = false;
+        updateEditorReadOnlyState();
     }
 
     function saveCurrentNote(index = activeNoteIndex) {
@@ -6180,12 +6550,14 @@ ${exportTable.outerHTML}
         // Keep existing postits and quick note data
         const existingPostits = currentNotesArray[index].postits || {};
         const existingQuickNote = currentNotesArray[index].quickNote || '';
+        const existingLocked = !!currentNotesArray[index].locked;
         currentNotesArray[index] = {
             title: currentTitle,
             content: currentContent,
             lastEdited: new Date().toISOString(),
             postits: existingPostits,
-            quickNote: existingQuickNote
+            quickNote: existingQuickNote,
+            locked: existingLocked
         };
 
         const noteType = activeNoteIcon.dataset.noteType;
@@ -6301,15 +6673,22 @@ ${exportTable.outerHTML}
             const btn = document.createElement('button');
             btn.className = 'note-item-btn w-full';
             btn.dataset.index = index;
-            
+
             if (index === activeNoteIndex) {
                 btn.classList.add('active');
             }
-            
+
+            if (note.locked) {
+                const lockBadge = document.createElement('span');
+                lockBadge.className = 'note-lock-indicator';
+                lockBadge.textContent = '🔒';
+                btn.appendChild(lockBadge);
+            }
+
             const titleSpan = document.createElement('span');
             titleSpan.className = 'note-title-text';
             titleSpan.textContent = note.title || `Nota ${index + 1}`;
-            
+
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-note-btn toolbar-btn';
             deleteBtn.innerHTML = '🗑️';
@@ -6344,11 +6723,15 @@ ${exportTable.outerHTML}
 
         const currentTab = openNoteTabs.find(t => t.id === activeTabId);
         if (currentTab) currentTab.activeIndex = index;
-        
+
         notesModalTitle.textContent = note.title || `Nota ${index + 1}`;
         notesEditor.innerHTML = note.content || '<p><br></p>';
         initAllResizableElements(notesEditor);
         resetHistory(notesEditor.innerHTML);
+
+        manualReadOnly = false;
+        noteLocked = !!note.locked;
+        updateEditorReadOnlyState();
 
         renderNotesList();
         notesEditor.focus({ preventScroll: true });
@@ -6366,9 +6749,10 @@ ${exportTable.outerHTML}
             content: '<p><br></p>',
             lastEdited: new Date().toISOString(),
             postits: {},
-            quickNote: ''
+            quickNote: '',
+            locked: false
         });
-        
+
         loadNoteIntoEditor(newIndex);
     }
     
@@ -7373,13 +7757,36 @@ ${exportTable.outerHTML}
             }
         });
 
-        toggleReadOnlyBtn.addEventListener('click', () => {
-            const modalContent = notesModal.querySelector('.notes-modal-content');
-            modalContent.classList.toggle('readonly-mode');
-            const isReadOnly = modalContent.classList.contains('readonly-mode');
-            notesEditor.contentEditable = !isReadOnly;
-            notesModalTitle.contentEditable = !isReadOnly;
-        });
+        if (toggleReadOnlyBtn) {
+            toggleReadOnlyBtn.addEventListener('click', () => {
+                if (noteLocked) return;
+                manualReadOnly = !manualReadOnly;
+                updateEditorReadOnlyState();
+            });
+        }
+
+        if (lockNoteBtn) {
+            lockNoteBtn.addEventListener('click', () => {
+                noteLocked = !noteLocked;
+                if (noteLocked) {
+                    manualReadOnly = false;
+                }
+                if (currentNotesArray[activeNoteIndex]) {
+                    currentNotesArray[activeNoteIndex].locked = noteLocked;
+                    const noteType = activeNoteIcon?.dataset.noteType;
+                    if (noteType === 'section') {
+                        currentNoteRow.dataset.sectionNote = JSON.stringify(currentNotesArray);
+                    } else {
+                        currentNoteRow.dataset.notes = JSON.stringify(currentNotesArray);
+                    }
+                    const currentTab = openNoteTabs.find(t => t.id === activeTabId);
+                    if (currentTab) currentTab.notesArray = currentNotesArray;
+                    saveState();
+                    renderNotesList();
+                }
+                updateEditorReadOnlyState();
+            });
+        }
 
         notesPanelToggle.addEventListener('click', () => {
             notesSidePanel.classList.toggle('open');
@@ -7920,10 +8327,32 @@ ${exportTable.outerHTML}
 
     }
 
+    const updateEditorReadOnlyState = () => {
+        const modalContent = notesModal.querySelector('.notes-modal-content');
+        const isReadOnly = noteLocked || manualReadOnly;
+        modalContent.classList.toggle('readonly-mode', isReadOnly);
+        modalContent.classList.toggle('locked-note', noteLocked);
+        notesEditor.contentEditable = !isReadOnly;
+        notesModalTitle.contentEditable = !isReadOnly;
+        if (toggleReadOnlyBtn) {
+            toggleReadOnlyBtn.disabled = noteLocked;
+            toggleReadOnlyBtn.classList.toggle('active', manualReadOnly && !noteLocked);
+        }
+        if (lockNoteBtn) {
+            lockNoteBtn.classList.toggle('active', noteLocked);
+            lockNoteBtn.setAttribute('aria-pressed', noteLocked ? 'true' : 'false');
+            lockNoteBtn.title = noteLocked ? 'Nota bloqueada' : 'Bloquear nota';
+            lockClosedIcon?.classList.toggle('hidden', !noteLocked);
+            lockOpenIcon?.classList.toggle('hidden', noteLocked);
+        }
+        if (hideInlineColorControlsFn) hideInlineColorControlsFn();
+    };
+
 
     function init() {
         initializeCells();
         setupEditorToolbar();
+        updateEditorReadOnlyState();
         setupImageTools(notesEditor, editorToolbar);
         populateIconPicker();
         loadState();
