@@ -123,6 +123,245 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveConfirmation = getElem('save-confirmation');
     const toggleReadOnlyBtn = getElem('toggle-readonly-btn');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
+    const toolbarHelpBtn = getElem('toolbar-help-btn');
+    const toolbarHelpModal = getElem('toolbar-help-modal');
+    const toolbarHelpClose = getElem('toolbar-help-close');
+    const toolbarHelpTableBody = getElem('toolbar-help-table-body');
+
+    const HELP_GROUPS = {
+        TOOLBAR: 'Barra de edición',
+        SUBNOTE_TOOLBAR: 'Barra de sub-notas',
+        NOTE_WINDOW: 'Ventana principal',
+        SUBNOTE_WINDOW: 'Ventana sub-nota'
+    };
+
+    const HELP_GROUP_ORDER = [
+        HELP_GROUPS.TOOLBAR,
+        HELP_GROUPS.SUBNOTE_TOOLBAR,
+        HELP_GROUPS.NOTE_WINDOW,
+        HELP_GROUPS.SUBNOTE_WINDOW
+    ];
+
+    const HELP_GROUP_PREFIX = {
+        [HELP_GROUPS.TOOLBAR]: 'toolbar',
+        [HELP_GROUPS.SUBNOTE_TOOLBAR]: 'subtoolbar',
+        [HELP_GROUPS.NOTE_WINDOW]: 'note',
+        [HELP_GROUPS.SUBNOTE_WINDOW]: 'subnote'
+    };
+
+    const toolbarHelpEntries = [];
+
+    const slugify = (text) => {
+        if (!text) return 'boton';
+        const slug = text
+            .toString()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .replace(/-{2,}/g, '-');
+        return slug || 'boton';
+    };
+
+    const clearHelpEntriesByGroup = (group) => {
+        if (!group) return;
+        for (let i = toolbarHelpEntries.length - 1; i >= 0; i--) {
+            if (toolbarHelpEntries[i].group === group) {
+                toolbarHelpEntries.splice(i, 1);
+            }
+        }
+    };
+
+    const registerHelpFromElement = (element, overrides = {}, group = HELP_GROUPS.NOTE_WINDOW) => {
+        if (!element || !group) return;
+        const shortName = overrides.shortName || element.dataset.helpShort || element.title || element.textContent.trim() || 'Botón';
+        const description = overrides.description || element.dataset.helpDescription || element.title || shortName;
+        const iconHTML = overrides.iconHTML !== undefined ? overrides.iconHTML : (element.innerHTML || element.textContent.trim() || '');
+        const prefix = overrides.codeName ? '' : `${HELP_GROUP_PREFIX[group] || 'ui'}-`;
+        const baseCode = overrides.codeName || slugify(overrides.shortName || shortName || description);
+        const codeName = `${prefix}${baseCode}`;
+        const entry = {
+            iconHTML,
+            shortName,
+            codeName,
+            description,
+            group,
+            elementId: element.id || null
+        };
+        element.dataset.helpCode = codeName;
+        element.dataset.helpGroup = group;
+        const existingIndex = toolbarHelpEntries.findIndex(e => e.codeName === codeName && e.group === group);
+        if (existingIndex >= 0) {
+            toolbarHelpEntries[existingIndex] = entry;
+        } else {
+            toolbarHelpEntries.push(entry);
+        }
+    };
+
+    const updateHelpEntryFromElement = (element, updates = {}) => {
+        if (!element || !element.dataset.helpCode || !element.dataset.helpGroup) return;
+        const idx = toolbarHelpEntries.findIndex(e => e.codeName === element.dataset.helpCode && e.group === element.dataset.helpGroup);
+        if (idx === -1) return;
+        const entry = toolbarHelpEntries[idx];
+        if (updates.iconHTML !== undefined) entry.iconHTML = updates.iconHTML;
+        if (updates.shortName !== undefined) entry.shortName = updates.shortName;
+        if (updates.description !== undefined) entry.description = updates.description;
+    };
+
+    const renderToolbarHelpTable = () => {
+        if (!toolbarHelpTableBody) return;
+        toolbarHelpTableBody.innerHTML = '';
+        const grouped = new Map();
+        toolbarHelpEntries.forEach(entry => {
+            if (!grouped.has(entry.group)) {
+                grouped.set(entry.group, []);
+            }
+            grouped.get(entry.group).push(entry);
+        });
+        const orderedGroups = [
+            ...HELP_GROUP_ORDER.filter(group => grouped.has(group)),
+            ...Array.from(grouped.keys()).filter(g => !HELP_GROUP_ORDER.includes(g)).sort()
+        ];
+        orderedGroups.forEach(group => {
+            const entries = grouped.get(group);
+            if (!entries || entries.length === 0) return;
+            entries.sort((a, b) => a.shortName.localeCompare(b.shortName, 'es', { sensitivity: 'base' }));
+            const headerRow = document.createElement('tr');
+            headerRow.className = 'help-group-row';
+            const headerCell = document.createElement('td');
+            headerCell.colSpan = 4;
+            headerCell.textContent = group;
+            headerRow.appendChild(headerCell);
+            toolbarHelpTableBody.appendChild(headerRow);
+            entries.forEach(entry => {
+                const row = document.createElement('tr');
+                const iconCell = document.createElement('td');
+                iconCell.className = 'icon-cell';
+                iconCell.innerHTML = entry.iconHTML || '';
+                const shortCell = document.createElement('td');
+                shortCell.textContent = entry.shortName;
+                const codeCell = document.createElement('td');
+                codeCell.className = 'code-cell';
+                codeCell.textContent = entry.codeName;
+                const descriptionCell = document.createElement('td');
+                descriptionCell.textContent = entry.description;
+                row.append(iconCell, shortCell, codeCell, descriptionCell);
+                toolbarHelpTableBody.appendChild(row);
+            });
+        });
+    };
+
+    if (toolbarHelpBtn && toolbarHelpModal) {
+        toolbarHelpBtn.addEventListener('click', () => {
+            renderToolbarHelpTable();
+            showModal(toolbarHelpModal);
+        });
+        toolbarHelpModal.addEventListener('click', (event) => {
+            if (event.target === toolbarHelpModal) {
+                hideModal(toolbarHelpModal);
+            }
+        });
+    }
+    if (toolbarHelpClose && toolbarHelpModal) {
+        toolbarHelpClose.addEventListener('click', () => hideModal(toolbarHelpModal));
+    }
+
+    const registerWindowHelpEntries = () => {
+        clearHelpEntriesByGroup(HELP_GROUPS.NOTE_WINDOW);
+        clearHelpEntriesByGroup(HELP_GROUPS.SUBNOTE_WINDOW);
+        registerHelpFromElement(notesPanelToggle, {
+            shortName: 'Panel lateral',
+            description: 'Muestra u oculta el listado de notas a la izquierda.',
+            codeName: 'note-panel-toggle'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(toggleHtmlPasteBtn, {
+            shortName: 'Pegado HTML',
+            description: 'Activa o desactiva el pegado con formato HTML en el editor principal.',
+            codeName: 'note-toggle-html-paste'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(dragBtn, {
+            shortName: 'Mover bloques',
+            description: 'Permite arrastrar bloques dentro de la nota.',
+            codeName: 'note-drag-toggle'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(fullscreenBtn, {
+            shortName: 'Pantalla completa',
+            description: 'Expande la ventana de la nota a pantalla completa.',
+            codeName: 'note-fullscreen-toggle'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(noteInfoBtn, {
+            shortName: 'Información',
+            description: 'Muestra estadísticas y metadatos de la nota.',
+            codeName: 'note-info'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(quickNoteBtn, {
+            shortName: 'Nota rápida',
+            description: 'Abre la nota rápida asociada para apuntes breves.',
+            codeName: 'note-quick'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(toggleReadOnlyBtn, {
+            shortName: 'Modo lectura',
+            description: 'Alterna entre modo lectura y edición de la nota.',
+            codeName: 'note-readonly-toggle'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(importNoteBtn, {
+            shortName: 'Importar HTML',
+            description: 'Importa contenido desde un archivo HTML o de texto.',
+            codeName: 'note-import-html'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(exportNoteBtn, {
+            shortName: 'Exportar HTML',
+            description: 'Descarga la nota actual como archivo HTML.',
+            codeName: 'note-export-html'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(minimizeNoteBtn, {
+            shortName: 'Minimizar',
+            description: 'Minimiza la ventana de la nota sin cerrarla.',
+            codeName: 'note-minimize'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(unmarkNoteBtn, {
+            shortName: 'Vaciar nota',
+            description: 'Elimina todo el contenido de la nota actual.',
+            codeName: 'note-clear'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(cancelNoteBtn, {
+            shortName: 'Cerrar nota',
+            description: 'Cierra la ventana de la nota sin guardar cambios.',
+            codeName: 'note-close'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(saveNoteBtn, {
+            shortName: 'Guardar',
+            description: 'Guarda los cambios realizados en la nota y continúa editando.',
+            codeName: 'note-save'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(saveAndCloseNoteBtn, {
+            shortName: 'Guardar y cerrar',
+            description: 'Guarda los cambios y cierra la ventana de la nota.',
+            codeName: 'note-save-close'
+        }, HELP_GROUPS.NOTE_WINDOW);
+        registerHelpFromElement(toggleSubnoteReadOnlyBtn, {
+            shortName: 'Modo lectura sub-nota',
+            description: 'Alterna entre lectura y edición de la sub-nota.',
+            codeName: 'subnote-readonly-toggle'
+        }, HELP_GROUPS.SUBNOTE_WINDOW);
+        registerHelpFromElement(cancelSubnoteBtn, {
+            shortName: 'Cerrar sub-nota',
+            description: 'Cierra la ventana de sub-nota sin guardar.',
+            codeName: 'subnote-close'
+        }, HELP_GROUPS.SUBNOTE_WINDOW);
+        registerHelpFromElement(saveSubnoteBtn, {
+            shortName: 'Guardar sub-nota',
+            description: 'Guarda los cambios de la sub-nota y permanece en la ventana.',
+            codeName: 'subnote-save'
+        }, HELP_GROUPS.SUBNOTE_WINDOW);
+        registerHelpFromElement(saveCloseSubnoteBtn, {
+            shortName: 'Guardar y cerrar sub-nota',
+            description: 'Guarda la sub-nota y cierra la ventana.',
+            codeName: 'subnote-save-close'
+        }, HELP_GROUPS.SUBNOTE_WINDOW);
+    };
+
     let sectionStylesheet = '';
     if (typeof fetch === 'function') {
         fetch('index.css').then(resp => resp.text()).then(css => {
@@ -623,6 +862,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveSubnoteBtn = getElem('save-subnote-btn');
     const cancelSubnoteBtn = getElem('cancel-subnote-btn');
     const toggleSubnoteReadOnlyBtn = getElem('toggle-subnote-readonly-btn');
+    registerWindowHelpEntries();
 
     const TOOLTIP_ICON_OPTIONS = ['✽', '✱', '🟢', '🔵', '●', '◆', 'ℹ️'];
     const DEFAULT_TOOLTIP_ICON = 'ℹ️';
@@ -786,6 +1026,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function setupSubnoteToolbar() {
         if (!subNoteToolbar) return;
         subNoteToolbar.innerHTML = '';
+        clearHelpEntriesByGroup(HELP_GROUPS.SUBNOTE_TOOLBAR);
 
         // Local state for sub-note toolbar color selections
         let savedSubnoteSelection = null;
@@ -810,7 +1051,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         // Helper to create a toolbar button for sub-note editor
-        const createSNButton = (title, content, command, value = null, action = null, extraClass = '') => {
+        const createSNButton = (title, content, command, value = null, action = null, extraClass = '', helpOptions = null) => {
             const btn = document.createElement('button');
             btn.className = 'toolbar-btn' + (extraClass ? ` ${extraClass}` : '');
             btn.title = title;
@@ -827,6 +1068,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 subNoteEditor.focus();
             });
+            if (!helpOptions?.skipHelp) {
+                registerHelpFromElement(btn, {
+                    shortName: helpOptions?.shortName || title,
+                    description: helpOptions?.description || title,
+                    codeName: helpOptions?.codeName,
+                    iconHTML: helpOptions?.iconHTML !== undefined ? helpOptions.iconHTML : content
+                }, HELP_GROUPS.SUBNOTE_TOOLBAR);
+            }
             return btn;
         };
 
@@ -958,7 +1207,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const renderSNSyms = () => {
                 content.innerHTML = '';
                 symbols.forEach((sym) => {
-                    const sBtn = createSNButton(sym, sym, 'insertText', sym);
+                    const sBtn = createSNButton(sym, sym, 'insertText', sym, null, '', { skipHelp: true });
                     sBtn.classList.add('symbol-btn');
                     sBtn.addEventListener('click', () => {
                         content.classList.remove('visible');
@@ -1000,6 +1249,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             });
+            registerHelpFromElement(btn, {
+                shortName: title,
+                description: isChar
+                    ? 'Muestra caracteres especiales para usarlos en la sub-nota.'
+                    : 'Muestra iconos y símbolos frecuentes para la sub-nota.',
+                iconHTML: icon
+            }, HELP_GROUPS.SUBNOTE_TOOLBAR);
             return dropdown;
         };
 
@@ -2480,6 +2736,7 @@ ${exportTable.outerHTML}
     }
 
     function setupEditorToolbar() {
+        clearHelpEntriesByGroup(HELP_GROUPS.TOOLBAR);
         editorToolbar.innerHTML = ''; // Clear existing toolbar
 
         // Run a callback while preserving the current text selection
@@ -2497,7 +2754,7 @@ ${exportTable.outerHTML}
             notesModalContent.scrollTop = modalScroll;
         };
 
-        const createButton = (title, content, command, value = null, action = null, extraClass = '') => {
+        const createButton = (title, content, command, value = null, action = null, extraClass = '', helpOptions = null) => {
             const btn = document.createElement('button');
             btn.className = 'toolbar-btn' + (extraClass ? ` ${extraClass}` : '');
             btn.title = title;
@@ -2515,6 +2772,14 @@ ${exportTable.outerHTML}
                 });
                 notesEditor.focus({ preventScroll: true });
             });
+            if (!helpOptions?.skipHelp) {
+                registerHelpFromElement(btn, {
+                    shortName: helpOptions?.shortName || title,
+                    description: helpOptions?.description || title,
+                    codeName: helpOptions?.codeName,
+                    iconHTML: helpOptions?.iconHTML !== undefined ? helpOptions.iconHTML : content
+                }, HELP_GROUPS.TOOLBAR);
+            }
             return btn;
         };
 
@@ -3438,7 +3703,7 @@ ${exportTable.outerHTML}
             const renderSymbols = () => {
                 content.innerHTML = '';
                 symbols.forEach((sym) => {
-                    const symBtn = createButton(sym, sym, 'insertText', sym);
+                    const symBtn = createButton(sym, sym, 'insertText', sym, null, '', { skipHelp: true });
                     symBtn.classList.add('symbol-btn');
                     symBtn.addEventListener('click', () => {
                         content.classList.remove('visible');
@@ -3483,6 +3748,13 @@ ${exportTable.outerHTML}
                     }
                 }
             });
+            registerHelpFromElement(btn, {
+                shortName: title,
+                description: isChar
+                    ? 'Abre la lista de caracteres especiales para insertarlos en el texto.'
+                    : 'Abre la lista de iconos y símbolos frecuentes para insertarlos en la nota.',
+                iconHTML: icon
+            }, HELP_GROUPS.TOOLBAR);
             return dropdown;
         };
 
@@ -3921,6 +4193,7 @@ ${exportTable.outerHTML}
         inlineIconSelect.addEventListener('change', () => {
             currentInlineNoteIcon = inlineIconSelect.value;
             inlineNoteBtn.innerHTML = currentInlineNoteIcon;
+            updateHelpEntryFromElement(inlineNoteBtn, { iconHTML: currentInlineNoteIcon });
         });
         editorToolbar.appendChild(inlineIconSelect);
 
