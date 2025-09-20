@@ -581,7 +581,125 @@ document.addEventListener('DOMContentLoaded', function () {
     const dragBtn = getElem('toggle-block-drag-btn');
     const fullscreenBtn = getElem('toggle-fullscreen-btn');
 
+    const tabGuideBtn = getElem('tab-guide-btn');
+    const uiGuideModal = getElem('ui-guide-modal');
+    const closeUiGuideBtn = getElem('close-ui-guide-btn');
+    const uiGuideSections = getElem('ui-guide-sections');
+
     let htmlPasteEnabled = false;
+
+    const UI_ICON_STRINGS = {
+        codeToggle: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-code w-5 h-5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`,
+        fullscreen: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-maximize-2 w-5 h-5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><polyline points="21 15 21 21 15 21"/><polyline points="3 9 3 3 9 3"/></svg>`,
+        noteInfo: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-info w-5 h-5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`,
+        quickNote: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sticky-note w-5 h-5"><path d="M3 3h12l6 6v12H3z"/><path d="M15 3v6h6"/></svg>`,
+        readonly: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye w-5 h-5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`,
+        importNote: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-upload w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>`,
+        exportNote: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>`,
+        minimize: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-minus w-5 h-5"><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+        type: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-type w-4 h-4"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>`,
+        highlighter: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-highlighter w-4 h-4"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>`,
+        highlightSize: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up-down w-4 h-4"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>`,
+        indentDecrease: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-decrease w-5 h-5"><polyline points="7 8 3 12 7 16"/><line x1="21" x2="3" y1="12" y2="12"/><line x1="21" x2="3" y1="6" y2="6"/><line x1="21" x2="3" y1="18" y2="18"/></svg>`,
+        indentIncrease: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`,
+        collapsibleList: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-tree w-5 h-5"><path d="M21 7H9"/><path d="M21 12H9"/><path d="M21 17H9"/><path d="M3 17v-6a4 4 0 0 1 4-4h4"/></svg>`,
+        subnote: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`,
+        gallery: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`
+    };
+
+    const UI_WINDOW_GUIDE_ITEMS = [
+        { icon: '📚', shortName: 'Referencias', codeName: 'references-editor', description: 'Gestiona la lista de referencias asociadas al tema seleccionado.' },
+        { icon: '😀', shortName: 'Selector de iconos', codeName: 'icon-picker', description: 'Permite elegir emojis o SVG para botones, notas y elementos personalizados.' },
+        { icon: '🧰', shortName: 'Gestor de iconos', codeName: 'icon-manager', description: 'Administra la colección de iconos guardados para añadir o quitar opciones del selector.' },
+        { icon: '🔡', shortName: 'Gestor de caracteres', codeName: 'character-manager', description: 'Define los caracteres especiales disponibles en el menú correspondiente.' },
+        { icon: '🔗', shortName: 'Editor de enlaces', codeName: 'link-editor', description: 'Crea o modifica hipervínculos que se insertan en el contenido de la nota.' },
+        { icon: '📝', shortName: 'Editor principal', codeName: 'notes-modal', description: 'Ventana principal para redactar, formatear y administrar el contenido de la nota.' },
+        { icon: '&lt;/&gt;', shortName: 'Plantillas HTML', codeName: 'html-template', description: 'Inserta fragmentos HTML predefinidos o guardados como favoritos.', isHtml: true },
+        { icon: '&lt;HTML&gt;', shortName: 'HTML seleccionado', codeName: 'selected-html', description: 'Muestra el código HTML del contenido actualmente seleccionado.', isHtml: true },
+        { icon: 'ℹ️', shortName: 'Información de nota', codeName: 'note-info', description: 'Resume métricas de la nota como palabras, peso en disco y última edición.' },
+        { icon: '❓', shortName: 'Confirmación', codeName: 'confirmation-modal', description: 'Solicita confirmar acciones sensibles antes de continuar.' },
+        { icon: '🖼️', shortName: 'Galería de imágenes', codeName: 'gallery-editor', description: 'Define las URLs que conforman una galería activada desde el editor.' },
+        { icon: '🖼️🔍', shortName: 'Visor de imágenes', codeName: 'image-lightbox', description: 'Revisa imágenes insertadas con zoom, navegación y descarga.' },
+        { icon: '⚠️', shortName: 'Alertas', codeName: 'alert-modal', description: 'Muestra mensajes informativos o de error que requieren atención.' },
+        { icon: '🗒️', shortName: 'Nota rápida', codeName: 'postit-modal', description: 'Crea pequeñas notas adhesivas asociadas a la nota principal.' },
+        { icon: '🧾', shortName: 'Sub-notas', codeName: 'subnote-modal', description: 'Abre las sub-notas vinculadas para revisarlas o editarlas en una ventana dedicada.' },
+        { icon: '🎨', shortName: 'Estilos de nota', codeName: 'note-style', description: 'Configura el diseño visual de las notas resaltadas (callouts).' }
+    ];
+
+    function renderUiGuideSections() {
+        if (!uiGuideSections) return;
+        const sections = [
+            { title: 'Barra de edición de texto', rows: buildToolbarGuideItems() },
+            { title: 'Ventanas y paneles', rows: UI_WINDOW_GUIDE_ITEMS }
+        ];
+
+        uiGuideSections.innerHTML = '';
+        sections.forEach(section => {
+            if (!section.rows || section.rows.length === 0) return;
+            const sectionContainer = document.createElement('div');
+            sectionContainer.className = 'ui-guide-section';
+
+            const heading = document.createElement('h4');
+            heading.textContent = section.title;
+            sectionContainer.appendChild(heading);
+
+            const table = document.createElement('table');
+            table.className = 'ui-guide-table';
+
+            const thead = document.createElement('thead');
+            thead.innerHTML = '<tr><th class="icon-cell">Icono</th><th>Nombre</th><th class="code-cell">Código</th><th>Función</th></tr>';
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            section.rows.forEach(row => {
+                const tr = document.createElement('tr');
+
+                const iconCell = document.createElement('td');
+                iconCell.className = 'icon-cell';
+                if (row.isHtml) {
+                    iconCell.innerHTML = row.icon;
+                } else {
+                    iconCell.textContent = row.icon;
+                }
+
+                const nameCell = document.createElement('td');
+                nameCell.textContent = row.shortName;
+
+                const codeCell = document.createElement('td');
+                codeCell.className = 'code-cell';
+                codeCell.textContent = row.codeName;
+
+                const descCell = document.createElement('td');
+                descCell.textContent = row.description;
+
+                tr.append(iconCell, nameCell, codeCell, descCell);
+                tbody.appendChild(tr);
+            });
+
+            table.appendChild(tbody);
+            sectionContainer.appendChild(table);
+            uiGuideSections.appendChild(sectionContainer);
+        });
+    }
+
+    if (tabGuideBtn && uiGuideModal) {
+        tabGuideBtn.addEventListener('click', () => {
+            renderUiGuideSections();
+            showModal(uiGuideModal);
+        });
+    }
+
+    if (closeUiGuideBtn && uiGuideModal) {
+        closeUiGuideBtn.addEventListener('click', () => hideModal(uiGuideModal));
+    }
+
+    if (uiGuideModal) {
+        uiGuideModal.addEventListener('click', (event) => {
+            if (event.target === uiGuideModal) {
+                hideModal(uiGuideModal);
+            }
+        });
+    }
 
     function sanitizeHtml(html) {
         const div = document.createElement('div');
@@ -1007,7 +1125,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const createSNHighlightSizeDropdown = () => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
-            const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up-down w-4 h-4"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>`;
+            const iconSVG = UI_ICON_STRINGS.highlightSize;
             const btn = createSNButton('Ajustar altura de destacado', iconSVG, null, null, null);
             dropdown.appendChild(btn);
             const content = document.createElement('div');
@@ -1252,8 +1370,8 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             recordHistory();
         };
-        const typeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-type w-4 h-4"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>`;
-        const highlighterIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-highlighter w-4 h-4"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>`;
+        const typeIcon = UI_ICON_STRINGS.type;
+        const highlighterIcon = UI_ICON_STRINGS.highlighter;
         const subTextPalette = createSNColorPalette('Color de Texto', applySubnoteForeColor, textColors, extraTextColors, typeIcon);
         const subHighlightPalette = createSNColorPalette('Color de Resaltado', applySubnoteHiliteColor, highlightColors, extraHighlightColors, highlighterIcon);
         const subLineHighlightPalette = createSNColorPalette('Color de fondo de línea', applySubnoteLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
@@ -1295,12 +1413,12 @@ document.addEventListener('DOMContentLoaded', function () {
         subNoteToolbar.appendChild(createSNSeparator());
         // Indent/outdent
         // Indent/outdent
-        const outdentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-decrease w-5 h-5"><polyline points="7 8 3 12 7 16"/><line x1="21" x2="3" y1="12" y2="12"/><line x1="21" x2="3" y1="6" y2="6"/><line x1="21" x2="3" y1="18" y2="18"/></svg>`;
-        const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
+        const outdentSVG = UI_ICON_STRINGS.indentDecrease;
+        const indentSVG = UI_ICON_STRINGS.indentIncrease;
         subNoteToolbar.appendChild(createSNButton('Disminuir sangría', outdentSVG, null, null, () => adjustIndent(-1, subNoteEditor)));
         subNoteToolbar.appendChild(createSNButton('Aumentar sangría', indentSVG, null, null, () => adjustIndent(1, subNoteEditor)));
         // Collapsible list item
-        const collapsibleListSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-tree w-5 h-5"><path d="M21 7H9"/><path d="M21 12H9"/><path d="M21 17H9"/><path d="M3 17v-6a4 4 0 0 1 4-4h4"/></svg>`;
+        const collapsibleListSVG = UI_ICON_STRINGS.collapsibleList;
         const collapsibleListHTML = `<details class="collapsible-list"><summary>Elemento</summary><div>Texto...<br></div></details><p><br></p>`;
         subNoteToolbar.appendChild(createSNButton('Insertar lista colapsable', collapsibleListSVG, 'insertHTML', collapsibleListHTML));
 
@@ -1357,7 +1475,7 @@ document.addEventListener('DOMContentLoaded', function () {
             true
         ));
         // Gallery link insertion
-        const gallerySVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-horizontal-end w-5 h-5"><path d="M2 7v10"/><path d="M6 5v14"/><rect width="12" height="18" x="10" y="3" rx="2"/></svg>`;
+        const gallerySVG = UI_ICON_STRINGS.gallery;
         subNoteToolbar.appendChild(createSNButton('Crear Galería de Imágenes', gallerySVG, null, null, () => {
             // Capture selection for gallery range
             const selection = window.getSelection();
@@ -1513,6 +1631,70 @@ document.addEventListener('DOMContentLoaded', function () {
                 selectedImageForResize = null;
             }
         });
+    }
+
+    function buildToolbarGuideItems() {
+        const inlineIcon = currentInlineNoteIcon || 'ℹ️';
+        return [
+            { icon: UI_ICON_STRINGS.codeToggle, shortName: 'Pegado HTML', codeName: 'toggle-html-paste', description: 'Activa o desactiva el pegado con formato HTML en el editor.', isHtml: true },
+            { icon: '✋', shortName: 'Arrastrar bloques', codeName: 'toggle-block-drag', description: 'Activa el modo para reorganizar bloques arrastrándolos.' },
+            { icon: UI_ICON_STRINGS.fullscreen, shortName: 'Pantalla amplia', codeName: 'toggle-fullscreen', description: 'Expande el editor para trabajar en modo casi pantalla completa.', isHtml: true },
+            { icon: UI_ICON_STRINGS.noteInfo, shortName: 'Información nota', codeName: 'note-info-toggle', description: 'Abre el resumen de palabras, peso y últimos cambios de la nota.', isHtml: true },
+            { icon: UI_ICON_STRINGS.quickNote, shortName: 'Nota amarilla', codeName: 'quick-note', description: 'Abre la nota adhesiva asociada para apuntes rápidos.', isHtml: true },
+            { icon: UI_ICON_STRINGS.readonly, shortName: 'Solo ver', codeName: 'toggle-readonly', description: 'Alterna entre modo lectura y edición del contenido.', isHtml: true },
+            { icon: UI_ICON_STRINGS.importNote, shortName: 'Importar HTML', codeName: 'import-note', description: 'Carga una nota desde un archivo HTML o de texto plano.', isHtml: true },
+            { icon: UI_ICON_STRINGS.exportNote, shortName: 'Exportar HTML', codeName: 'export-note', description: 'Descarga la nota actual como archivo HTML.', isHtml: true },
+            { icon: UI_ICON_STRINGS.minimize, shortName: 'Minimizar', codeName: 'minimize-note', description: 'Oculta temporalmente la ventana del editor y deja un acceso para restaurarla.', isHtml: true },
+            { icon: '🔤', shortName: 'Fuente', codeName: 'font-select', description: 'Cambia la familia tipográfica del texto seleccionado.' },
+            { icon: '🔍', shortName: 'Zoom', codeName: 'editor-zoom', description: 'Ajusta el nivel de zoom del área de edición.' },
+            { icon: 'A↕', shortName: 'Tamaño (lista)', codeName: 'font-size-select', description: 'Aplica tamaños predefinidos a la fuente.' },
+            { icon: 'A−', shortName: 'Reducir tamaño', codeName: 'font-size-dec', description: 'Reduce proporcionalmente la fuente del bloque seleccionado.' },
+            { icon: 'A+', shortName: 'Aumentar tamaño', codeName: 'font-size-inc', description: 'Aumenta proporcionalmente la fuente del bloque seleccionado.' },
+            { icon: '↕︎', shortName: 'Interlineado (lista)', codeName: 'line-height-select', description: 'Define un interlineado preestablecido para el párrafo.' },
+            { icon: '↕−', shortName: 'Reducir interlineado', codeName: 'line-height-dec', description: 'Reduce el espacio vertical del bloque seleccionado.' },
+            { icon: '↕+', shortName: 'Aumentar interlineado', codeName: 'line-height-inc', description: 'Amplía el espacio vertical del bloque seleccionado.' },
+            { icon: '<b>B</b>', shortName: 'Negrita', codeName: 'bold', description: 'Aplica negrita al texto seleccionado.', isHtml: true },
+            { icon: '<i>I</i>', shortName: 'Cursiva', codeName: 'italic', description: 'Aplica cursiva al texto seleccionado.', isHtml: true },
+            { icon: '<u>U</u>', shortName: 'Subrayado', codeName: 'underline', description: 'Subraya el texto seleccionado.', isHtml: true },
+            { icon: '<s>S</s>', shortName: 'Tachado', codeName: 'strikethrough', description: 'Tacha el texto seleccionado.', isHtml: true },
+            { icon: 'X²', shortName: 'Superíndice', codeName: 'superscript', description: 'Eleva el texto seleccionado como superíndice.' },
+            { icon: '↺', shortName: 'Deshacer', codeName: 'undo', description: 'Revierte la última acción realizada.' },
+            { icon: '↻', shortName: 'Rehacer', codeName: 'redo', description: 'Reaplica la última acción revertida.' },
+            { icon: '❌', shortName: 'Limpiar formato', codeName: 'clear-format', description: 'Elimina estilos y clases del texto seleccionado.' },
+            { icon: '✨', shortName: 'Mejorar texto', codeName: 'ai-improve', description: 'Envía el fragmento seleccionado a la IA para mejorar su redacción.' },
+            { icon: '📝', shortName: 'Insertar nota', codeName: 'insert-callout', description: 'Abre el panel de estilos para insertar una nota destacada.' },
+            { icon: inlineIcon, shortName: 'Nota en línea', codeName: 'inline-note', description: 'Inserta una nota compacta dentro del texto con el icono activo.' },
+            { icon: '🎯', shortName: 'Icono nota en línea', codeName: 'inline-note-icon', description: 'Selecciona el icono que usarán las notas en línea.' },
+            { icon: UI_ICON_STRINGS.type, shortName: 'Color de texto', codeName: 'text-color', description: 'Aplica un color al texto seleccionado.', isHtml: true },
+            { icon: UI_ICON_STRINGS.highlighter, shortName: 'Resaltado', codeName: 'highlight-color', description: 'Resalta el fondo del texto seleccionado.', isHtml: true },
+            { icon: UI_ICON_STRINGS.highlighter, shortName: 'Fondo de línea', codeName: 'line-highlight', description: 'Pinta el fondo de toda la línea para destacarla.', isHtml: true },
+            { icon: '🖌️', shortName: 'Estilos de texto', codeName: 'preset-styles', description: 'Despliega estilos predefinidos para títulos y bloques.' },
+            { icon: '💊', shortName: 'Texto píldora', codeName: 'pill-text', description: 'Convierte el texto seleccionado en una etiqueta tipo pastilla.' },
+            { icon: UI_ICON_STRINGS.highlightSize, shortName: 'Altura de destacado', codeName: 'highlight-spacing', description: 'Ajusta el espacio superior e inferior de los bloques resaltados.', isHtml: true },
+            { icon: '—', shortName: 'Línea separadora', codeName: 'insert-divider', description: 'Inserta una línea divisoria editable en el documento.' },
+            { icon: UI_ICON_STRINGS.indentDecrease, shortName: 'Disminuir sangría', codeName: 'indent-decrease', description: 'Reduce la sangría del bloque seleccionado.', isHtml: true },
+            { icon: UI_ICON_STRINGS.indentIncrease, shortName: 'Aumentar sangría', codeName: 'indent-increase', description: 'Incrementa la sangría del bloque seleccionado.', isHtml: true },
+            { icon: '↤', shortName: 'Corregir sangría inversa', codeName: 'fix-outdent', description: 'Elimina manualmente sangrías sobrantes hacia la izquierda.' },
+            { icon: '↦', shortName: 'Corregir sangría bloque', codeName: 'fix-indent', description: 'Ajusta la sangría de todos los elementos del bloque.' },
+            { icon: '⬆️⏎', shortName: 'Línea en blanco arriba', codeName: 'blank-line-above', description: 'Inserta una línea en blanco por encima del bloque actual.' },
+            { icon: '🧹', shortName: 'Borrado rápido', codeName: 'erase-block', description: 'Activa el modo para limpiar con un clic el contenido de un bloque.' },
+            { icon: '🗑️⏎', shortName: 'Eliminar bloque', codeName: 'delete-line', description: 'Elimina completamente el bloque donde está el cursor.' },
+            { icon: UI_ICON_STRINGS.collapsibleList, shortName: 'Lista colapsable', codeName: 'collapsible-list', description: 'Inserta una lista con elementos que se pueden expandir o contraer.', isHtml: true },
+            { icon: '&lt;/&gt;', shortName: 'Insertar HTML', codeName: 'insert-html', description: 'Abre el modal para pegar código HTML personalizado.', isHtml: true },
+            { icon: '&lt;HTML&gt;', shortName: 'Ver HTML', codeName: 'view-html', description: 'Muestra el HTML del contenido seleccionado en el editor.', isHtml: true },
+            { icon: '↔️', shortName: 'Redimensionar nota', codeName: 'resize-note', description: 'Permite ajustar el ancho de las notas destacadas.' },
+            { icon: UI_ICON_STRINGS.subnote, shortName: 'Añadir sub-nota', codeName: 'add-subnote', description: 'Crea una sub-nota vinculada al punto actual.', isHtml: true },
+            { icon: '🖼️', shortName: 'Imagen flotante', codeName: 'float-image', description: 'Alterna el estilo de imagen flotante izquierda/derecha.' },
+            { icon: '🖼️🖼️', shortName: 'Imágenes en fila', codeName: 'images-inline', description: 'Coloca las imágenes seleccionadas una junto a la otra.' },
+            { icon: UI_ICON_STRINGS.gallery, shortName: 'Galería', codeName: 'image-gallery', description: 'Abre el editor de galerías para asociar varias imágenes.', isHtml: true },
+            { icon: '➕', shortName: 'Ampliar imagen', codeName: 'image-grow', description: 'Aumenta un 10% el tamaño de la imagen o tabla seleccionada.' },
+            { icon: '➖', shortName: 'Reducir imagen', codeName: 'image-shrink', description: 'Disminuye un 10% el tamaño de la imagen o tabla seleccionada.' },
+            { icon: '⬅️', shortName: 'Mover a la izquierda', codeName: 'move-left', description: 'Desplaza la imagen o tabla seleccionada hacia la izquierda.' },
+            { icon: '➡️', shortName: 'Mover a la derecha', codeName: 'move-right', description: 'Desplaza la imagen o tabla seleccionada hacia la derecha.' },
+            { icon: '💾', shortName: 'Imprimir/PDF', codeName: 'print-export', description: 'Genera una vista preparada para impresión o guardado como PDF.' },
+            { icon: '📌', shortName: 'Símbolos rápidos', codeName: 'insert-symbol', description: 'Abre el menú de iconos guardados para insertarlos en el texto.' },
+            { icon: 'Ω', shortName: 'Caracteres especiales', codeName: 'special-chars', description: 'Muestra los caracteres especiales configurados para insertar.' }
+        ];
     }
 
     notesEditor.addEventListener('click', (e) => {
@@ -3973,8 +4155,8 @@ ${exportTable.outerHTML}
             });
         };
 
-        const typeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-type w-4 h-4"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>`;
-        const highlighterIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-highlighter w-4 h-4"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>`;
+        const typeIcon = UI_ICON_STRINGS.type;
+        const highlighterIcon = UI_ICON_STRINGS.highlighter;
 
         const textPalette = createColorPalette('Color de Texto', applyForeColor, textColors, extraTextColors, typeIcon);
         editorToolbar.appendChild(textPalette);
@@ -4626,8 +4808,7 @@ ${exportTable.outerHTML}
         const createHighlightSizeDropdown = () => {
             const dropdown = document.createElement('div');
             dropdown.className = 'symbol-dropdown';
-    
-            const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up-down w-4 h-4"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>`;
+            const iconSVG = UI_ICON_STRINGS.highlightSize;
             const btn = createButton('Ajustar altura de destacado', iconSVG, null, null, null);
             dropdown.appendChild(btn);
     
@@ -4800,8 +4981,8 @@ ${exportTable.outerHTML}
             if (!lineStylePopup.contains(e.target)) hideLineStylePopup();
         });
 
-        const outdentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-decrease w-5 h-5"><polyline points="7 8 3 12 7 16"/><line x1="21" x2="3" y1="12" y2="12"/><line x1="21" x2="3" y1="6" y2="6"/><line x1="21" x2="3" y1="18" y2="18"/></svg>`;
-        const indentSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-indent-increase w-5 h-5"><polyline points="17 8 21 12 17 16"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="17" y1="6" y2="6"/><line x1="3" x2="17" y1="18" y2="18"/></svg>`;
+        const outdentSVG = UI_ICON_STRINGS.indentDecrease;
+        const indentSVG = UI_ICON_STRINGS.indentIncrease;
         editorToolbar.appendChild(createButton('Disminuir sangría', outdentSVG, null, null, () => adjustIndent(-1, notesEditor)));
         editorToolbar.appendChild(createButton('Aumentar sangría', indentSVG, null, null, () => adjustIndent(1, notesEditor)));
         editorToolbar.appendChild(createButton('Corregir sangría inversa', '↤', null, null, () => manualOutdentBlock(notesEditor)));
@@ -4866,7 +5047,7 @@ ${exportTable.outerHTML}
         });
         editorToolbar.appendChild(deleteLineBtn);
 
-        const collapsibleListSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-tree w-5 h-5"><path d="M21 7H9"/><path d="M21 12H9"/><path d="M21 17H9"/><path d="M3 17v-6a4 4 0 0 1 4-4h4"/></svg>`;
+        const collapsibleListSVG = UI_ICON_STRINGS.collapsibleList;
         const collapsibleListHTML = `<details class="collapsible-list"><summary>Elemento</summary><div>Texto...<br></div></details><p><br></p>`;
 
         editorToolbar.appendChild(createButton('Insertar lista colapsable', collapsibleListSVG, 'insertHTML', collapsibleListHTML));
@@ -4987,7 +5168,7 @@ ${exportTable.outerHTML}
         });
         editorToolbar.appendChild(resizeCalloutBtn);
 
-        const subnoteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-pen-line w-5 h-5"><path d="m18 12-4 4-1 4 4-1 4-4"/><path d="M12 22h6"/><path d="M7 12h10"/><path d="M5 17h10"/><path d="M5 7h10"/><path d="M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>`;
+        const subnoteSVG = UI_ICON_STRINGS.subnote;
         // El botón ahora crea una sub-nota en lugar de un Post-it
         editorToolbar.appendChild(createButton('Añadir Sub-nota', subnoteSVG, null, null, createSubnoteLink));
 

@@ -25,6 +25,7 @@
             <div id="note-tabs"></div>
         </div>
         <button id="tabs-next" class="tab-nav hidden">▶</button>
+        <button id="tab-guide-btn" class="tab-nav" title="Guía de controles">❔</button>
         <button id="tab-config-btn" class="tab-nav" title="Configuración">⚙️</button>
         <div id="tab-config-panel" class="hidden">
             <label><input type="checkbox" id="tab-bar-toggle" checked> Mostrar barra</label>
@@ -635,6 +636,19 @@
                 <button id="cancel-note-style-btn" class="px-3 py-1 bg-gray-500 text-white rounded">Cancelar</button>
                 <button id="apply-note-style-btn" class="px-3 py-1 bg-blue-600 text-white rounded">Aplicar</button>
             </div>
+        </div>
+    </div>
+
+    <div id="ui-guide-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-4xl">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 class="text-xl font-bold">Guía de botones y ventanas</h3>
+                    <p class="text-sm text-text-muted mt-1">Consulta el nombre corto, código y función de cada control para comunicar cambios con precisión.</p>
+                </div>
+                <button id="close-ui-guide-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700" title="Cerrar guía">✖️</button>
+            </div>
+            <div id="ui-guide-sections" class="space-y-6 overflow-y-auto" style="max-height:70vh"></div>
         </div>
     </div>
 

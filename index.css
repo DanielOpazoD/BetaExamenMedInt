@@ -145,19 +145,61 @@
             background-color: var(--btn-primary-bg);
             color: var(--btn-primary-text);
         }
-        .note-icon.has-note:hover {
+.note-icon.has-note:hover {
              background-color: var(--btn-primary-bg);
              filter: brightness(1.15);
         }
 
-        .section-cover-icon.has-cover {
+.section-cover-icon.has-cover {
             background-color: var(--btn-primary-bg);
             color: var(--btn-primary-text);
         }
-        .section-cover-icon.has-cover:hover {
+.section-cover-icon.has-cover:hover {
             background-color: var(--btn-primary-bg);
             filter: brightness(1.15);
         }
+
+.ui-guide-section h4 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.ui-guide-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    background-color: var(--modal-bg);
+}
+
+.ui-guide-table th,
+.ui-guide-table td {
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 0.75rem;
+    vertical-align: top;
+}
+
+.ui-guide-table thead th {
+    background-color: var(--header-bg);
+    color: var(--header-text);
+    position: static;
+}
+
+.ui-guide-table tbody tr:nth-child(even) {
+    background-color: var(--bg-tertiary);
+}
+
+.ui-guide-table .icon-cell {
+    width: 3.5rem;
+    text-align: center;
+    font-size: 1.3rem;
+    white-space: nowrap;
+}
+
+.ui-guide-table .code-cell {
+    font-family: 'Fira Code', 'SFMono-Regular', 'Menlo', monospace;
+    font-size: 0.85rem;
+}
         
         .confidence-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #d1d5db; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; }
         html.dark .confidence-dot { border-color: #4b5563; }
