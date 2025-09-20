@@ -25,6 +25,7 @@
             <div id="note-tabs"></div>
         </div>
         <button id="tabs-next" class="tab-nav hidden">▶</button>
+        <button id="toolbar-help-btn" class="tab-nav" title="Guía de botones">❔</button>
         <button id="tab-config-btn" class="tab-nav" title="Configuración">⚙️</button>
         <div id="tab-config-panel" class="hidden">
             <label><input type="checkbox" id="tab-bar-toggle" checked> Mostrar barra</label>
@@ -416,7 +417,33 @@
             </div>
         </div>
     </div>
-    
+
+
+    <div id="toolbar-help-modal" class="modal-overlay">
+        <div class="modal-content w-full max-w-4xl">
+            <div class="flex items-start justify-between mb-4 gap-4">
+                <div>
+                    <h3 class="text-xl font-bold">Guía de botones</h3>
+                    <p class="text-sm text-text-secondary mt-1">Consulta el significado de cada control disponible en el editor y sus ventanas.</p>
+                </div>
+                <button id="toolbar-help-close" class="toolbar-btn" title="Cerrar guía">✖️</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm help-table">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="w-20">Icono</th>
+                            <th scope="col">Nombre corto</th>
+                            <th scope="col" class="w-56">Nombre código</th>
+                            <th scope="col">Función</th>
+                        </tr>
+                    </thead>
+                    <tbody id="toolbar-help-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
 
     <div id="html-code-modal" class="modal-overlay">
         <div class="modal-content w-full max-w-3xl">
