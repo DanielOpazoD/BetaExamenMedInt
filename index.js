@@ -1694,8 +1694,11 @@ document.addEventListener('DOMContentLoaded', function () {
             { icon: '↤', shortName: 'Corregir sangría inversa', codeName: 'fix-outdent', description: 'Elimina manualmente sangrías sobrantes hacia la izquierda.' },
             { icon: '↦', shortName: 'Corregir sangría bloque', codeName: 'fix-indent', description: 'Ajusta la sangría de todos los elementos del bloque.' },
             { icon: '⬆️⏎', shortName: 'Línea en blanco arriba', codeName: 'blank-line-above', description: 'Inserta una línea en blanco por encima del bloque actual.' },
-            { icon: '🧹', shortName: 'Borrado rápido', codeName: 'erase-block', description: 'Activa el modo para limpiar con un clic el contenido de un bloque.' },
-            { icon: '🗑️⏎', shortName: 'Eliminar bloque', codeName: 'delete-line', description: 'Elimina completamente el bloque donde está el cursor.' },
+            { icon: '⬇️⏎', shortName: 'Línea en blanco abajo', codeName: 'blank-line-below', description: 'Inserta una línea en blanco por debajo del bloque o selección actual.' },
+            { icon: '🧹', shortName: 'Borrado por área', codeName: 'erase-block', description: 'Permite arrastrar un rectángulo para eliminar todas las líneas comprendidas en esa zona.' },
+            { icon: '🗑️⏎', shortName: 'Eliminar línea', codeName: 'delete-line', description: 'Elimina únicamente la línea donde está el cursor, incluyendo viñetas.' },
+            { icon: '•✚', shortName: 'Viñetas', codeName: 'bullet-styles', description: 'Inserta listas con distintos estilos de viñetas o numeración.' },
+            { icon: '•✖', shortName: 'Quitar viñetas', codeName: 'remove-bullets', description: 'Convierte los elementos con viñetas seleccionados en párrafos normales.' },
             { icon: UI_ICON_STRINGS.collapsibleList, shortName: 'Lista colapsable', codeName: 'collapsible-list', description: 'Inserta una lista con elementos que se pueden expandir o contraer.', isHtml: true },
             { icon: '&lt;/&gt;', shortName: 'Insertar HTML', codeName: 'insert-html', description: 'Abre el modal para pegar código HTML personalizado.', isHtml: true },
             { icon: '&lt;HTML&gt;', shortName: 'Ver HTML', codeName: 'view-html', description: 'Muestra el HTML del contenido seleccionado en el editor.', isHtml: true },
@@ -1714,13 +1717,7 @@ document.addEventListener('DOMContentLoaded', function () {
         ];
     }
 
-    notesEditor.addEventListener('click', (e) => {
-        if (!lineEraseMode) return;
-        const block = e.target.closest('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details');
-        if (block && notesEditor.contains(block)) {
-            block.innerHTML = '<br>';
-        }
-    });
+    // Line erase mode helpers are declared inside the toolbar setup where the button is defined
 
     // ------------------------------------------------------------------------
     // Icon Manager and Character Manager Functions
@@ -2125,7 +2122,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         table.dataset.cellLineHeight = '1.4';
         table.dataset.cellPadding = '6';
+        table.dataset.tableMarginTop = table.dataset.tableMarginTop || '12';
+        table.dataset.tableMarginBottom = table.dataset.tableMarginBottom || '12';
         applyTableSpacing(table, 1.4, 6);
+        applyTableMargins(table, parseFloat(table.dataset.tableMarginTop), parseFloat(table.dataset.tableMarginBottom));
         // Insertar la tabla en la posición actual del cursor mediante Range
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0) {
@@ -3947,6 +3947,13 @@ ${exportTable.outerHTML}
 
         let presetVariantIdCounter = 0;
 
+        const formatPresetLabel = (label) => {
+            if (!label) return '';
+            const cleaned = label.replace(/^Estilo\s+/i, '').trim();
+            if (!cleaned) return label.trim();
+            return cleaned.replace(/^./, (c) => c.toUpperCase());
+        };
+
         const renderPresetStyleList = (container, { onSelectStyle }) => {
             container.innerHTML = '';
             const entries = [];
@@ -3960,12 +3967,6 @@ ${exportTable.outerHTML}
                 if (typeof onSelectStyle === 'function') {
                     onSelectStyle(style, { closeAll });
                 }
-            };
-            const formatPresetLabel = (label) => {
-                if (!label) return '';
-                const cleaned = label.replace(/^Estilo\s+/i, '').trim();
-                if (!cleaned) return label.trim();
-                return cleaned.replace(/^./, (c) => c.toUpperCase());
             };
             const createPreview = (label, style, badgeText = '') => {
                 const preview = document.createElement('span');
@@ -4227,9 +4228,163 @@ ${exportTable.outerHTML}
 
         const highlightPalette = createColorPalette('Color de Resaltado', applyHiliteColor, highlightColors, extraHighlightColors, highlighterIcon);
         editorToolbar.appendChild(highlightPalette);
-        
+
         const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
         editorToolbar.appendChild(lineHighlightPalette);
+
+        const convertListTag = (list, tagName) => {
+            if (!list || list.tagName.toLowerCase() === tagName.toLowerCase()) return list;
+            const newList = document.createElement(tagName);
+            newList.className = list.className;
+            Array.from(list.attributes).forEach(attr => {
+                if (attr.name !== 'style') {
+                    newList.setAttribute(attr.name, attr.value);
+                }
+            });
+            if (list.getAttribute('style')) {
+                newList.setAttribute('style', list.getAttribute('style'));
+            }
+            Object.entries(list.dataset || {}).forEach(([key, value]) => {
+                newList.dataset[key] = value;
+            });
+            while (list.firstChild) {
+                newList.appendChild(list.firstChild);
+            }
+            list.parentNode?.replaceChild(newList, list);
+            return newList;
+        };
+
+        const applyBulletStyle = ({ listTag, style }) => {
+            document.execCommand(listTag === 'ol' ? 'insertOrderedList' : 'insertUnorderedList', false, null);
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            const range = selection.getRangeAt(0);
+            const targets = new Set();
+            getSelectedBlockElements().forEach(block => {
+                const list = block?.closest('ul, ol');
+                if (list) targets.add(list);
+            });
+            const anchorList = range.startContainer?.closest?.('ul, ol');
+            if (anchorList) targets.add(anchorList);
+            targets.forEach(list => {
+                if (!list) return;
+                let targetList = list;
+                if (listTag === 'ul' && list.tagName !== 'UL') {
+                    targetList = convertListTag(list, 'ul');
+                } else if (listTag === 'ol' && list.tagName !== 'OL') {
+                    targetList = convertListTag(list, 'ol');
+                }
+                if (!targetList) return;
+                targetList.style.listStyleType = style;
+                targetList.dataset.listStyleType = style;
+            });
+            recordHistory();
+        };
+
+        const bulletOptions = [
+            { label: 'Viñeta clásica', preview: '•', listTag: 'ul', style: 'disc' },
+            { label: 'Viñeta hueca', preview: '○', listTag: 'ul', style: 'circle' },
+            { label: 'Viñeta cuadrada', preview: '■', listTag: 'ul', style: 'square' },
+            { label: 'Numerada', preview: '1.', listTag: 'ol', style: 'decimal' },
+            { label: 'Romanos', preview: 'I.', listTag: 'ol', style: 'upper-roman' }
+        ];
+
+        const bulletDropdown = document.createElement('div');
+        bulletDropdown.className = 'symbol-dropdown bullet-style-dropdown';
+        const bulletBtn = document.createElement('button');
+        bulletBtn.type = 'button';
+        bulletBtn.className = 'toolbar-btn';
+        bulletBtn.title = 'Insertar viñetas';
+        bulletBtn.innerHTML = '•✚';
+        bulletBtn.addEventListener('mousedown', (event) => event.preventDefault());
+        const bulletMenu = document.createElement('div');
+        bulletMenu.className = 'symbol-dropdown-content bullet-style-menu';
+        bulletOptions.forEach(option => {
+            const optionBtn = document.createElement('button');
+            optionBtn.type = 'button';
+            optionBtn.className = 'toolbar-btn bullet-style-option';
+            optionBtn.innerHTML = `<span class="bullet-preview">${option.preview}</span><span class="bullet-option-label">${option.label}</span>`;
+            optionBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                withEditorSelection(() => applyBulletStyle(option));
+                bulletMenu.classList.remove('visible');
+                notesEditor.focus({ preventScroll: true });
+            });
+            bulletMenu.appendChild(optionBtn);
+        });
+        bulletDropdown.appendChild(bulletBtn);
+        bulletDropdown.appendChild(bulletMenu);
+        bulletBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(el => {
+                if (el !== bulletMenu) el.classList.remove('visible');
+            });
+            bulletMenu.classList.toggle('visible');
+        });
+        document.addEventListener('click', (event) => {
+            if (!bulletDropdown.contains(event.target)) {
+                bulletMenu.classList.remove('visible');
+            }
+        });
+        editorToolbar.appendChild(bulletDropdown);
+
+        const removeBullets = () => {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            const scrollY = window.scrollY;
+            const modalScroll = notesModalContent.scrollTop;
+            const lists = new Set();
+            getSelectedBlockElements().forEach(block => {
+                const li = block?.closest('li');
+                if (li) lists.add(li.parentElement);
+            });
+            const anchorLi = selection.anchorNode?.closest?.('li');
+            if (anchorLi) lists.add(anchorLi.parentElement);
+            if (!lists.size) return;
+            let focusTarget = null;
+            lists.forEach(list => {
+                if (!list) return;
+                const fragment = document.createDocumentFragment();
+                Array.from(list.children).forEach(item => {
+                    if (item.tagName !== 'LI') return;
+                    const paragraph = document.createElement('p');
+                    while (item.firstChild) {
+                        paragraph.appendChild(item.firstChild);
+                    }
+                    if (!paragraph.textContent.trim()) {
+                        paragraph.innerHTML = '<br>';
+                    }
+                    if (!focusTarget) focusTarget = paragraph;
+                    fragment.appendChild(paragraph);
+                });
+                if (fragment.childNodes.length) {
+                    list.parentNode?.insertBefore(fragment, list);
+                }
+                list.remove();
+            });
+            if (focusTarget) {
+                moveCaretToElementStart(focusTarget);
+            }
+            recordHistory();
+            window.scrollTo(0, scrollY);
+            notesModalContent.scrollTop = modalScroll;
+            notesEditor.focus({ preventScroll: true });
+        };
+
+        const removeBulletsBtn = document.createElement('button');
+        removeBulletsBtn.type = 'button';
+        removeBulletsBtn.className = 'toolbar-btn';
+        removeBulletsBtn.title = 'Eliminar viñetas';
+        removeBulletsBtn.innerHTML = '•✖';
+        removeBulletsBtn.addEventListener('mousedown', (event) => event.preventDefault());
+        removeBulletsBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            removeBullets();
+        });
+        editorToolbar.appendChild(removeBulletsBtn);
+
         editorToolbar.appendChild(createPresetStyleDropdown());
 
         const inlineColorMenu = document.createElement('div');
@@ -4483,73 +4638,131 @@ ${exportTable.outerHTML}
 
         // Popup to change existing preset styles
         const stylePopup = document.createElement('div');
-        stylePopup.className = 'preset-style-popup symbol-dropdown-content preset-style-panel';
+        stylePopup.className = 'styled-style-popup';
         document.body.appendChild(stylePopup);
         let currentStyledSpan = null;
-        let currentStyleListControls = null;
+
+        const renderStyledPopup = () => {
+            stylePopup.innerHTML = '';
+            const header = document.createElement('div');
+            header.className = 'styled-style-popup-header';
+            const title = document.createElement('span');
+            title.textContent = 'Cambiar estilo';
+            header.appendChild(title);
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.className = 'styled-style-popup-close';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.addEventListener('click', hideStylePopup);
+            header.appendChild(closeBtn);
+            stylePopup.appendChild(header);
+
+            const grid = document.createElement('div');
+            grid.className = 'styled-style-popup-grid';
+
+            PRESET_STYLE_GROUPS.forEach(group => {
+                const card = document.createElement('div');
+                card.className = 'styled-style-card';
+
+                const mainBtn = document.createElement('button');
+                mainBtn.type = 'button';
+                mainBtn.className = 'styled-style-main';
+                const mainPreview = document.createElement('span');
+                mainPreview.className = 'styled-style-preview';
+                mainPreview.setAttribute('style', group.style);
+                mainPreview.textContent = formatPresetLabel(group.label);
+                mainBtn.appendChild(mainPreview);
+                mainBtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    if (!currentStyledSpan) return;
+                    applyPresetStyle(group.style, currentStyledSpan);
+                    hideStylePopup();
+                    notesEditor.focus({ preventScroll: true });
+                });
+                card.appendChild(mainBtn);
+
+                if (group.variants && group.variants.length) {
+                    const variantsRow = document.createElement('div');
+                    variantsRow.className = 'styled-style-variants';
+                    group.variants.forEach(variant => {
+                        const variantBtn = document.createElement('button');
+                        variantBtn.type = 'button';
+                        variantBtn.className = 'styled-style-variant-btn';
+                        const variantPreview = document.createElement('span');
+                        variantPreview.className = 'styled-style-preview';
+                        variantPreview.setAttribute('style', variant.style);
+                        variantPreview.textContent = formatPresetLabel(variant.label);
+                        variantBtn.appendChild(variantPreview);
+                        const variantName = document.createElement('span');
+                        variantName.className = 'styled-style-variant-label';
+                        const labelText = variant.label.replace(`${group.label} `, '').trim();
+                        variantName.textContent = labelText || 'Variante';
+                        variantBtn.appendChild(variantName);
+                        variantBtn.addEventListener('click', (event) => {
+                            event.preventDefault();
+                            if (!currentStyledSpan) return;
+                            applyPresetStyle(variant.style, currentStyledSpan);
+                            hideStylePopup();
+                            notesEditor.focus({ preventScroll: true });
+                        });
+                        variantsRow.appendChild(variantBtn);
+                    });
+                    card.appendChild(variantsRow);
+                }
+
+                grid.appendChild(card);
+            });
+
+            stylePopup.appendChild(grid);
+        };
 
         const hideStylePopup = () => {
-            stylePopup.style.display = 'none';
-            stylePopup.style.visibility = 'hidden';
             stylePopup.classList.remove('visible');
             currentStyledSpan = null;
-            if (currentStyleListControls) {
-                currentStyleListControls.closeAll();
-                currentStyleListControls = null;
-            }
         };
 
         const showStylePopup = (span) => {
             currentStyledSpan = span;
-            currentStyleListControls = buildPresetStylePanel(stylePopup, (style) => {
-                if (!currentStyledSpan) return;
-                applyPresetStyle(style, currentStyledSpan);
-                hideStylePopup();
-                notesEditor.focus({ preventScroll: true });
-            });
-            stylePopup.style.display = 'flex';
+            renderStyledPopup();
             stylePopup.classList.add('visible');
-            const editorRect = notesEditor.getBoundingClientRect();
-            const availableWidth = Math.max(280, editorRect.width - 32);
-            const popupMaxWidth = Math.min(560, availableWidth);
-            const popupMinWidth = Math.min(Math.max(320, availableWidth), popupMaxWidth);
-            stylePopup.style.minWidth = `${popupMinWidth}px`;
-            stylePopup.style.maxWidth = `${popupMaxWidth}px`;
-            stylePopup.style.visibility = 'hidden';
-            stylePopup.style.top = '0px';
-            stylePopup.style.left = '0px';
             requestAnimationFrame(() => {
                 if (!currentStyledSpan) return;
-                const rect = span.getBoundingClientRect();
+                const editorRect = notesEditor.getBoundingClientRect();
+                const desiredWidth = Math.min(560, Math.max(320, editorRect.width - 16));
+                stylePopup.style.maxWidth = `${desiredWidth}px`;
+                const spanRect = span.getBoundingClientRect();
                 const popupRect = stylePopup.getBoundingClientRect();
-                let top = rect.bottom + window.scrollY + 8;
-                if (top + popupRect.height > window.scrollY + window.innerHeight) {
-                    top = rect.top + window.scrollY - popupRect.height - 8;
+                let top = spanRect.bottom + window.scrollY + 8;
+                if (top + popupRect.height > window.scrollY + window.innerHeight - 8) {
+                    top = spanRect.top + window.scrollY - popupRect.height - 8;
                 }
-                let left = rect.left + window.scrollX;
-                if (left + popupRect.width > window.scrollX + window.innerWidth) {
-                    left = window.scrollX + window.innerWidth - popupRect.width - 8;
+                let left = spanRect.left + window.scrollX;
+                if (left + popupRect.width > window.scrollX + window.innerWidth - 8) {
+                    left = Math.max(window.scrollX + 8, window.scrollX + window.innerWidth - popupRect.width - 8);
                 }
                 stylePopup.style.top = `${Math.max(window.scrollY + 8, top)}px`;
                 stylePopup.style.left = `${Math.max(window.scrollX + 8, left)}px`;
-                stylePopup.style.visibility = 'visible';
             });
         };
 
         hideStylePopup();
 
-        notesEditor.addEventListener('click', (e) => {
-            const span = e.target.closest('span[data-preset-style]');
-            if (span) {
-                currentStyledSpan = span;
-                showStylePopup(span);
-                e.stopPropagation();
-            } else {
+        notesEditor.addEventListener('dblclick', (event) => {
+            const span = event.target.closest('span[data-preset-style]');
+            if (!span) return;
+            event.preventDefault();
+            event.stopPropagation();
+            showStylePopup(span);
+        });
+
+        notesEditor.addEventListener('click', (event) => {
+            if (!event.target.closest('span[data-preset-style]')) {
                 hideStylePopup();
             }
         });
-        document.addEventListener('click', (e) => {
-            if (!stylePopup.contains(e.target)) hideStylePopup();
+
+        document.addEventListener('click', (event) => {
+            if (!stylePopup.contains(event.target)) hideStylePopup();
         });
 
         // --- Pills text styles ---
@@ -4807,6 +5020,20 @@ ${exportTable.outerHTML}
             }
             initTableResize(table);
         };
+        const applyTableMargins = (table, top, bottom) => {
+            if (!table) return;
+            const topValue = Number.isFinite(top) ? top : parseFloat(table.dataset.tableMarginTop || '12');
+            const bottomValue = Number.isFinite(bottom) ? bottom : parseFloat(table.dataset.tableMarginBottom || '12');
+            if (Number.isFinite(topValue)) {
+                table.style.marginTop = `${topValue}px`;
+                table.dataset.tableMarginTop = `${topValue}`;
+            }
+            if (Number.isFinite(bottomValue)) {
+                table.style.marginBottom = `${bottomValue}px`;
+                table.dataset.tableMarginBottom = `${bottomValue}`;
+            }
+        };
+
         const ensureSpacingState = (table) => {
             if (!table) return;
             const firstCell = table.querySelector('th, td');
@@ -4829,6 +5056,22 @@ ${exportTable.outerHTML}
             }
             if (!table.dataset.cellLineHeight) table.dataset.cellLineHeight = '1.4';
             if (!table.dataset.cellPadding) table.dataset.cellPadding = '6';
+            const computedTableStyle = window.getComputedStyle(table);
+            if (!table.dataset.tableMarginTop) {
+                const marginTop = parseFloat(computedTableStyle.marginTop);
+                if (!Number.isNaN(marginTop)) {
+                    table.dataset.tableMarginTop = String(Math.round(marginTop));
+                }
+            }
+            if (!table.dataset.tableMarginBottom) {
+                const marginBottom = parseFloat(computedTableStyle.marginBottom);
+                if (!Number.isNaN(marginBottom)) {
+                    table.dataset.tableMarginBottom = String(Math.round(marginBottom));
+                }
+            }
+            if (!table.dataset.tableMarginTop) table.dataset.tableMarginTop = '12';
+            if (!table.dataset.tableMarginBottom) table.dataset.tableMarginBottom = '12';
+            applyTableMargins(table, parseFloat(table.dataset.tableMarginTop), parseFloat(table.dataset.tableMarginBottom));
         };
         const applyTableSpacing = (table, lineHeight, padding) => {
             if (!table) return;
@@ -5020,10 +5263,19 @@ ${exportTable.outerHTML}
 
                 let currentLineHeight = parseFloat(table.dataset.cellLineHeight || '1.4');
                 let currentPadding = parseFloat(table.dataset.cellPadding || '6');
+                let currentMarginTop = parseFloat(table.dataset.tableMarginTop || '12');
+                let currentMarginBottom = parseFloat(table.dataset.tableMarginBottom || '12');
+                const defaultMarginTop = currentMarginTop;
+                const defaultMarginBottom = currentMarginBottom;
                 const updateSpacing = (lineHeight, padding) => {
                     currentLineHeight = parseFloat(lineHeight);
                     currentPadding = parseFloat(padding);
                     applyTableSpacing(table, currentLineHeight, currentPadding);
+                };
+                const updateMargins = (marginTop, marginBottom) => {
+                    currentMarginTop = parseFloat(marginTop);
+                    currentMarginBottom = parseFloat(marginBottom);
+                    applyTableMargins(table, currentMarginTop, currentMarginBottom);
                 };
 
                 const createSlider = (label, min, max, step, value, formatter, onInput) => {
@@ -5061,6 +5313,14 @@ ${exportTable.outerHTML}
                 });
                 spacingSection.appendChild(lineHeightSlider.element);
                 spacingSection.appendChild(paddingSlider.element);
+                const marginTopSlider = createSlider('Espacio superior', 0, 64, 1, currentMarginTop, (v) => `${Math.round(parseFloat(v))} px`, (val) => {
+                    updateMargins(val, currentMarginBottom);
+                });
+                const marginBottomSlider = createSlider('Espacio inferior', 0, 64, 1, currentMarginBottom, (v) => `${Math.round(parseFloat(v))} px`, (val) => {
+                    updateMargins(currentMarginTop, val);
+                });
+                spacingSection.appendChild(marginTopSlider.element);
+                spacingSection.appendChild(marginBottomSlider.element);
 
                 const presets = [
                     { label: 'Ultra compacto', lineHeight: 1.1, padding: 2 },
@@ -5094,6 +5354,11 @@ ${exportTable.outerHTML}
                     lineHeightSlider.valueDisplay.textContent = '1.40';
                     paddingSlider.valueDisplay.textContent = '6 px';
                     updateSpacing(1.4, 6);
+                    marginTopSlider.input.value = String(defaultMarginTop);
+                    marginBottomSlider.input.value = String(defaultMarginBottom);
+                    marginTopSlider.valueDisplay.textContent = `${defaultMarginTop} px`;
+                    marginBottomSlider.valueDisplay.textContent = `${defaultMarginBottom} px`;
+                    updateMargins(defaultMarginTop, defaultMarginBottom);
                 });
                 presetsContainer.appendChild(resetBtn);
                 spacingSection.appendChild(presetsContainer);
@@ -5146,10 +5411,17 @@ ${exportTable.outerHTML}
             if (tableEditMode) return;
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
-            if (table && notesEditor.contains(table)) {
-                showTableMenu(table, cell);
-                e.stopPropagation();
+            if (!table || !notesEditor.contains(table) || !cell) {
+                return;
             }
+            const row = cell.closest('tr');
+            const sectionRowIndex = row && typeof row.sectionRowIndex === 'number' ? row.sectionRowIndex : (row ? row.rowIndex : 0);
+            const cellIndex = typeof cell.cellIndex === 'number' ? cell.cellIndex : 0;
+            if (sectionRowIndex !== 0 && cellIndex !== 0) {
+                return;
+            }
+            showTableMenu(table, cell);
+            e.stopPropagation();
         });
         document.addEventListener('click', (e) => {
             if (tableEditMode && editingTable && !editingTable.contains(e.target)) {
@@ -5356,6 +5628,21 @@ ${exportTable.outerHTML}
         editorToolbar.appendChild(createButton('Corregir sangría inversa', '↤', null, null, () => manualOutdentBlock(notesEditor)));
         editorToolbar.appendChild(createButton('Corregir sangría bloque', '↦', null, null, () => manualIndentBlock(notesEditor)));
 
+        const moveCaretToElementStart = (element) => {
+            if (!element) return;
+            const selection = window.getSelection();
+            if (!selection) return;
+            const range = document.createRange();
+            if (element.firstChild && element.firstChild.nodeType === Node.TEXT_NODE) {
+                range.setStart(element.firstChild, 0);
+            } else {
+                range.selectNodeContents(element);
+                range.collapse(true);
+            }
+            selection.removeAllRanges();
+            selection.addRange(range);
+        };
+
         const insertBlankLineAbove = () => {
             let blocks = getSelectedBlockElements();
             if (blocks.length === 0) {
@@ -5368,50 +5655,350 @@ ${exportTable.outerHTML}
                 const blank = document.createElement(tag);
                 blank.innerHTML = '<br>';
                 first.parentNode.insertBefore(blank, first);
+                moveCaretToElementStart(blank);
             }
             recordHistory();
+            notesEditor.focus({ preventScroll: true });
+        };
+
+        const insertBlankLineBelow = () => {
+            let blocks = getSelectedBlockElements();
+            if (blocks.length === 0) {
+                document.execCommand('formatBlock', false, 'p');
+                blocks = getSelectedBlockElements();
+            }
+            const last = blocks[blocks.length - 1];
+            if (last && notesEditor.contains(last)) {
+                const tag = last.tagName === 'LI' ? 'li' : 'p';
+                const blank = document.createElement(tag);
+                blank.innerHTML = '<br>';
+                last.parentNode.insertBefore(blank, last.nextSibling);
+                moveCaretToElementStart(blank);
+            }
+            recordHistory();
+            notesEditor.focus({ preventScroll: true });
         };
 
         editorToolbar.appendChild(createButton('Insertar línea en blanco arriba', '⬆️⏎', null, null, insertBlankLineAbove));
+        editorToolbar.appendChild(createButton('Insertar línea en blanco abajo', '⬇️⏎', null, null, insertBlankLineBelow));
 
-        const eraseLineBtn = createButton('Borrar contenido con clic', '🧹', null, null, () => {
-            lineEraseMode = !lineEraseMode;
-            notesEditor.style.cursor = lineEraseMode ? 'crosshair' : '';
-            eraseLineBtn.classList.toggle('active', lineEraseMode);
-        });
+        const rectanglesOverlap = (a, b) => !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+
+        let lineEraseOverlay = document.querySelector('.line-erase-selection');
+        if (!lineEraseOverlay) {
+            lineEraseOverlay = document.createElement('div');
+            lineEraseOverlay.className = 'line-erase-selection';
+            document.body.appendChild(lineEraseOverlay);
+        }
+
+        let lineEraseSelectionStart = null;
+        let lineEraseDragging = false;
+
+        function hideLineEraseOverlay() {
+            lineEraseOverlay.classList.remove('active');
+            lineEraseOverlay.style.width = '0px';
+            lineEraseOverlay.style.height = '0px';
+        }
+
+        function updateLineEraseOverlay(rect) {
+            const left = Math.min(rect.left, rect.right);
+            const top = Math.min(rect.top, rect.bottom);
+            const width = Math.abs(rect.right - rect.left);
+            const height = Math.abs(rect.bottom - rect.top);
+            lineEraseOverlay.classList.add('active');
+            lineEraseOverlay.style.left = `${left}px`;
+            lineEraseOverlay.style.top = `${top}px`;
+            lineEraseOverlay.style.width = `${width}px`;
+            lineEraseOverlay.style.height = `${height}px`;
+        }
+
+        function cancelLineEraseSelection() {
+            lineEraseDragging = false;
+            lineEraseSelectionStart = null;
+            hideLineEraseOverlay();
+            document.removeEventListener('mousemove', handleLineEraseMouseMove);
+            document.removeEventListener('mouseup', handleLineEraseMouseUp);
+        }
+
+        function applyLineEraseRect(rect) {
+            if (!rect) return;
+            const normalized = {
+                left: Math.min(rect.left, rect.right),
+                right: Math.max(rect.left, rect.right),
+                top: Math.min(rect.top, rect.bottom),
+                bottom: Math.max(rect.top, rect.bottom)
+            };
+            if (Math.abs(normalized.right - normalized.left) < 3 && Math.abs(normalized.bottom - normalized.top) < 3) {
+                normalized.left -= 2;
+                normalized.right += 2;
+                normalized.top -= 2;
+                normalized.bottom += 2;
+            }
+            const blocks = Array.from(notesEditor.querySelectorAll(blockSelector)).filter(block => {
+                const blockRect = block.getBoundingClientRect();
+                return rectanglesOverlap(blockRect, normalized);
+            });
+            if (!blocks.length) return;
+
+            const scrollY = window.scrollY;
+            const modalScroll = notesModalContent.scrollTop;
+
+            let removed = false;
+            blocks.forEach(block => {
+                if (!notesEditor.contains(block)) return;
+                removed = true;
+                if (block.matches('li')) {
+                    const list = block.parentElement;
+                    block.remove();
+                    if (list && !list.querySelector('li')) {
+                        const placeholder = document.createElement('p');
+                        placeholder.innerHTML = '<br>';
+                        list.parentNode?.replaceChild(placeholder, list);
+                    }
+                } else {
+                    block.remove();
+                }
+            });
+
+            if (!removed) return;
+
+            const remainingBlocks = Array.from(notesEditor.querySelectorAll(blockSelector));
+            let focusTarget = remainingBlocks.find(el => {
+                const r = el.getBoundingClientRect();
+                return r.top >= normalized.bottom - 1;
+            });
+            if (!focusTarget && remainingBlocks.length) {
+                focusTarget = remainingBlocks[remainingBlocks.length - 1];
+            }
+            if (!focusTarget) {
+                const placeholder = document.createElement('p');
+                placeholder.innerHTML = '<br>';
+                notesEditor.appendChild(placeholder);
+                focusTarget = placeholder;
+            }
+            moveCaretToElementStart(focusTarget);
+            recordHistory();
+            window.scrollTo(0, scrollY);
+            notesModalContent.scrollTop = modalScroll;
+            notesEditor.focus({ preventScroll: true });
+        }
+
+        function handleLineEraseMouseMove(event) {
+            if (!lineEraseDragging || !lineEraseSelectionStart) return;
+            const current = { x: event.clientX, y: event.clientY };
+            const rect = {
+                left: Math.min(lineEraseSelectionStart.x, current.x),
+                right: Math.max(lineEraseSelectionStart.x, current.x),
+                top: Math.min(lineEraseSelectionStart.y, current.y),
+                bottom: Math.max(lineEraseSelectionStart.y, current.y)
+            };
+            updateLineEraseOverlay(rect);
+        }
+
+        function handleLineEraseMouseUp(event) {
+            if (!lineEraseDragging) {
+                cancelLineEraseSelection();
+                return;
+            }
+            lineEraseDragging = false;
+            document.removeEventListener('mousemove', handleLineEraseMouseMove);
+            document.removeEventListener('mouseup', handleLineEraseMouseUp);
+            if (!lineEraseSelectionStart) {
+                cancelLineEraseSelection();
+                return;
+            }
+            const endPoint = { x: event.clientX, y: event.clientY };
+            const rect = {
+                left: Math.min(lineEraseSelectionStart.x, endPoint.x),
+                right: Math.max(lineEraseSelectionStart.x, endPoint.x),
+                top: Math.min(lineEraseSelectionStart.y, endPoint.y),
+                bottom: Math.max(lineEraseSelectionStart.y, endPoint.y)
+            };
+            lineEraseSelectionStart = null;
+            hideLineEraseOverlay();
+            applyLineEraseRect(rect);
+        }
+
+        const startLineEraseSelection = (event) => {
+            if (!lineEraseMode || event.button !== 0) return;
+            if (!notesEditor.contains(event.target)) return;
+            lineEraseDragging = true;
+            lineEraseSelectionStart = { x: event.clientX, y: event.clientY };
+            const rect = {
+                left: lineEraseSelectionStart.x,
+                right: lineEraseSelectionStart.x,
+                top: lineEraseSelectionStart.y,
+                bottom: lineEraseSelectionStart.y
+            };
+            updateLineEraseOverlay(rect);
+            event.preventDefault();
+            document.addEventListener('mousemove', handleLineEraseMouseMove);
+            document.addEventListener('mouseup', handleLineEraseMouseUp);
+        };
+
+        if (!notesEditor.dataset.lineEraseSetup) {
+            notesEditor.addEventListener('mousedown', startLineEraseSelection);
+            notesModalContent.addEventListener('scroll', () => {
+                if (lineEraseMode) cancelLineEraseSelection();
+            });
+            notesEditor.dataset.lineEraseSetup = 'true';
+        }
+
+        let eraseLineBtn;
+
+        const deactivateLineEraseMode = () => {
+            lineEraseMode = false;
+            cancelLineEraseSelection();
+            notesEditor.style.cursor = '';
+            if (eraseLineBtn) eraseLineBtn.classList.remove('active');
+        };
+
+        const activateLineEraseMode = () => {
+            lineEraseMode = true;
+            notesEditor.style.cursor = 'crosshair';
+            if (eraseLineBtn) eraseLineBtn.classList.add('active');
+        };
+
+        const toggleLineEraseMode = () => {
+            if (lineEraseMode) {
+                deactivateLineEraseMode();
+            } else {
+                activateLineEraseMode();
+            }
+        };
+
+        eraseLineBtn = createButton('Borrado por área', '🧹', null, null, toggleLineEraseMode);
         editorToolbar.appendChild(eraseLineBtn);
+
+        document.addEventListener('keydown', (event) => {
+            if (!lineEraseMode) return;
+            if (event.key === 'Escape') {
+                deactivateLineEraseMode();
+            }
+        });
 
         const deleteLineBtn = document.createElement('button');
         deleteLineBtn.className = 'toolbar-btn';
-        deleteLineBtn.title = 'Eliminar línea completa';
+        deleteLineBtn.title = 'Eliminar línea actual';
         deleteLineBtn.textContent = '🗑️⏎';
         deleteLineBtn.addEventListener('click', (e) => {
             e.preventDefault();
             const sel = window.getSelection();
-            if (!sel.rangeCount) return;
+            if (!sel || sel.rangeCount === 0) return;
+            const range = sel.getRangeAt(0);
+            let container = range.startContainer;
+            if (container.nodeType === Node.TEXT_NODE) {
+                container = container.parentElement;
+            }
+            let block = container?.closest('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details');
+            if (!block || !notesEditor.contains(block)) return;
+
             const scrollY = window.scrollY;
             const modalScroll = notesModalContent.scrollTop;
-            let node = sel.anchorNode;
-            if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
-            const line = node.closest('p, div, li');
-            if (line && notesEditor.contains(line)) {
-                const next = line.nextSibling;
-                line.remove();
-                const range = document.createRange();
-                if (next) {
-                    if (next.nodeType === Node.TEXT_NODE) {
-                        range.setStart(next, 0);
-                    } else {
-                        range.selectNodeContents(next);
-                        range.collapse(true);
-                    }
-                    sel.removeAllRanges();
-                    sel.addRange(range);
+
+            const restoreFocus = () => {
+                window.scrollTo(0, scrollY);
+                notesModalContent.scrollTop = modalScroll;
+                notesEditor.focus({ preventScroll: true });
+            };
+
+            if (block.tagName === 'LI') {
+                const list = block.parentElement;
+                const nextItem = block.nextElementSibling || block.previousElementSibling;
+                block.remove();
+                if (list && !list.querySelector('li')) {
+                    const placeholder = document.createElement('p');
+                    placeholder.innerHTML = '<br>';
+                    list.parentNode?.replaceChild(placeholder, list);
+                    moveCaretToElementStart(placeholder);
+                } else if (nextItem) {
+                    moveCaretToElementStart(nextItem);
+                } else if (list && notesEditor.contains(list)) {
+                    moveCaretToElementStart(list);
+                } else {
+                    moveCaretToElementStart(notesEditor);
+                }
+                recordHistory();
+                restoreFocus();
+                return;
+            }
+
+            const beforeRange = range.cloneRange();
+            beforeRange.setStart(block, 0);
+            const tempContainer = document.createElement('div');
+            tempContainer.appendChild(beforeRange.cloneContents());
+            const lineIndex = tempContainer.querySelectorAll('br').length;
+
+            const childNodes = Array.from(block.childNodes);
+            const lines = [];
+            let currentLine = [];
+            childNodes.forEach(node => {
+                if (node.nodeName === 'BR') {
+                    lines.push({ nodes: currentLine, breakNode: node });
+                    currentLine = [];
+                } else {
+                    currentLine.push(node);
+                }
+            });
+            lines.push({ nodes: currentLine, breakNode: null });
+
+            const targetIndex = Math.min(lineIndex, lines.length - 1);
+            const targetLine = lines[targetIndex];
+            if (!targetLine) return;
+
+            let removedSomething = false;
+            targetLine.nodes.forEach(node => {
+                if (node.parentNode === block) {
+                    block.removeChild(node);
+                    removedSomething = true;
+                }
+            });
+            if (targetLine.breakNode && targetLine.breakNode.parentNode === block) {
+                block.removeChild(targetLine.breakNode);
+                removedSomething = true;
+            } else if (targetIndex > 0) {
+                const previousBreak = lines[targetIndex - 1]?.breakNode;
+                if (previousBreak && previousBreak.parentNode === block) {
+                    block.removeChild(previousBreak);
+                    removedSomething = true;
                 }
             }
-            window.scrollTo(0, scrollY);
-            notesModalContent.scrollTop = modalScroll;
-            notesEditor.focus({ preventScroll: true });
+
+            if (!removedSomething) {
+                restoreFocus();
+                return;
+            }
+
+            if (!block.childNodes.length) {
+                block.innerHTML = '<br>';
+            }
+
+            const nextLine = lines[targetIndex + 1];
+            const previousLine = lines[targetIndex - 1];
+            let caretNode = null;
+            if (nextLine && nextLine.nodes.length) {
+                caretNode = nextLine.nodes[0];
+            } else if (previousLine && previousLine.nodes.length) {
+                caretNode = previousLine.nodes[previousLine.nodes.length - 1];
+            }
+
+            const newRange = document.createRange();
+            if (caretNode && caretNode.parentNode) {
+                if (caretNode.nodeType === Node.TEXT_NODE) {
+                    newRange.setStart(caretNode, 0);
+                } else {
+                    newRange.selectNodeContents(caretNode);
+                    newRange.collapse(true);
+                }
+            } else {
+                newRange.selectNodeContents(block);
+                newRange.collapse(true);
+            }
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+
+            recordHistory();
+            restoreFocus();
         });
         editorToolbar.appendChild(deleteLineBtn);
 
