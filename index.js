@@ -1634,7 +1634,9 @@ document.addEventListener('DOMContentLoaded', function () {
     let savedEditorSelection = null;
     let savedSelectedHtml = '';
     let currentCallout = null;
-    let lineEraseMode = false;
+    let blockEraseMode = false;
+    let eraseSelectionStart = null;
+    let eraseSelectionBox = null;
 
     // Image selection handling within the sub-note editor
     if (subNoteEditor) {
@@ -1713,14 +1715,6 @@ document.addEventListener('DOMContentLoaded', function () {
             { icon: 'Ω', shortName: 'Caracteres especiales', codeName: 'special-chars', description: 'Muestra los caracteres especiales configurados para insertar.' }
         ];
     }
-
-    notesEditor.addEventListener('click', (e) => {
-        if (!lineEraseMode) return;
-        const block = e.target.closest('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, details');
-        if (block && notesEditor.contains(block)) {
-            block.innerHTML = '<br>';
-        }
-    });
 
     // ------------------------------------------------------------------------
     // Icon Manager and Character Manager Functions
@@ -3945,100 +3939,68 @@ ${exportTable.outerHTML}
             sel.addRange(newRange);
         };
 
-        let presetVariantIdCounter = 0;
-
         const renderPresetStyleList = (container, { onSelectStyle }) => {
             container.innerHTML = '';
-            const entries = [];
-            const closeAll = () => {
-                entries.forEach(({ list, toggle }) => {
-                    list.hidden = true;
-                    toggle.setAttribute('aria-expanded', 'false');
-                });
-            };
-            const handleSelect = (style) => {
-                if (typeof onSelectStyle === 'function') {
-                    onSelectStyle(style, { closeAll });
-                }
-            };
             const formatPresetLabel = (label) => {
                 if (!label) return '';
                 const cleaned = label.replace(/^Estilo\s+/i, '').trim();
                 if (!cleaned) return label.trim();
                 return cleaned.replace(/^./, (c) => c.toUpperCase());
             };
-            const createPreview = (label, style, badgeText = '') => {
-                const preview = document.createElement('span');
-                preview.className = 'preset-style-preview';
-                preview.setAttribute('style', style);
-                const text = document.createElement('span');
-                text.className = 'preset-style-label';
-                text.textContent = formatPresetLabel(label);
-                preview.appendChild(text);
+            const handleSelect = (style) => {
+                if (typeof onSelectStyle === 'function') {
+                    onSelectStyle(style, { closeAll: () => {} });
+                }
+            };
+            const createCard = (label, style, badgeText = '') => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'toolbar-btn preset-style-card';
+                const preview = document.createElement('div');
+                preview.className = 'preset-style-card-preview';
+                const sample = document.createElement('span');
+                sample.className = 'preset-style-card-sample';
+                sample.setAttribute('style', style);
+                sample.textContent = 'Aa Bb';
+                preview.appendChild(sample);
+                button.appendChild(preview);
+                const footer = document.createElement('div');
+                footer.className = 'preset-style-card-footer';
+                const labelSpan = document.createElement('span');
+                labelSpan.className = 'preset-style-card-label';
+                labelSpan.textContent = formatPresetLabel(label);
+                footer.appendChild(labelSpan);
                 if (badgeText) {
                     const badge = document.createElement('span');
-                    badge.className = 'preset-style-variant-badge';
+                    badge.className = 'preset-style-card-badge';
                     badge.textContent = badgeText;
-                    preview.appendChild(badge);
+                    footer.appendChild(badge);
                 }
-                return preview;
+                button.appendChild(footer);
+                button.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    handleSelect(style);
+                });
+                return button;
             };
-            PRESET_STYLE_GROUPS.forEach(group => {
-                const option = document.createElement('div');
-                option.className = 'preset-style-option';
-                const row = document.createElement('div');
-                row.className = 'preset-style-row';
-                const mainBtn = document.createElement('button');
-                mainBtn.type = 'button';
-                mainBtn.className = 'toolbar-btn preset-style-main';
-                mainBtn.appendChild(createPreview(group.label, group.style));
-                mainBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    handleSelect(group.style);
-                });
-                row.appendChild(mainBtn);
-                const toggle = document.createElement('button');
-                toggle.type = 'button';
-                toggle.className = 'toolbar-btn preset-style-variants-toggle';
-                toggle.innerHTML = '＋';
-                toggle.title = `Ver variaciones de ${formatPresetLabel(group.label)}`;
-                toggle.setAttribute('aria-expanded', 'false');
-                row.appendChild(toggle);
-                option.appendChild(row);
-                const variantsList = document.createElement('div');
-                variantsList.className = 'preset-style-variants';
-                variantsList.hidden = true;
-                const variantsId = `preset-style-variants-${++presetVariantIdCounter}`;
-                variantsList.id = variantsId;
-                toggle.setAttribute('aria-controls', variantsId);
-                group.variants.forEach(variant => {
-                    const variantBtn = document.createElement('button');
-                    variantBtn.type = 'button';
-                    variantBtn.className = 'toolbar-btn preset-style-variant';
+            PRESET_STYLE_GROUPS.forEach((group) => {
+                const section = document.createElement('div');
+                section.className = 'preset-style-section-block';
+                const heading = document.createElement('h3');
+                heading.className = 'preset-style-group-title';
+                heading.textContent = formatPresetLabel(group.label);
+                section.appendChild(heading);
+                const grid = document.createElement('div');
+                grid.className = 'preset-style-grid';
+                grid.appendChild(createCard(group.label, group.style));
+                group.variants.forEach((variant) => {
                     const variantName = variant.label.replace(`${group.label} `, '').trim();
-                    variantBtn.appendChild(
-                        createPreview(variant.label, variant.style, variantName)
-                    );
-                    variantBtn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        handleSelect(variant.style);
-                    });
-                    variantsList.appendChild(variantBtn);
+                    grid.appendChild(createCard(variant.label, variant.style, variantName));
                 });
-                option.appendChild(variantsList);
-                toggle.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const shouldOpen = variantsList.hidden;
-                    closeAll();
-                    if (shouldOpen) {
-                        variantsList.hidden = false;
-                        toggle.setAttribute('aria-expanded', 'true');
-                    }
-                });
-                container.appendChild(option);
-                entries.push({ list: variantsList, toggle });
+                section.appendChild(grid);
+                container.appendChild(section);
             });
-            return { closeAll };
+            return { closeAll: () => {} };
         };
 
         const buildPresetStylePanel = (container, onSelectStyle) => {
@@ -4483,7 +4445,7 @@ ${exportTable.outerHTML}
 
         // Popup to change existing preset styles
         const stylePopup = document.createElement('div');
-        stylePopup.className = 'preset-style-popup symbol-dropdown-content preset-style-panel';
+        stylePopup.className = 'preset-style-popup preset-style-panel-surface';
         document.body.appendChild(stylePopup);
         let currentStyledSpan = null;
         let currentStyleListControls = null;
@@ -4507,7 +4469,7 @@ ${exportTable.outerHTML}
                 hideStylePopup();
                 notesEditor.focus({ preventScroll: true });
             });
-            stylePopup.style.display = 'flex';
+            stylePopup.style.display = 'block';
             stylePopup.classList.add('visible');
             const editorRect = notesEditor.getBoundingClientRect();
             const availableWidth = Math.max(280, editorRect.width - 32);
@@ -4538,13 +4500,16 @@ ${exportTable.outerHTML}
 
         hideStylePopup();
 
-        notesEditor.addEventListener('click', (e) => {
+        notesEditor.addEventListener('dblclick', (e) => {
             const span = e.target.closest('span[data-preset-style]');
             if (span) {
                 currentStyledSpan = span;
                 showStylePopup(span);
                 e.stopPropagation();
-            } else {
+            }
+        });
+        notesEditor.addEventListener('click', (e) => {
+            if (!e.target.closest('span[data-preset-style]')) {
                 hideStylePopup();
             }
         });
@@ -4829,6 +4794,21 @@ ${exportTable.outerHTML}
             }
             if (!table.dataset.cellLineHeight) table.dataset.cellLineHeight = '1.4';
             if (!table.dataset.cellPadding) table.dataset.cellPadding = '6';
+            const tableStyles = window.getComputedStyle(table);
+            if (!table.dataset.outerMarginTop) {
+                const top = parseFloat(tableStyles.marginTop);
+                if (!Number.isNaN(top)) {
+                    table.dataset.outerMarginTop = String(Math.round(top));
+                }
+            }
+            if (!table.dataset.outerMarginBottom) {
+                const bottom = parseFloat(tableStyles.marginBottom);
+                if (!Number.isNaN(bottom)) {
+                    table.dataset.outerMarginBottom = String(Math.round(bottom));
+                }
+            }
+            if (!table.dataset.outerMarginTop) table.dataset.outerMarginTop = '12';
+            if (!table.dataset.outerMarginBottom) table.dataset.outerMarginBottom = '12';
         };
         const applyTableSpacing = (table, lineHeight, padding) => {
             if (!table) return;
@@ -4841,6 +4821,15 @@ ${exportTable.outerHTML}
             });
             if (!isNaN(lh)) table.dataset.cellLineHeight = `${lh}`;
             if (!isNaN(pad)) table.dataset.cellPadding = `${pad}`;
+        };
+        const applyTableOuterSpacing = (table, marginTop, marginBottom) => {
+            if (!table) return;
+            const top = parseFloat(marginTop);
+            const bottom = parseFloat(marginBottom);
+            table.style.marginTop = Number.isNaN(top) ? '' : `${top}px`;
+            table.style.marginBottom = Number.isNaN(bottom) ? '' : `${bottom}px`;
+            if (!Number.isNaN(top)) table.dataset.outerMarginTop = `${top}`;
+            if (!Number.isNaN(bottom)) table.dataset.outerMarginBottom = `${bottom}`;
         };
         const TABLE_THEMES = [
             { label: 'Clásico azul', class: 'table-theme-blue', preview: { headerBg: '#bbdefb', headerColor: '#0d47a1', row1: '#ffffff', row2: '#e3f2fd', border: '#2196f3' } },
@@ -5020,10 +5009,19 @@ ${exportTable.outerHTML}
 
                 let currentLineHeight = parseFloat(table.dataset.cellLineHeight || '1.4');
                 let currentPadding = parseFloat(table.dataset.cellPadding || '6');
+                let currentMarginTop = parseFloat(table.dataset.outerMarginTop || '12');
+                let currentMarginBottom = parseFloat(table.dataset.outerMarginBottom || '12');
                 const updateSpacing = (lineHeight, padding) => {
                     currentLineHeight = parseFloat(lineHeight);
                     currentPadding = parseFloat(padding);
                     applyTableSpacing(table, currentLineHeight, currentPadding);
+                };
+                const defaultMarginTop = currentMarginTop;
+                const defaultMarginBottom = currentMarginBottom;
+                const updateOuterSpacing = (top, bottom) => {
+                    currentMarginTop = parseFloat(top);
+                    currentMarginBottom = parseFloat(bottom);
+                    applyTableOuterSpacing(table, currentMarginTop, currentMarginBottom);
                 };
 
                 const createSlider = (label, min, max, step, value, formatter, onInput) => {
@@ -5099,6 +5097,60 @@ ${exportTable.outerHTML}
                 spacingSection.appendChild(presetsContainer);
 
                 spacingColumn.appendChild(spacingSection);
+
+                const createMarginInput = (label, value, onChange) => {
+                    const wrapper = document.createElement('label');
+                    wrapper.className = 'table-margin-control';
+                    const title = document.createElement('span');
+                    title.className = 'table-margin-label';
+                    title.textContent = label;
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.className = 'table-margin-input';
+                    input.value = `${Math.round(value)}`;
+                    input.step = '1';
+                    input.min = '-32';
+                    input.max = '160';
+                    input.addEventListener('input', () => {
+                        const val = parseFloat(input.value);
+                        if (!Number.isNaN(val)) {
+                            onChange(val);
+                        }
+                    });
+                    const suffix = document.createElement('span');
+                    suffix.className = 'table-margin-suffix';
+                    suffix.textContent = 'px';
+                    wrapper.appendChild(title);
+                    wrapper.appendChild(input);
+                    wrapper.appendChild(suffix);
+                    return { element: wrapper, input };
+                };
+
+                const marginSection = document.createElement('div');
+                marginSection.className = 'table-style-section';
+                const marginTitle = document.createElement('div');
+                marginTitle.className = 'table-style-section-title';
+                marginTitle.textContent = 'Espacio exterior';
+                marginSection.appendChild(marginTitle);
+                const marginGrid = document.createElement('div');
+                marginGrid.className = 'table-margin-grid';
+                const marginTopControl = createMarginInput('Margen superior', currentMarginTop, (val) => {
+                    updateOuterSpacing(val, currentMarginBottom);
+                });
+                const marginBottomControl = createMarginInput('Margen inferior', currentMarginBottom, (val) => {
+                    updateOuterSpacing(currentMarginTop, val);
+                });
+                marginGrid.appendChild(marginTopControl.element);
+                marginGrid.appendChild(marginBottomControl.element);
+                marginSection.appendChild(marginGrid);
+                spacingColumn.appendChild(marginSection);
+
+                resetBtn.addEventListener('click', () => {
+                    marginTopControl.input.value = `${Math.round(defaultMarginTop)}`;
+                    marginBottomControl.input.value = `${Math.round(defaultMarginBottom)}`;
+                    updateOuterSpacing(defaultMarginTop, defaultMarginBottom);
+                });
+
                 layout.appendChild(themesColumn);
                 layout.appendChild(spacingColumn);
                 tabContent.appendChild(layout);
@@ -5146,9 +5198,20 @@ ${exportTable.outerHTML}
             if (tableEditMode) return;
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
-            if (table && notesEditor.contains(table)) {
+            if (!table || !notesEditor.contains(table)) return;
+            if (!cell) {
+                hideTableMenu();
+                return;
+            }
+            const row = cell.parentElement;
+            const rowIndex = typeof row?.rowIndex === 'number' ? row.rowIndex : -1;
+            const cellIndex = typeof cell.cellIndex === 'number' ? cell.cellIndex : -1;
+            const isAllowedArea = rowIndex === 0 || cellIndex === 0;
+            if (isAllowedArea) {
                 showTableMenu(table, cell);
                 e.stopPropagation();
+            } else {
+                hideTableMenu();
             }
         });
         document.addEventListener('click', (e) => {
@@ -5368,52 +5431,346 @@ ${exportTable.outerHTML}
                 const blank = document.createElement(tag);
                 blank.innerHTML = '<br>';
                 first.parentNode.insertBefore(blank, first);
+                recordHistory();
             }
-            recordHistory();
+        };
+
+        const insertBlankLineBelow = () => {
+            let blocks = getSelectedBlockElements();
+            if (blocks.length === 0) {
+                document.execCommand('formatBlock', false, 'p');
+                blocks = getSelectedBlockElements();
+            }
+            const last = blocks[blocks.length - 1];
+            if (last && notesEditor.contains(last)) {
+                const tag = last.tagName === 'LI' ? 'li' : 'p';
+                const blank = document.createElement(tag);
+                blank.innerHTML = '<br>';
+                if (last.nextSibling) {
+                    last.parentNode.insertBefore(blank, last.nextSibling);
+                } else {
+                    last.parentNode.appendChild(blank);
+                }
+                recordHistory();
+            }
         };
 
         editorToolbar.appendChild(createButton('Insertar línea en blanco arriba', '⬆️⏎', null, null, insertBlankLineAbove));
+        editorToolbar.appendChild(createButton('Insertar línea en blanco abajo', '⬇️⏎', null, null, insertBlankLineBelow));
 
-        const eraseLineBtn = createButton('Borrar contenido con clic', '🧹', null, null, () => {
-            lineEraseMode = !lineEraseMode;
-            notesEditor.style.cursor = lineEraseMode ? 'crosshair' : '';
-            eraseLineBtn.classList.toggle('active', lineEraseMode);
-        });
+        const ensureEraseOverlay = () => {
+            if (!eraseSelectionBox) {
+                eraseSelectionBox = document.createElement('div');
+                eraseSelectionBox.className = 'erase-selection-box';
+                document.body.appendChild(eraseSelectionBox);
+            }
+            eraseSelectionBox.style.display = 'block';
+            eraseSelectionBox.style.opacity = '1';
+        };
+
+        const hideEraseOverlay = () => {
+            if (eraseSelectionBox) {
+                eraseSelectionBox.style.display = 'none';
+            }
+        };
+
+        const normalizeSelectionRect = (start, current) => {
+            const left = Math.min(start.x, current.x);
+            const top = Math.min(start.y, current.y);
+            const right = Math.max(start.x, current.x);
+            const bottom = Math.max(start.y, current.y);
+            return { left, top, right, bottom, width: right - left, height: bottom - top };
+        };
+
+        const updateEraseOverlay = (start, current) => {
+            if (!start || !current) return;
+            ensureEraseOverlay();
+            const rect = normalizeSelectionRect(start, current);
+            eraseSelectionBox.style.left = `${rect.left + window.scrollX}px`;
+            eraseSelectionBox.style.top = `${rect.top + window.scrollY}px`;
+            eraseSelectionBox.style.width = `${Math.max(rect.width, 1)}px`;
+            eraseSelectionBox.style.height = `${Math.max(rect.height, 1)}px`;
+        };
+
+        const collectBlocksInRect = (rect) => {
+            if (!rect) return [];
+            const selector = 'p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, table, details, figure';
+            const candidates = Array.from(notesEditor.querySelectorAll(selector));
+            return candidates.filter((block) => {
+                if (!notesEditor.contains(block)) return false;
+                const blockRect = block.getBoundingClientRect();
+                if (blockRect.width === 0 && blockRect.height === 0) return false;
+                return !(rect.right < blockRect.left || rect.left > blockRect.right || rect.bottom < blockRect.top || rect.top > blockRect.bottom);
+            });
+        };
+
+        const applyEraseToRect = (rect, fallbackTarget) => {
+            if (!rect && !fallbackTarget) return false;
+            const removedElements = new Set();
+            if (rect) {
+                collectBlocksInRect(rect).forEach((block) => {
+                    if (notesEditor.contains(block)) {
+                        removedElements.add(block);
+                    }
+                });
+            }
+            if (!removedElements.size && fallbackTarget) {
+                const fallback = fallbackTarget.closest('p, h1, h2, h3, h4, h5, h6, div, li, blockquote, pre, table, details, figure');
+                if (fallback && notesEditor.contains(fallback)) {
+                    removedElements.add(fallback);
+                }
+            }
+            if (!removedElements.size) {
+                return false;
+            }
+            removedElements.forEach((block) => {
+                if (block.parentNode) {
+                    block.remove();
+                }
+            });
+            recordHistory();
+            return true;
+        };
+
+        let eraseMouseMoveHandler = null;
+        let eraseScrollState = null;
+        let eraseStartTarget = null;
+
+        const stopEraseTracking = () => {
+            if (eraseMouseMoveHandler) {
+                document.removeEventListener('mousemove', eraseMouseMoveHandler);
+                eraseMouseMoveHandler = null;
+            }
+            document.removeEventListener('mouseup', finishEraseSelection);
+            hideEraseOverlay();
+            eraseSelectionStart = null;
+            eraseStartTarget = null;
+            eraseScrollState = null;
+        };
+
+        const finishEraseSelection = (event) => {
+            const endPoint = { x: event.clientX, y: event.clientY };
+            const rect = eraseSelectionStart ? normalizeSelectionRect(eraseSelectionStart, endPoint) : null;
+            let erased = false;
+            if (rect && (rect.width > 2 || rect.height > 2)) {
+                erased = applyEraseToRect(rect, eraseStartTarget);
+            } else {
+                erased = applyEraseToRect(null, eraseStartTarget || event.target);
+            }
+            if (eraseScrollState) {
+                window.scrollTo(0, eraseScrollState.windowY);
+                notesModalContent.scrollTop = eraseScrollState.modalY;
+            }
+            stopEraseTracking();
+            if (erased) {
+                notesEditor.focus({ preventScroll: true });
+            }
+        };
+
+        const onEraseMouseMove = (event) => {
+            if (!eraseSelectionStart) return;
+            updateEraseOverlay(eraseSelectionStart, { x: event.clientX, y: event.clientY });
+        };
+
+        const startEraseSelection = (event) => {
+            if (!blockEraseMode || event.button !== 0) return;
+            if (!notesEditor.contains(event.target)) return;
+            event.preventDefault();
+            eraseScrollState = {
+                windowY: window.scrollY,
+                modalY: notesModalContent.scrollTop
+            };
+            eraseSelectionStart = { x: event.clientX, y: event.clientY };
+            eraseStartTarget = event.target;
+            updateEraseOverlay(eraseSelectionStart, eraseSelectionStart);
+            eraseMouseMoveHandler = onEraseMouseMove;
+            document.addEventListener('mousemove', eraseMouseMoveHandler);
+            document.addEventListener('mouseup', finishEraseSelection, { once: true });
+        };
+
+        notesEditor.addEventListener('mousedown', startEraseSelection);
+
+        const toggleBlockEraseMode = () => {
+            blockEraseMode = !blockEraseMode;
+            if (!blockEraseMode) {
+                stopEraseTracking();
+            }
+            notesEditor.style.cursor = blockEraseMode ? 'crosshair' : '';
+            eraseLineBtn.classList.toggle('active', blockEraseMode);
+        };
+
+        const eraseLineBtn = createButton('Borrado por selección', '🧹', null, null, toggleBlockEraseMode);
         editorToolbar.appendChild(eraseLineBtn);
 
         const deleteLineBtn = document.createElement('button');
         deleteLineBtn.className = 'toolbar-btn';
-        deleteLineBtn.title = 'Eliminar línea completa';
+        deleteLineBtn.title = 'Eliminar línea actual';
         deleteLineBtn.textContent = '🗑️⏎';
         deleteLineBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            const sel = window.getSelection();
-            if (!sel.rangeCount) return;
+            const selection = window.getSelection();
+            if (!selection || !selection.rangeCount) return;
+            const originalRange = selection.getRangeAt(0).cloneRange();
             const scrollY = window.scrollY;
             const modalScroll = notesModalContent.scrollTop;
-            let node = sel.anchorNode;
-            if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
-            const line = node.closest('p, div, li');
-            if (line && notesEditor.contains(line)) {
-                const next = line.nextSibling;
-                line.remove();
-                const range = document.createRange();
-                if (next) {
-                    if (next.nodeType === Node.TEXT_NODE) {
-                        range.setStart(next, 0);
-                    } else {
-                        range.selectNodeContents(next);
-                        range.collapse(true);
-                    }
-                    sel.removeAllRanges();
-                    sel.addRange(range);
+            const tryDeleteWithModify = () => {
+                if (typeof selection.modify !== 'function') return false;
+                const startNode = originalRange.startContainer;
+                const startOffset = originalRange.startOffset;
+                selection.removeAllRanges();
+                const workingRange = document.createRange();
+                workingRange.setStart(startNode, startOffset);
+                workingRange.collapse(true);
+                selection.addRange(workingRange);
+                selection.modify('move', 'backward', 'lineboundary');
+                selection.modify('extend', 'forward', 'lineboundary');
+                selection.deleteFromDocument();
+                const collapsedRange = selection.rangeCount ? selection.getRangeAt(0) : null;
+                if (collapsedRange) {
+                    selection.removeAllRanges();
+                    selection.addRange(collapsedRange);
                 }
+                return true;
+            };
+            const deleted = tryDeleteWithModify();
+            let finalBlock = selection.anchorNode || originalRange.startContainer;
+            if (!deleted) {
+                finalBlock = originalRange.startContainer;
+            }
+            const block = finalBlock && finalBlock.nodeType === Node.ELEMENT_NODE
+                ? finalBlock.closest('p, div, li, blockquote, pre')
+                : finalBlock?.parentElement?.closest('p, div, li, blockquote, pre');
+            let changed = deleted;
+            if (!deleted && block && notesEditor.contains(block)) {
+                block.innerHTML = '<br>';
+                changed = true;
+                const caretRange = document.createRange();
+                caretRange.selectNodeContents(block);
+                caretRange.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(caretRange);
+            }
+            if (block && notesEditor.contains(block)) {
+                const hasContent = block.textContent && block.textContent.trim().length > 0;
+                if (!hasContent) {
+                    block.innerHTML = '<br>';
+                }
+            }
+            if (changed) {
+                recordHistory();
             }
             window.scrollTo(0, scrollY);
             notesModalContent.scrollTop = modalScroll;
             notesEditor.focus({ preventScroll: true });
         });
         editorToolbar.appendChild(deleteLineBtn);
+
+        const bulletStyles = [
+            { label: 'Punto clásico', preview: '•', css: 'disc' },
+            { label: 'Círculo', preview: '○', css: 'circle' },
+            { label: 'Cuadrado', preview: '▪', css: 'square' },
+            { label: 'Guion largo', preview: '—', css: '"—"' },
+            { label: 'Flecha', preview: '➤', css: '"➤"' }
+        ];
+
+        const findActiveList = () => {
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount) return null;
+            let node = sel.anchorNode;
+            if (node && node.nodeType === Node.TEXT_NODE) {
+                node = node.parentElement;
+            }
+            return node ? node.closest('ul') : null;
+        };
+
+        const applyBulletStyle = (cssValue) => {
+            withEditorSelection(() => {
+                let list = findActiveList();
+                if (!list) {
+                    document.execCommand('insertUnorderedList', false, null);
+                    list = findActiveList();
+                }
+                if (list && notesEditor.contains(list)) {
+                    list.style.listStyleType = cssValue;
+                    list.dataset.customBullet = cssValue;
+                }
+            });
+            recordHistory();
+            notesEditor.focus({ preventScroll: true });
+        };
+
+        const bulletDropdown = document.createElement('div');
+        bulletDropdown.className = 'symbol-dropdown bullet-style-dropdown';
+        const bulletBtn = document.createElement('button');
+        bulletBtn.className = 'toolbar-btn';
+        bulletBtn.title = 'Aplicar viñetas';
+        bulletBtn.innerHTML = '•◦▪';
+        bulletDropdown.appendChild(bulletBtn);
+        const bulletMenu = document.createElement('div');
+        bulletMenu.className = 'symbol-dropdown-content bullet-style-menu';
+        bulletStyles.forEach((style) => {
+            const option = document.createElement('button');
+            option.type = 'button';
+            option.className = 'toolbar-btn bullet-style-option';
+            option.innerHTML = `<span class="bullet-preview">${style.preview}</span><span class="bullet-label">${style.label}</span>`;
+            option.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                applyBulletStyle(style.css);
+                bulletMenu.classList.remove('visible');
+            });
+            bulletMenu.appendChild(option);
+        });
+        bulletDropdown.appendChild(bulletMenu);
+        bulletBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            document.querySelectorAll('.symbol-dropdown-content.visible').forEach((openMenu) => {
+                if (openMenu !== bulletMenu) {
+                    openMenu.classList.remove('visible');
+                }
+            });
+            bulletMenu.classList.toggle('visible');
+        });
+        document.addEventListener('click', (event) => {
+            if (!bulletDropdown.contains(event.target)) {
+                bulletMenu.classList.remove('visible');
+            }
+        });
+        editorToolbar.appendChild(bulletDropdown);
+
+        const removeBulletsBtn = createButton('Quitar viñetas', '🚫•', null, null, () => {
+            withEditorSelection(() => {
+                const selection = window.getSelection();
+                if (!selection || !selection.rangeCount) return;
+                const selectedBlocks = getSelectedBlockElements();
+                const lists = new Set();
+                selectedBlocks.forEach((block) => {
+                    const item = block.closest('li');
+                    if (item && item.parentElement && item.parentElement.tagName === 'UL') {
+                        lists.add(item.parentElement);
+                    }
+                });
+                if (lists.size === 0) {
+                    const activeList = findActiveList();
+                    if (activeList) lists.add(activeList);
+                }
+                lists.forEach((list) => {
+                    const parent = list.parentNode;
+                    if (!parent) return;
+                    const fragment = document.createDocumentFragment();
+                    Array.from(list.children).forEach((li) => {
+                        const p = document.createElement('p');
+                        p.innerHTML = li.innerHTML || '<br>';
+                        fragment.appendChild(p);
+                    });
+                    parent.insertBefore(fragment, list);
+                    list.remove();
+                });
+            });
+            recordHistory();
+            notesEditor.focus({ preventScroll: true });
+        });
+        editorToolbar.appendChild(removeBulletsBtn);
 
         const collapsibleListSVG = UI_ICON_STRINGS.collapsibleList;
         const collapsibleListHTML = `<details class="collapsible-list"><summary>Elemento</summary><div>Texto...<br></div></details><p><br></p>`;
