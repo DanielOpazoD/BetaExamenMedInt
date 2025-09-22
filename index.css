@@ -1571,6 +1571,40 @@ table.resizable-table th {
     gap: 4px;
     margin-bottom: 4px;
 }
+.line-color-option {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    border-radius: 9999px;
+    border: 1px solid var(--border-color);
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.line-color-option:hover,
+.line-color-option:focus-visible {
+    transform: scale(1.05);
+}
+.line-color-option.active {
+    box-shadow: 0 0 0 2px var(--accent-color, var(--btn-primary-bg));
+}
+.line-color-custom {
+    min-width: 32px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.line-toggle-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.line-toggle-btn {
+    justify-content: flex-start;
+}
 .table-style-section {
     display: flex;
     flex-direction: column;
@@ -1832,6 +1866,11 @@ table.resizable-table th {
 .table-theme-indigo th, .table-theme-indigo td { border:1px solid #3949ab; }
 .table-theme-indigo th { background:#c5cae9; color:#1a237e; }
 .table-theme-indigo td { background:#ffffff; }
+.table-theme-monochrome { border-collapse: collapse; }
+.table-theme-monochrome th, .table-theme-monochrome td { border:1px solid #111827; }
+.table-theme-monochrome th { background:#111827; color:#f9fafb; }
+.table-theme-monochrome td { background:#ffffff; color:#111827; }
+.table-theme-monochrome tr:nth-child(even) td { background:#f3f4f6; }
 .note-resizable {
     resize: horizontal;
     overflow: auto;

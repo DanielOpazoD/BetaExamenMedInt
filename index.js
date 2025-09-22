@@ -3491,7 +3491,91 @@ ${exportTable.outerHTML}
         const clearFormatting = () => {
             const sel = window.getSelection();
             if (!sel.rangeCount) return;
+            const range = sel.getRangeAt(0).cloneRange();
             document.execCommand('removeFormat');
+
+            const unwrapNode = (node) => {
+                const parent = node.parentNode;
+                if (!parent) return;
+                while (node.firstChild) parent.insertBefore(node.firstChild, node);
+                parent.removeChild(node);
+            };
+
+            const inlineNodes = [];
+            const walker = document.createTreeWalker(
+                range.commonAncestorContainer,
+                NodeFilter.SHOW_ELEMENT,
+                {
+                    acceptNode(node) {
+                        return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+                    }
+                }
+            );
+            while (walker.nextNode()) inlineNodes.push(walker.currentNode);
+            if (range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE) {
+                inlineNodes.push(range.commonAncestorContainer);
+            }
+
+            inlineNodes.forEach(node => {
+                if (node.nodeType !== Node.ELEMENT_NODE) return;
+                if (!notesEditor.contains(node)) return;
+
+                if (node.dataset && node.dataset.lineHighlight) {
+                    delete node.dataset.lineHighlight;
+                    delete node.dataset.lineHighlightColor;
+                    node.style.removeProperty('background-color');
+                    node.style.removeProperty('padding-left');
+                    node.style.removeProperty('padding-right');
+                    node.style.removeProperty('margin-top');
+                    node.style.removeProperty('margin-bottom');
+                    node.style.removeProperty('border-top-left-radius');
+                    node.style.removeProperty('border-top-right-radius');
+                    node.style.removeProperty('border-bottom-left-radius');
+                    node.style.removeProperty('border-bottom-right-radius');
+                }
+
+                if (node.dataset && node.dataset.pillText) {
+                    delete node.dataset.pillText;
+                }
+
+                if (node.tagName === 'MARK') {
+                    unwrapNode(node);
+                    return;
+                }
+
+                const classList = Array.from(node.classList || []);
+                classList
+                    .filter(cls => /highlight|pill/i.test(cls))
+                    .forEach(cls => node.classList.remove(cls));
+
+                if (typeof node.removeAttribute === 'function') {
+                    ['bgcolor', 'color'].forEach(attr => {
+                        if (node.hasAttribute(attr)) node.removeAttribute(attr);
+                    });
+                }
+
+                if (node.style) {
+                    Array.from(node.style).forEach(prop => {
+                        const normalized = prop.toLowerCase();
+                        if (
+                            normalized.includes('background') ||
+                            normalized.includes('color') ||
+                            normalized.includes('shadow') ||
+                            normalized.startsWith('--')
+                        ) {
+                            node.style.removeProperty(prop);
+                        }
+                    });
+                    if (!node.getAttribute('style') || node.getAttribute('style').trim() === '') {
+                        node.removeAttribute('style');
+                    }
+                }
+
+                if (node.tagName === 'SPAN' && !node.attributes.length) {
+                    unwrapNode(node);
+                }
+            });
+
             const blocks = getSelectedBlockElements();
             blocks.forEach(block => {
                 block.removeAttribute('style');
@@ -4522,13 +4606,76 @@ ${exportTable.outerHTML}
         };
 
         const actionWithInlineSelection = (fn) => (value) => {
-            restoreInlineSelection();
-            fn(value);
+            const clearEmptyStyle = (el) => {
+                if (!el || !el.getAttribute) return;
+                const styleAttr = el.getAttribute('style');
+                if (!styleAttr || styleAttr.trim() === '') {
+                    el.removeAttribute('style');
+                }
+            };
+            let handledDirectly = false;
+            let selectionAnchor = inlineColorTarget;
+
+            if (inlineColorTarget) {
+                if (inlineColorType === 'fore') {
+                    handledDirectly = true;
+                    if (!value || value === 'transparent') {
+                        inlineColorTarget.style.removeProperty('color');
+                        if (inlineColorTarget.hasAttribute('color')) inlineColorTarget.removeAttribute('color');
+                    } else {
+                        inlineColorTarget.style.setProperty('color', value);
+                    }
+                    clearEmptyStyle(inlineColorTarget);
+                } else if (inlineColorType === 'highlight') {
+                    handledDirectly = true;
+                    if (!value || value === 'transparent') {
+                        inlineColorTarget.style.removeProperty('background-color');
+                        if (inlineColorTarget.tagName === 'MARK') {
+                            const parent = inlineColorTarget.parentElement;
+                            while (inlineColorTarget.firstChild) {
+                                parent?.insertBefore(inlineColorTarget.firstChild, inlineColorTarget);
+                            }
+                            inlineColorTarget.remove();
+                            selectionAnchor = parent || notesEditor;
+                        } else {
+                            clearEmptyStyle(inlineColorTarget);
+                        }
+                    } else {
+                        inlineColorTarget.style.setProperty('background-color', value);
+                    }
+                } else if (inlineColorType === 'line') {
+                    handledDirectly = true;
+                    restoreInlineSelection();
+                    fn(value);
+                }
+            }
+
+            if (!handledDirectly) {
+                restoreInlineSelection();
+                fn(value);
+            }
+
             recordHistory();
+
             const selection = window.getSelection();
-            inlineColorRange = selection && selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
-            const anchor = selection && selection.anchorNode ? selection.anchorNode : inlineColorTarget;
-            const updated = detectInlineColorContext(anchor);
+            if (selection && selection.rangeCount) {
+                inlineColorRange = selection.getRangeAt(0).cloneRange();
+            } else if (selectionAnchor && notesEditor.contains(selectionAnchor)) {
+                const newRange = document.createRange();
+                try {
+                    newRange.selectNodeContents(selectionAnchor);
+                    selection?.removeAllRanges();
+                    selection?.addRange(newRange);
+                    inlineColorRange = newRange.cloneRange();
+                } catch (error) {
+                    inlineColorRange = null;
+                }
+            } else {
+                inlineColorRange = null;
+            }
+
+            const anchorNode = selection && selection.anchorNode ? selection.anchorNode : (selectionAnchor || inlineColorTarget);
+            const updated = detectInlineColorContext(anchorNode);
             if (updated) {
                 inlineColorTarget = updated.target;
                 inlineColorType = updated.type;
@@ -4890,6 +5037,11 @@ ${exportTable.outerHTML}
         document.addEventListener('click', (e) => {
             if (!pillTextPopup.contains(e.target)) hidePillTextPopup();
         });
+        notesEditor.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                hidePillTextPopup();
+            }
+        });
 
         // Floating menu for table tools
         const tableMenu = document.createElement('div');
@@ -4989,7 +5141,20 @@ ${exportTable.outerHTML}
                 cell.style.borderTopColor = '';
                 cell.style.borderBottomColor = '';
                 cell.style.borderRadius = '';
+                cell.style.borderWidth = '';
+                cell.style.borderLeftWidth = '';
+                cell.style.borderRightWidth = '';
+                cell.style.borderTopWidth = '';
+                cell.style.borderBottomWidth = '';
+                cell.style.borderStyle = '';
             });
+            table.style.borderColor = '';
+            table.style.borderWidth = '';
+            table.style.borderStyle = '';
+            delete table.dataset.dividerColor;
+            delete table.dataset.dividerWidth;
+            delete table.dataset.hideVerticalBorders;
+            delete table.dataset.hideHorizontalBorders;
         };
         const convertCellTag = (cell, tagName) => {
             if (!cell || cell.tagName === tagName.toUpperCase()) return cell;
@@ -5019,6 +5184,7 @@ ${exportTable.outerHTML}
                 table.classList.add(themeClass);
             }
             initTableResize(table);
+            ensureDividerState(table);
         };
         const applyTableMargins = (table, top, bottom) => {
             if (!table) return;
@@ -5073,6 +5239,102 @@ ${exportTable.outerHTML}
             if (!table.dataset.tableMarginBottom) table.dataset.tableMarginBottom = '12';
             applyTableMargins(table, parseFloat(table.dataset.tableMarginTop), parseFloat(table.dataset.tableMarginBottom));
         };
+        const applyDividerStyles = (table) => {
+            if (!table) return;
+            const color = (table.dataset.dividerColor || '').trim();
+            const widthValue = parseFloat(table.dataset.dividerWidth || '1');
+            const hideVertical = table.dataset.hideVerticalBorders === 'true';
+            const hideHorizontal = table.dataset.hideHorizontalBorders === 'true';
+            const hasWidth = Number.isFinite(widthValue) && widthValue >= 0;
+            const pxWidth = hasWidth ? `${widthValue}px` : '';
+
+            if (color) {
+                table.style.setProperty('border-color', color);
+                table.style.setProperty('border-style', 'solid');
+            } else {
+                table.style.removeProperty('border-color');
+            }
+            if (hasWidth) {
+                table.style.setProperty('border-width', pxWidth);
+                table.style.setProperty('border-style', 'solid');
+            } else {
+                table.style.removeProperty('border-width');
+            }
+
+            Array.from(table.querySelectorAll('th, td')).forEach(cell => {
+                if (color) {
+                    cell.style.setProperty('border-color', color);
+                } else {
+                    cell.style.removeProperty('border-color');
+                }
+                if (hasWidth) {
+                    cell.style.setProperty('border-width', pxWidth);
+                    cell.style.setProperty('border-style', 'solid');
+                } else {
+                    cell.style.removeProperty('border-width');
+                    cell.style.removeProperty('border-style');
+                }
+
+                if (hideVertical) {
+                    cell.style.setProperty('border-left-width', '0px');
+                    cell.style.setProperty('border-right-width', '0px');
+                } else if (hasWidth) {
+                    cell.style.setProperty('border-left-width', pxWidth);
+                    cell.style.setProperty('border-right-width', pxWidth);
+                } else {
+                    cell.style.removeProperty('border-left-width');
+                    cell.style.removeProperty('border-right-width');
+                }
+
+                if (hideHorizontal) {
+                    cell.style.setProperty('border-top-width', '0px');
+                    cell.style.setProperty('border-bottom-width', '0px');
+                } else if (hasWidth) {
+                    cell.style.setProperty('border-top-width', pxWidth);
+                    cell.style.setProperty('border-bottom-width', pxWidth);
+                } else {
+                    cell.style.removeProperty('border-top-width');
+                    cell.style.removeProperty('border-bottom-width');
+                }
+            });
+        };
+        const ensureDividerState = (table) => {
+            if (!table) return;
+            const firstCell = table.querySelector('th, td');
+            const tableComputed = window.getComputedStyle(table);
+            const cellComputed = firstCell ? window.getComputedStyle(firstCell) : null;
+            const isTransparent = (value) => {
+                if (!value) return true;
+                const normalized = value.trim().toLowerCase();
+                return normalized === 'transparent' || normalized === 'rgba(0, 0, 0, 0)' || normalized === 'rgba(0,0,0,0)';
+            };
+
+            if (!table.dataset.dividerColor) {
+                if (cellComputed && !isTransparent(cellComputed.borderColor)) {
+                    table.dataset.dividerColor = cellComputed.borderColor;
+                } else if (!isTransparent(tableComputed.borderColor)) {
+                    table.dataset.dividerColor = tableComputed.borderColor;
+                } else {
+                    table.dataset.dividerColor = '#d1d5db';
+                }
+            }
+
+            if (!table.dataset.dividerWidth) {
+                let width = 1;
+                if (cellComputed) {
+                    const cellWidth = parseFloat(cellComputed.borderTopWidth || cellComputed.borderWidth);
+                    if (Number.isFinite(cellWidth) && cellWidth >= 0) width = cellWidth;
+                } else {
+                    const tableWidth = parseFloat(tableComputed.borderTopWidth || tableComputed.borderWidth);
+                    if (Number.isFinite(tableWidth) && tableWidth >= 0) width = tableWidth;
+                }
+                table.dataset.dividerWidth = String(width);
+            }
+
+            if (!table.dataset.hideVerticalBorders) table.dataset.hideVerticalBorders = 'false';
+            if (!table.dataset.hideHorizontalBorders) table.dataset.hideHorizontalBorders = 'false';
+            applyDividerStyles(table);
+        };
         const applyTableSpacing = (table, lineHeight, padding) => {
             if (!table) return;
             const lh = parseFloat(lineHeight);
@@ -5097,7 +5359,8 @@ ${exportTable.outerHTML}
             { label: 'Arena dorada', class: 'table-theme-amber', preview: { headerBg: '#ffecb3', headerColor: '#ff6f00', row1: '#fffdf5', row2: '#fff5d7', border: '#ffb300' } },
             { label: 'Esmeralda', class: 'table-theme-emerald', preview: { headerBg: '#b9f6ca', headerColor: '#1b5e20', row1: '#ffffff', row2: '#e6ffef', border: '#2e7d32' } },
             { label: 'Clásico rojo', class: 'table-theme-red', preview: { headerBg: '#ffcdd2', headerColor: '#b71c1c', row1: '#ffffff', row2: '#ffe7ea', border: '#f44336' } },
-            { label: 'Minimalista gris', class: 'table-theme-gray', preview: { headerBg: '#e0e0e0', headerColor: '#212121', row1: '#ffffff', row2: '#f7f7f7', border: '#9e9e9e' } }
+            { label: 'Minimalista gris', class: 'table-theme-gray', preview: { headerBg: '#e0e0e0', headerColor: '#212121', row1: '#ffffff', row2: '#f7f7f7', border: '#9e9e9e' } },
+            { label: 'Blanco y negro', class: 'table-theme-monochrome', preview: { headerBg: '#111827', headerColor: '#f9fafb', row1: '#ffffff', row2: '#f3f4f6', border: '#111827' } }
         ];
         const showTableMenu = (table, cell) => {
             currentTable = table;
@@ -5170,12 +5433,19 @@ ${exportTable.outerHTML}
                 { label: 'Cabecera ámbar', bg: '#ffecb3', color: '#ff6f00', accent: '#ffb300' },
                 { label: 'Cabecera coral', bg: '#ffccbc', color: '#bf360c', accent: '#ff7043' },
                 { label: 'Cabecera lavanda', bg: '#e1bee7', color: '#4a148c', accent: '#ab47bc' },
-                { label: 'Cabecera gris azulado', bg: '#cfd8dc', color: '#37474f', accent: '#90a4ae' }
+                { label: 'Cabecera gris azulado', bg: '#cfd8dc', color: '#37474f', accent: '#90a4ae' },
+                { label: 'Cabecera negro clásico', bg: '#111827', color: '#f9fafb', accent: '#000000' },
+                { label: 'Cabecera gris perla', bg: '#f3f4f6', color: '#1f2937', accent: '#9ca3af' },
+                { label: 'Cabecera azul profundo', bg: '#bfdbfe', color: '#1e3a8a', accent: '#2563eb' },
+                { label: 'Cabecera verde bosque', bg: '#c7f9cc', color: '#065f46', accent: '#047857' },
+                { label: 'Cabecera naranja intensa', bg: '#ffedd5', color: '#9a3412', accent: '#f97316' },
+                { label: 'Cabecera ciruela', bg: '#f3e8ff', color: '#581c87', accent: '#7c3aed' }
             ];
 
             const buildStyleTab = () => {
                 tabContent.innerHTML = '';
                 ensureSpacingState(table);
+                ensureDividerState(table);
                 const layout = document.createElement('div');
                 layout.className = 'table-style-layout';
                 const themesColumn = document.createElement('div');
@@ -5363,7 +5633,108 @@ ${exportTable.outerHTML}
                 presetsContainer.appendChild(resetBtn);
                 spacingSection.appendChild(presetsContainer);
 
+                const dividerSection = document.createElement('div');
+                dividerSection.className = 'table-style-section';
+                const dividerTitle = document.createElement('div');
+                dividerTitle.className = 'table-style-section-title';
+                dividerTitle.textContent = 'Líneas divisorias';
+                dividerSection.appendChild(dividerTitle);
+
+                const dividerColors = [
+                    { label: 'Negro', value: '#111827' },
+                    { label: 'Gris oscuro', value: '#374151' },
+                    { label: 'Gris medio', value: '#6b7280' },
+                    { label: 'Gris claro', value: '#d1d5db' },
+                    { label: 'Blanco', value: '#ffffff' },
+                    { label: 'Azul', value: '#2563eb' },
+                    { label: 'Celeste', value: '#0ea5e9' },
+                    { label: 'Verde', value: '#059669' },
+                    { label: 'Ámbar', value: '#f59e0b' },
+                    { label: 'Rojo', value: '#dc2626' },
+                    { label: 'Morado', value: '#7c3aed' }
+                ];
+                const dividerColorGroup = document.createElement('div');
+                dividerColorGroup.className = 'line-style-group';
+                const dividerColorButtons = [];
+                const setDividerColor = (color) => {
+                    table.dataset.dividerColor = color || '';
+                    applyDividerStyles(table);
+                    updateDividerColorButtons();
+                };
+                const updateDividerColorButtons = () => {
+                    const current = (table.dataset.dividerColor || '').toLowerCase();
+                    dividerColorButtons.forEach(({ btn, value }) => {
+                        btn.classList.toggle('active', current === value.toLowerCase());
+                    });
+                };
+                dividerColors.forEach(color => {
+                    const colorBtn = document.createElement('button');
+                    colorBtn.type = 'button';
+                    colorBtn.className = 'toolbar-btn line-color-option';
+                    colorBtn.style.setProperty('background', color.value);
+                    colorBtn.title = color.label;
+                    colorBtn.setAttribute('aria-label', color.label);
+                    colorBtn.addEventListener('click', () => setDividerColor(color.value));
+                    dividerColorButtons.push({ btn: colorBtn, value: color.value });
+                    dividerColorGroup.appendChild(colorBtn);
+                });
+                const customDividerLabel = document.createElement('label');
+                customDividerLabel.className = 'toolbar-btn line-color-custom';
+                customDividerLabel.title = 'Color personalizado';
+                customDividerLabel.textContent = '🎨';
+                const customDividerInput = document.createElement('input');
+                customDividerInput.type = 'color';
+                customDividerInput.style.position = 'absolute';
+                customDividerInput.style.width = '0';
+                customDividerInput.style.height = '0';
+                customDividerInput.style.opacity = '0';
+                customDividerInput.addEventListener('input', (event) => {
+                    setDividerColor(event.target.value);
+                });
+                customDividerInput.addEventListener('click', (event) => event.stopPropagation());
+                customDividerLabel.appendChild(customDividerInput);
+                dividerColorGroup.appendChild(customDividerLabel);
+                dividerSection.appendChild(dividerColorGroup);
+
+                const currentDividerWidth = parseFloat(table.dataset.dividerWidth || '1');
+                const widthSlider = createSlider('Grosor de línea', 0, 6, 0.25, currentDividerWidth, (v) => `${parseFloat(v).toFixed(2)} px`, (val) => {
+                    const normalized = Math.max(0, parseFloat(val));
+                    table.dataset.dividerWidth = String(Number.isFinite(normalized) ? normalized : 0);
+                    applyDividerStyles(table);
+                });
+                dividerSection.appendChild(widthSlider.element);
+
+                const toggleGroup = document.createElement('div');
+                toggleGroup.className = 'line-toggle-group';
+                const createDividerToggle = (label, key) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'toolbar-btn line-toggle-btn';
+                    btn.textContent = label;
+                    btn.addEventListener('click', () => {
+                        const current = table.dataset[key] === 'true';
+                        table.dataset[key] = current ? 'false' : 'true';
+                        applyDividerStyles(table);
+                        updateToggleStates();
+                    });
+                    return btn;
+                };
+                const verticalToggle = createDividerToggle('Ocultar líneas verticales', 'hideVerticalBorders');
+                const horizontalToggle = createDividerToggle('Ocultar líneas horizontales', 'hideHorizontalBorders');
+                toggleGroup.appendChild(verticalToggle);
+                toggleGroup.appendChild(horizontalToggle);
+                dividerSection.appendChild(toggleGroup);
+
+                const updateToggleStates = () => {
+                    verticalToggle.classList.toggle('active', table.dataset.hideVerticalBorders === 'true');
+                    horizontalToggle.classList.toggle('active', table.dataset.hideHorizontalBorders === 'true');
+                };
+
+                updateDividerColorButtons();
+                updateToggleStates();
+
                 spacingColumn.appendChild(spacingSection);
+                spacingColumn.appendChild(dividerSection);
                 layout.appendChild(themesColumn);
                 layout.appendChild(spacingColumn);
                 tabContent.appendChild(layout);
@@ -5734,49 +6105,109 @@ ${exportTable.outerHTML}
                 normalized.top -= 2;
                 normalized.bottom += 2;
             }
-            const blocks = Array.from(notesEditor.querySelectorAll(blockSelector)).filter(block => {
-                const blockRect = block.getBoundingClientRect();
-                return rectanglesOverlap(blockRect, normalized);
-            });
-            if (!blocks.length) return;
+
+            const editorRect = notesEditor.getBoundingClientRect();
+            const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+            const pointToRange = (x, y) => {
+                const clampedX = clamp(x, editorRect.left + 1, editorRect.right - 1);
+                const clampedY = clamp(y, editorRect.top + 1, editorRect.bottom - 1);
+                let caretRange = null;
+                if (typeof document.caretRangeFromPoint === 'function') {
+                    caretRange = document.caretRangeFromPoint(clampedX, clampedY);
+                }
+                if (!caretRange && typeof document.caretPositionFromPoint === 'function') {
+                    const pos = document.caretPositionFromPoint(clampedX, clampedY);
+                    if (pos) {
+                        caretRange = document.createRange();
+                        caretRange.setStart(pos.offsetNode, pos.offset);
+                        caretRange.collapse(true);
+                    }
+                }
+                if (!caretRange || !caretRange.startContainer) return null;
+                if (!notesEditor.contains(caretRange.startContainer)) return null;
+                return caretRange;
+            };
+            const findRange = (xCandidates, yCandidates) => {
+                for (const y of yCandidates) {
+                    for (const x of xCandidates) {
+                        const range = pointToRange(x, y);
+                        if (range) return range;
+                    }
+                }
+                return null;
+            };
+
+            const xCandidates = [
+                normalized.left + 2,
+                (normalized.left + normalized.right) / 2,
+                normalized.right - 2
+            ];
+            const startRange = findRange(xCandidates, [normalized.top + 2, normalized.bottom - 2, (normalized.top + normalized.bottom) / 2]);
+            const endRange = findRange(xCandidates.slice().reverse(), [normalized.bottom - 2, normalized.top + 2, (normalized.top + normalized.bottom) / 2]);
+            if (!startRange || !endRange) return;
+
+            let start = startRange;
+            let end = endRange;
+            if (start.compareBoundaryPoints(Range.START_TO_START, end) === 1) {
+                [start, end] = [end, start];
+            }
+
+            const deletionRange = document.createRange();
+            deletionRange.setStart(start.startContainer, start.startOffset);
+            deletionRange.setEnd(end.endContainer || end.startContainer, end.endOffset || end.startOffset);
+            if (deletionRange.collapsed) return;
+
+            const fragment = deletionRange.cloneContents();
+            const hasContent = (fragment.textContent && fragment.textContent.trim().length > 0) || (typeof fragment.querySelector === 'function' && fragment.querySelector('*'));
+            if (!hasContent) return;
 
             const scrollY = window.scrollY;
             const modalScroll = notesModalContent.scrollTop;
 
-            let removed = false;
-            blocks.forEach(block => {
-                if (!notesEditor.contains(block)) return;
-                removed = true;
-                if (block.matches('li')) {
-                    const list = block.parentElement;
-                    block.remove();
-                    if (list && !list.querySelector('li')) {
-                        const placeholder = document.createElement('p');
-                        placeholder.innerHTML = '<br>';
-                        list.parentNode?.replaceChild(placeholder, list);
-                    }
-                } else {
-                    block.remove();
+            const candidateBlocks = Array.from(notesEditor.querySelectorAll(blockSelector)).filter(block => {
+                const blockRect = block.getBoundingClientRect();
+                return rectanglesOverlap(blockRect, normalized);
+            });
+
+            const caretRange = deletionRange.cloneRange();
+            caretRange.collapse(true);
+            deletionRange.deleteContents();
+
+            const selection = window.getSelection();
+            if (selection) {
+                selection.removeAllRanges();
+                try {
+                    selection.addRange(caretRange);
+                } catch (error) {
+                    selection.removeAllRanges();
                 }
-            });
-
-            if (!removed) return;
-
-            const remainingBlocks = Array.from(notesEditor.querySelectorAll(blockSelector));
-            let focusTarget = remainingBlocks.find(el => {
-                const r = el.getBoundingClientRect();
-                return r.top >= normalized.bottom - 1;
-            });
-            if (!focusTarget && remainingBlocks.length) {
-                focusTarget = remainingBlocks[remainingBlocks.length - 1];
             }
-            if (!focusTarget) {
-                const placeholder = document.createElement('p');
-                placeholder.innerHTML = '<br>';
-                notesEditor.appendChild(placeholder);
-                focusTarget = placeholder;
+
+            if (!selection || selection.rangeCount === 0) {
+                const fallbackBlock = candidateBlocks.find(block => notesEditor.contains(block)) || notesEditor.querySelector(blockSelector);
+                if (fallbackBlock) {
+                    moveCaretToElementStart(fallbackBlock);
+                }
             }
-            moveCaretToElementStart(focusTarget);
+
+            const cleanupBlock = (block) => {
+                if (!block || !notesEditor.contains(block)) return;
+                if (!block.textContent.trim()) {
+                    if (block.matches('li')) {
+                        const list = block.parentElement;
+                        block.remove();
+                        if (list && !list.querySelector('li')) {
+                            const placeholder = document.createElement('p');
+                            placeholder.innerHTML = '<br>';
+                            list.parentNode?.replaceChild(placeholder, list);
+                        }
+                    } else {
+                        block.innerHTML = '<br>';
+                    }
+                }
+            };
+            candidateBlocks.forEach(cleanupBlock);
+
             recordHistory();
             window.scrollTo(0, scrollY);
             notesModalContent.scrollTop = modalScroll;
