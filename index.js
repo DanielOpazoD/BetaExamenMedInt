@@ -2278,6 +2278,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const grandTotalSpans = {
         references: getElem('total-references'),
+        mapa: getElem('total-mapa'),
         lectura: getElem('total-lectura')
     };
     const grandPercentSpans = {
@@ -2541,7 +2542,7 @@ ${exportTable.outerHTML}
         const fragment = document.createDocumentFragment();
         const container = document.createElement('div');
         container.className = 'flex items-center justify-center space-x-2';
-        
+
         const counterSpan = document.createElement('span');
         counterSpan.className = 'lectura-counter';
         counterSpan.textContent = '0';
@@ -2559,10 +2560,38 @@ ${exportTable.outerHTML}
         fragment.appendChild(container);
         return fragment;
     }
-    
+
+    function createMapaCellContent() {
+        const fragment = document.createDocumentFragment();
+        const container = document.createElement('div');
+        container.className = 'flex items-center justify-center space-x-2';
+
+        const counterSpan = document.createElement('span');
+        counterSpan.className = 'mapa-counter';
+        counterSpan.textContent = '0';
+
+        const noteIconSvg = `<svg class="solid-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10zm0 5.25a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 15.25z" clip-rule="evenodd" /></svg><svg class="outline-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>`;
+
+        const noteIcon = document.createElement('span');
+        noteIcon.className = 'note-icon';
+        noteIcon.dataset.noteType = 'mapa';
+        noteIcon.title = 'Notas del mapa';
+        noteIcon.innerHTML = noteIconSvg;
+
+        container.appendChild(counterSpan);
+        container.appendChild(noteIcon);
+        fragment.appendChild(container);
+        return fragment;
+    }
+
     function initializeCells() {
         document.querySelectorAll('td.references-cell').forEach(cell => {
             renderReferencesCell(cell);
+        });
+
+        document.querySelectorAll('td.mapa-cell[data-col="mapa"]').forEach(cellEl => {
+            cellEl.innerHTML = '';
+            cellEl.appendChild(createMapaCellContent());
         });
 
         document.querySelectorAll('td.lectura-cell[data-col="lectura"]').forEach(cellEl => {
@@ -6766,11 +6795,17 @@ ${exportTable.outerHTML}
 
     function updateAllTotals() {
         let grandLectura = 0;
-        
+        let grandMapa = 0;
+
         const allRows = document.querySelectorAll('tr[data-topic-id]');
         const totalTopics = allRows.length;
-        
+
         allRows.forEach(row => {
+            const mapaCounter = row.querySelector(`td[data-col="mapa"] .mapa-counter`);
+            const mapaCount = parseInt(mapaCounter?.textContent || '0', 10);
+            if (mapaCount > 0) {
+                grandMapa++;
+            }
             const counter = row.querySelector(`td[data-col="lectura"] .lectura-counter`);
             const count = parseInt(counter?.textContent || '0', 10);
             if (count > 0) {
@@ -6785,13 +6820,18 @@ ${exportTable.outerHTML}
             const totalRowTds = totalRow.querySelectorAll('td');
             
             let sectionLecturaCount = 0;
+            let sectionMapaCount = 0;
             let sectionReferencesCount = 0;
-    
+
             sectionRows.forEach(row => {
+                const mapaCounter = row.querySelector(`td[data-col="mapa"] .mapa-counter`);
+                const mapaValue = parseInt(mapaCounter?.textContent || '0', 10);
+                if (mapaValue > 0) sectionMapaCount++;
+
                 const counter = row.querySelector(`td[data-col="lectura"] .lectura-counter`);
                 const count = parseInt(counter?.textContent || '0', 10);
                 if (count > 0) sectionLecturaCount++;
-    
+
                 const references = JSON.parse(row.dataset.references || '[]');
                 if (references.length > 0) {
                     sectionReferencesCount++;
@@ -6801,15 +6841,20 @@ ${exportTable.outerHTML}
             const sectionTotalTopics = sectionRows.length;
     
             if (totalRowTds[1]) totalRowTds[1].textContent = '-'; // References column
-            if (totalRowTds[2]) { // Lectura column
-                totalRowTds[2].textContent = `${sectionLecturaCount} / ${sectionTotalTopics}`;
-                totalRowTds[2].style.fontSize = '0.75rem'; // Make font smaller
+            if (totalRowTds[2]) { // Mapa column
+                totalRowTds[2].textContent = `${sectionMapaCount} / ${sectionTotalTopics}`;
+                totalRowTds[2].style.fontSize = '0.75rem';
+            }
+            if (totalRowTds[3]) { // Lectura column
+                totalRowTds[3].textContent = `${sectionLecturaCount} / ${sectionTotalTopics}`;
+                totalRowTds[3].style.fontSize = '0.75rem'; // Make font smaller
             }
         });
-        
+
         grandTotalSpans.references.textContent = '-';
+        grandTotalSpans.mapa.textContent = String(grandMapa);
         grandTotalSpans.lectura.textContent = String(grandLectura);
-        
+
         const lecturaPercentage = totalTopics > 0 ? Math.round((grandLectura / totalTopics) * 100) : 0;
         grandPercentSpans.lectura.textContent = `${lecturaPercentage}%`;
             
@@ -6859,10 +6904,13 @@ ${exportTable.outerHTML}
         document.querySelectorAll('tr[data-topic-id]').forEach(row => {
             const topicId = row.dataset.topicId;
             const notes = JSON.parse(row.dataset.notes || '[]');
+            const mapaNotes = JSON.parse(row.dataset.mapaNotes || '[]');
             const topicData = {
                 notes: notes.map(note => ({ ...note, lastEdited: note.lastEdited || new Date().toISOString() })),
+                mapaNotes: mapaNotes.map(note => ({ ...note, lastEdited: note.lastEdited || new Date().toISOString() })),
                 confidence: row.querySelector('.confidence-dot')?.dataset.confidenceLevel || '0',
                 references: JSON.parse(row.dataset.references || '[]'),
+                mapa: row.querySelector(`td[data-col="mapa"] .mapa-counter`)?.textContent || '0',
                 lectura: row.querySelector(`td[data-col="lectura"] .lectura-counter`)?.textContent || '0'
             };
             state.topics[topicId] = topicData;
@@ -6908,6 +6956,15 @@ ${exportTable.outerHTML}
                     renderReferencesCell(refCell);
                 }
 
+                const mapaCell = row.querySelector('td[data-col="mapa"]');
+                const mapaCount = topicData.mapa || '0';
+                if (mapaCell) {
+                    const counter = mapaCell.querySelector('.mapa-counter');
+                    const count = parseInt(mapaCount, 10);
+                    if (counter) counter.textContent = count;
+                    mapaCell.classList.toggle('mapa-filled', count > 0);
+                }
+
                 const lectCell = row.querySelector('td[data-col="lectura"]');
                 const lectCount = topicData.lectura || '0';
                 if (lectCell) {
@@ -6924,6 +6981,14 @@ ${exportTable.outerHTML}
                 if(noteIcon) {
                     const hasContent = notes.some(n => n.content && n.content.trim() !== '' && n.content.trim() !== '<p><br></p>');
                     noteIcon.classList.toggle('has-note', hasContent);
+                }
+
+                const mapaNotes = topicData.mapaNotes || [];
+                row.dataset.mapaNotes = JSON.stringify(mapaNotes);
+                const mapaIcon = row.querySelector(`.note-icon[data-note-type="mapa"]`);
+                if (mapaIcon) {
+                    const hasMapaContent = mapaNotes.some(n => n.content && n.content.trim() !== '' && n.content.trim() !== '<p><br></p>');
+                    mapaIcon.classList.toggle('has-note', hasMapaContent);
                 }
 
                 const confidenceDot = row.querySelector('.confidence-dot');
@@ -7582,6 +7647,8 @@ ${exportTable.outerHTML}
         const noteType = activeNoteIcon.dataset.noteType;
         if (noteType === 'section') {
             currentNoteRow.dataset.sectionNote = JSON.stringify(currentNotesArray);
+        } else if (noteType === 'mapa') {
+            currentNoteRow.dataset.mapaNotes = JSON.stringify(currentNotesArray);
         } else {
             currentNoteRow.dataset.notes = JSON.stringify(currentNotesArray);
         }
@@ -8362,7 +8429,7 @@ ${exportTable.outerHTML}
         window.print();
     }
 
-    async function handlePrintSection(sectionHeaderRow) {
+    async function handlePrintSection(sectionHeaderRow, targetType = 'lectura') {
         const sectionId = sectionHeaderRow.dataset.sectionHeader;
         const topicRows = document.querySelectorAll(`tr[data-section="${sectionId}"]`);
         const allTopicRows = document.querySelectorAll('tr[data-topic-id]');
@@ -8373,6 +8440,10 @@ ${exportTable.outerHTML}
         });
         const printArea = getElem('print-area');
         printArea.innerHTML = '';
+
+        const noteField = targetType === 'mapa' ? 'mapaNotes' : 'notes';
+        const emptyPlaceholder = targetType === 'mapa' ? 'Mapa no desarrollado.' : 'Tema no desarrollado.';
+        const emptyAlert = targetType === 'mapa' ? 'No hay mapas que imprimir en esta sección.' : 'No hay notas que imprimir en esta sección.';
 
         const cover = document.createElement('div');
         cover.className = 'section-cover-page';
@@ -8409,7 +8480,8 @@ ${exportTable.outerHTML}
             const topicId = row.dataset.topicId;
             const title = row.cells[1]?.textContent.trim() || '';
             const topicData = await db.get('topics', topicId);
-            const hasNotes = topicData && topicData.notes && topicData.notes.length > 0;
+            const notesArray = topicData && Array.isArray(topicData[noteField]) ? topicData[noteField] : [];
+            const hasNotes = notesArray.length > 0;
 
             const li = document.createElement('li');
             const link = document.createElement('a');
@@ -8441,18 +8513,16 @@ ${exportTable.outerHTML}
             topicWrapper.appendChild(titleEl);
 
             if (hasNotes) {
-                const note = topicData.notes[0];
+                const note = notesArray[0];
                 const noteContent = document.createElement('div');
                 noteContent.innerHTML = note.content;
-                // Sanitize links for printing
-                // Convert sub-note and post-it links back to plain text for printing
                 noteContent.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
                     link.outerHTML = `<span>${link.innerHTML}</span>`;
                 });
                 topicWrapper.appendChild(noteContent);
             } else {
                 const placeholder = document.createElement('p');
-                placeholder.textContent = 'Tema no desarrollado.';
+                placeholder.textContent = emptyPlaceholder;
                 topicWrapper.appendChild(placeholder);
             }
             printArea.appendChild(topicWrapper);
@@ -8461,7 +8531,7 @@ ${exportTable.outerHTML}
 
         if (!printArea.querySelector('.topic-print-wrapper')) {
             printArea.innerHTML = '';
-            await showAlert("No hay notas que imprimir en esta sección.");
+            await showAlert(emptyAlert);
             return;
         }
 
@@ -8497,6 +8567,20 @@ ${exportTable.outerHTML}
                 return;
             }
 
+            // Mapa cell click (excluding note icon)
+            if (cell.classList.contains('mapa-cell') && !target.closest('.note-icon')) {
+                const counter = cell.querySelector('.mapa-counter');
+                if (counter) {
+                    let count = parseInt(counter.textContent, 10);
+                    count = (count + 1) % 2; // Simple toggle between 0 and 1
+                    counter.textContent = count;
+                    cell.classList.toggle('mapa-filled', count > 0);
+                    updateAllTotals();
+                    saveState();
+                }
+                return;
+            }
+
             // Lectura cell click (excluding note icon)
             if (cell.classList.contains('lectura-cell') && !target.closest('.note-icon')) {
                 const counter = cell.querySelector('.lectura-counter');
@@ -8525,13 +8609,22 @@ ${exportTable.outerHTML}
                 activeNoteIcon = target.closest('.note-icon');
                 currentNoteRow = activeNoteIcon.closest('tr');
                 const noteType = activeNoteIcon.dataset.noteType;
-                const noteId = currentNoteRow.dataset.topicId || `section-${Date.now()}`;
 
+                let noteId;
                 let notesDataString;
                 if (noteType === 'section') {
+                    const sectionKey = currentNoteRow.dataset.sectionHeader || `section-${Date.now()}`;
+                    noteId = `section-${sectionKey}`;
                     notesDataString = currentNoteRow.dataset.sectionNote || '[]';
                 } else {
-                    notesDataString = currentNoteRow.dataset.notes || '[]';
+                    const topicKey = currentNoteRow.dataset.topicId || `topic-${Date.now()}`;
+                    if (noteType === 'mapa') {
+                        noteId = `${topicKey}-mapa`;
+                        notesDataString = currentNoteRow.dataset.mapaNotes || '[]';
+                    } else {
+                        noteId = topicKey;
+                        notesDataString = currentNoteRow.dataset.notes || '[]';
+                    }
                 }
 
                 let parsed = [];
@@ -8542,14 +8635,24 @@ ${exportTable.outerHTML}
                 }
 
                 let tab = openNoteTabs.find(t => t.id === noteId);
-                const title = currentNoteRow.cells[1]?.textContent.trim() || 'Nota';
+                const baseTitle = currentNoteRow.cells[1]?.textContent.trim() || 'Nota';
+                let tabTitle = baseTitle;
+                if (noteType === 'section') {
+                    const sectionTitle = currentNoteRow.querySelector('.section-title')?.textContent.trim();
+                    if (sectionTitle) {
+                        tabTitle = sectionTitle;
+                    }
+                } else if (noteType === 'mapa') {
+                    tabTitle = `${baseTitle} · Mapa`;
+                }
                 if (!tab) {
-                    tab = { id: noteId, row: currentNoteRow, icon: activeNoteIcon, notesArray: parsed, activeIndex: 0, title };
+                    tab = { id: noteId, row: currentNoteRow, icon: activeNoteIcon, notesArray: parsed, activeIndex: 0, title: tabTitle };
                     openNoteTabs.push(tab);
                 } else {
                     tab.notesArray = parsed;
                     tab.row = currentNoteRow;
                     tab.icon = activeNoteIcon;
+                    tab.title = tabTitle;
                 }
                 activeTabId = noteId;
                 loadTab(tab);
@@ -8631,7 +8734,8 @@ ${exportTable.outerHTML}
             if (printBtn) {
                 e.stopPropagation();
                 const sectionHeaderRow = printBtn.closest('.section-header-row');
-                handlePrintSection(sectionHeaderRow);
+                const targetType = printBtn.dataset.printTarget || 'lectura';
+                handlePrintSection(sectionHeaderRow, targetType);
             }
         });
 
@@ -8795,6 +8899,8 @@ ${exportTable.outerHTML}
                     const noteType = activeNoteIcon?.dataset.noteType;
                     if (noteType === 'section') {
                         currentNoteRow.dataset.sectionNote = JSON.stringify(currentNotesArray);
+                    } else if (noteType === 'mapa') {
+                        currentNoteRow.dataset.mapaNotes = JSON.stringify(currentNotesArray);
                     } else {
                         currentNoteRow.dataset.notes = JSON.stringify(currentNotesArray);
                     }

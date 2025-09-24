@@ -15,9 +15,10 @@
             --filled-bg: #dcfce7; --filled-text: #166534;
             --not-done-bg: #fee2e2; --not-done-text: #991b1b;
             --lectura-filled-bg: #fef9c3; --lectura-filled-text: #854d0e;
+            --mapa-filled-bg: #e0f2fe; --mapa-filled-text: #075985;
             --fullscreen-bg-color: #F8FBFD;
         }
-        html.dark { 
+        html.dark {
             color-scheme: dark;
             --bg-primary: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155;
             --text-primary: #cbd5e1; --text-secondary: #94a3b8; --text-muted: #64748b;
@@ -30,6 +31,7 @@
             --filled-bg: #14532d; --filled-text: #bbf7d0;
             --not-done-bg: #7f1d1d; --not-done-text: #fca5a5;
             --lectura-filled-bg: #713f12; --lectura-filled-text: #fde047;
+            --mapa-filled-bg: #0f172a; --mapa-filled-text: #38bdf8;
         }
         html[data-theme="ocean"] {
             --header-bg: #164e63;
@@ -72,12 +74,13 @@
             color: #fff;
         }
         
-        .fillable-cell, .lectura-cell { cursor: pointer; user-select: none; transition: background-color 0.2s; position: relative; text-align: center; }
+        .fillable-cell, .lectura-cell, .mapa-cell { cursor: pointer; user-select: none; transition: background-color 0.2s; position: relative; text-align: center; }
         .fillable-cell.filled { background-color: var(--filled-bg); }
         .fillable-cell.not-done { background-color: var(--not-done-bg); }
         .lectura-cell.lectura-filled { background-color: var(--lectura-filled-bg); }
-        
-        .lectura-counter {
+        .mapa-cell.mapa-filled { background-color: var(--mapa-filled-bg); }
+
+        .lectura-counter, .mapa-counter {
             font-weight: bold;
             font-size: 1.1em;
             min-width: 24px;
@@ -87,6 +90,9 @@
         }
         .lectura-cell.lectura-filled .lectura-counter {
             color: var(--lectura-filled-text);
+        }
+        .mapa-cell.mapa-filled .mapa-counter {
+            color: var(--mapa-filled-text);
         }
 
         .section-header-row td { background: var(--section-header-bg); color: var(--section-header-text); cursor: pointer; }
