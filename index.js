@@ -7872,7 +7872,15 @@ ${exportTable.outerHTML}
         
         infoWordCount.textContent = words.length;
         infoNoteSize.textContent = formatBytes(new Blob([note.content]).size);
-        infoLastEdited.textContent = note.lastEdited ? new Date(note.lastEdited).toLocaleString() : 'N/A';
+        infoLastEdited.textContent = note.lastEdited
+            ? new Date(note.lastEdited).toLocaleString('es-ES', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            })
+            : 'N/A';
     }
 
     function renderNoteTabs() {
