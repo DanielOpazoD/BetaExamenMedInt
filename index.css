@@ -554,6 +554,60 @@
         .color-submenu { display: none; position: absolute; top: 110%; left: 0; background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 8px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 1010; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 180px; }
         .color-submenu.visible { display: grid; }
 
+        #floating-format-toolbar {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 6px;
+            box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.98);
+            transition: opacity 0.16s ease, transform 0.16s ease;
+            z-index: 10020;
+        }
+
+        #floating-format-toolbar.visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: scale(1);
+        }
+
+        #floating-format-toolbar .floating-toolbar-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        #floating-format-toolbar .floating-btn {
+            min-width: 30px;
+            min-height: 28px;
+            padding: 4px 6px;
+        }
+
+        #floating-format-toolbar .floating-color-palette {
+            border: none;
+            background: transparent;
+            padding: 0;
+            gap: 3px;
+            box-shadow: none;
+        }
+
+        #floating-format-toolbar .floating-color-palette .toolbar-btn {
+            min-width: 24px;
+            min-height: 24px;
+        }
+
+        #floating-format-toolbar .color-submenu {
+            top: 120%;
+            left: 0;
+        }
+
         .inline-color-menu {
             position: absolute;
             display: none;
@@ -583,6 +637,15 @@
         .symbol-dropdown { position: relative; display: inline-block; }
         .symbol-dropdown-content { display: none; position: absolute; top: 100%; left: 0; background-color: var(--bg-secondary); min-width: 280px; max-height: 200px; overflow-y: auto; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 10; border-radius: 8px; border: 1px solid var(--border-color); padding: 8px; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 4px; }
         .symbol-dropdown-content.visible { display: grid; }
+        .symbol-dropdown-content.tailwind-spacing-panel {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 260px;
+        }
+        .symbol-dropdown-content.tailwind-spacing-panel.visible {
+            display: flex !important;
+        }
         .symbol-dropdown-content.bullet-style-menu {
             display: none;
             flex-direction: column;
@@ -623,6 +686,48 @@
             min-width: auto;
             max-height: none;
             overflow-y: visible;
+        }
+
+        .tailwind-spacing-info {
+            font-size: 0.78rem;
+            margin: 0;
+            color: var(--text-muted);
+        }
+
+        .tailwind-spacing-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .tailwind-spacing-select {
+            width: 100%;
+            padding: 4px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+
+        .tailwind-spacing-custom {
+            display: flex;
+        }
+
+        .tailwind-spacing-input {
+            width: 100%;
+            padding: 4px 6px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+
+        .tailwind-spacing-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .tailwind-spacing-actions .toolbar-btn {
+            flex: 1;
         }
         .symbol-dropdown-content.preset-style-panel {
             display: none;
@@ -832,6 +937,10 @@ table.resizable-table,
 table.resizable-table td,
 table.resizable-table th {
     position: relative;
+}
+
+[data-tailwind-space-y-value] > * + * {
+    margin-top: var(--tailwind-space-y, inherit);
 }
 
 :is(table.resizable-table, .resizable-block) .table-resize-handle {

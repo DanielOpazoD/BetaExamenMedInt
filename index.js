@@ -1632,6 +1632,10 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeTooltipState = null;
     let editingQuickNote = false;
     let savedEditorSelection = null;
+    let floatingFormatToolbar = null;
+    let floatingToolbarRange = null;
+    let floatingToolbarVisible = false;
+    let floatingToolbarListenersInitialized = false;
     let savedSelectedHtml = '';
     let currentCallout = null;
     let lineEraseMode = false;
@@ -1685,6 +1689,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { icon: UI_ICON_STRINGS.type, shortName: 'Color de texto', codeName: 'text-color', description: 'Aplica un color al texto seleccionado.', isHtml: true },
             { icon: UI_ICON_STRINGS.highlighter, shortName: 'Resaltado', codeName: 'highlight-color', description: 'Resalta el fondo del texto seleccionado.', isHtml: true },
             { icon: UI_ICON_STRINGS.highlighter, shortName: 'Fondo de línea', codeName: 'line-highlight', description: 'Pinta el fondo de toda la línea para destacarla.', isHtml: true },
+            { icon: '📏', shortName: 'Espaciado Tailwind', codeName: 'tailwind-spacing', description: 'Modifica las clases mb-* y space-y-* del bloque seleccionado.' },
             { icon: '🖌️', shortName: 'Estilos de texto', codeName: 'preset-styles', description: 'Despliega estilos predefinidos para títulos y bloques.' },
             { icon: '💊', shortName: 'Texto píldora', codeName: 'pill-text', description: 'Convierte el texto seleccionado en una etiqueta tipo pastilla.' },
             { icon: UI_ICON_STRINGS.highlightSize, shortName: 'Altura de destacado', codeName: 'highlight-spacing', description: 'Ajusta el espacio superior e inferior de los bloques resaltados.', isHtml: true },
@@ -4229,11 +4234,7 @@ ${exportTable.outerHTML}
         editorToolbar.appendChild(createSeparator());
 
         // Basic formatting
-        editorToolbar.appendChild(createButton('Negrita', '<b>B</b>', 'bold'));
-        editorToolbar.appendChild(createButton('Cursiva', '<i>I</i>', 'italic'));
-        editorToolbar.appendChild(createButton('Subrayado', '<u>U</u>', 'underline'));
         editorToolbar.appendChild(createButton('Tachado', '<s>S</s>', 'strikeThrough'));
-        editorToolbar.appendChild(createButton('Superíndice', 'X²', 'superscript'));
         editorToolbar.appendChild(createButton('Deshacer', '↺', null, null, undoAction));
         editorToolbar.appendChild(createButton('Rehacer', '↻', null, null, redoAction));
 
@@ -4336,14 +4337,434 @@ ${exportTable.outerHTML}
         const typeIcon = UI_ICON_STRINGS.type;
         const highlighterIcon = UI_ICON_STRINGS.highlighter;
 
-        const textPalette = createColorPalette('Color de Texto', applyForeColor, textColors, extraTextColors, typeIcon);
-        editorToolbar.appendChild(textPalette);
+        const ensureFloatingToolbarElement = () => {
+            if (!floatingFormatToolbar) {
+                floatingFormatToolbar = document.createElement('div');
+                floatingFormatToolbar.id = 'floating-format-toolbar';
+                floatingFormatToolbar.className = 'floating-format-toolbar';
+                document.body.appendChild(floatingFormatToolbar);
+            }
+            return floatingFormatToolbar;
+        };
 
-        const highlightPalette = createColorPalette('Color de Resaltado', applyHiliteColor, highlightColors, extraHighlightColors, highlighterIcon);
-        editorToolbar.appendChild(highlightPalette);
+        const hideFloatingToolbar = () => {
+            if (!floatingFormatToolbar) return;
+            floatingFormatToolbar.classList.remove('visible');
+            floatingFormatToolbar.style.visibility = '';
+            floatingToolbarRange = null;
+            floatingToolbarVisible = false;
+        };
 
-        const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
-        editorToolbar.appendChild(lineHighlightPalette);
+        const updateFloatingToolbarPosition = () => {
+            const toolbar = ensureFloatingToolbarElement();
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) {
+                hideFloatingToolbar();
+                return;
+            }
+            const range = selection.getRangeAt(0);
+            if (!range || range.collapsed) {
+                hideFloatingToolbar();
+                return;
+            }
+            const anchorInside = range.startContainer && notesEditor.contains(range.startContainer);
+            const focusInside = range.endContainer && notesEditor.contains(range.endContainer);
+            if (!anchorInside && !focusInside) {
+                hideFloatingToolbar();
+                return;
+            }
+            const rect = range.getBoundingClientRect();
+            if (!rect || (rect.width === 0 && rect.height === 0)) {
+                hideFloatingToolbar();
+                return;
+            }
+            floatingToolbarRange = range.cloneRange();
+            toolbar.classList.add('visible');
+            toolbar.style.visibility = 'hidden';
+            toolbar.style.top = '0px';
+            toolbar.style.left = '0px';
+            const toolbarRect = toolbar.getBoundingClientRect();
+            let top = rect.top + window.scrollY - toolbarRect.height - 8;
+            if (top < window.scrollY + 8) {
+                top = rect.bottom + window.scrollY + 8;
+            }
+            let left = rect.left + window.scrollX + rect.width / 2 - toolbarRect.width / 2;
+            const minLeft = window.scrollX + 8;
+            const maxLeft = window.scrollX + window.innerWidth - toolbarRect.width - 8;
+            if (left < minLeft) left = minLeft;
+            if (left > maxLeft) left = maxLeft;
+            toolbar.style.top = `${top}px`;
+            toolbar.style.left = `${left}px`;
+            toolbar.style.visibility = '';
+            floatingToolbarVisible = true;
+        };
+
+        const scheduleFloatingToolbarUpdate = () => {
+            requestAnimationFrame(updateFloatingToolbarPosition);
+        };
+
+        const rebuildFloatingToolbar = () => {
+            const toolbar = ensureFloatingToolbarElement();
+            toolbar.innerHTML = '';
+            const actionsRow = document.createElement('div');
+            actionsRow.className = 'floating-toolbar-row';
+            const makeFloatingButton = (title, content, command, value = null, action = null) => {
+                const btn = document.createElement('button');
+                btn.className = 'toolbar-btn floating-btn';
+                btn.title = title;
+                btn.innerHTML = content;
+                btn.addEventListener('mousedown', (e) => e.preventDefault());
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    withEditorSelection(() => {
+                        if (command) {
+                            document.execCommand(command, false, value);
+                        }
+                        if (typeof action === 'function') {
+                            action();
+                        }
+                    });
+                    scheduleFloatingToolbarUpdate();
+                });
+                return btn;
+            };
+            actionsRow.appendChild(makeFloatingButton('Negrita', '<b>B</b>', 'bold'));
+            actionsRow.appendChild(makeFloatingButton('Cursiva', '<i>I</i>', 'italic'));
+            actionsRow.appendChild(makeFloatingButton('Subrayado', '<u>U</u>', 'underline'));
+            actionsRow.appendChild(makeFloatingButton('Superíndice', 'X²', 'superscript'));
+            toolbar.appendChild(actionsRow);
+
+            const colorRow = document.createElement('div');
+            colorRow.className = 'floating-toolbar-row floating-toolbar-colors';
+            const floatingTextPalette = createColorPalette('Color de Texto', applyForeColor, textColors, extraTextColors, typeIcon);
+            floatingTextPalette.classList.add('floating-color-palette');
+            const floatingHighlightPalette = createColorPalette('Color de Resaltado', applyHiliteColor, highlightColors, extraHighlightColors, highlighterIcon);
+            floatingHighlightPalette.classList.add('floating-color-palette');
+            const floatingLinePalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
+            floatingLinePalette.classList.add('floating-color-palette');
+            colorRow.appendChild(floatingTextPalette);
+            colorRow.appendChild(floatingHighlightPalette);
+            colorRow.appendChild(floatingLinePalette);
+            toolbar.appendChild(colorRow);
+            hideFloatingToolbar();
+        };
+
+        const registerFloatingToolbarListeners = () => {
+            if (floatingToolbarListenersInitialized) return;
+            const monitorSelection = () => {
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0) {
+                    hideFloatingToolbar();
+                    return;
+                }
+                const range = selection.getRangeAt(0);
+                if (!range || range.collapsed) {
+                    hideFloatingToolbar();
+                    return;
+                }
+                const anchorInside = range.startContainer && notesEditor.contains(range.startContainer);
+                const focusInside = range.endContainer && notesEditor.contains(range.endContainer);
+                if (!anchorInside && !focusInside) {
+                    hideFloatingToolbar();
+                    return;
+                }
+                scheduleFloatingToolbarUpdate();
+            };
+            const updateIfVisible = () => {
+                if (floatingToolbarVisible) scheduleFloatingToolbarUpdate();
+            };
+            notesEditor.addEventListener('mouseup', monitorSelection);
+            notesEditor.addEventListener('keyup', monitorSelection);
+            notesEditor.addEventListener('touchend', monitorSelection);
+            document.addEventListener('selectionchange', monitorSelection);
+            window.addEventListener('scroll', updateIfVisible, true);
+            window.addEventListener('resize', updateIfVisible);
+            notesModalContent?.addEventListener('scroll', updateIfVisible);
+            document.addEventListener('mousedown', (e) => {
+                if (!floatingToolbarVisible) return;
+                if (floatingFormatToolbar && floatingFormatToolbar.contains(e.target)) return;
+                if (notesEditor.contains(e.target)) return;
+                hideFloatingToolbar();
+            });
+            floatingToolbarListenersInitialized = true;
+        };
+
+        rebuildFloatingToolbar();
+        registerFloatingToolbarListeners();
+
+        const tailwindSpacingScale = {
+            '0': 0,
+            '1': 4,
+            '2': 8,
+            '3': 12,
+            '4': 16,
+            '5': 20,
+            '6': 24,
+            '8': 32,
+            '10': 40
+        };
+
+        const createTailwindSpacingControl = () => {
+            const dropdown = document.createElement('div');
+            dropdown.className = 'symbol-dropdown tailwind-spacing-control';
+
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'toolbar-btn';
+            toggle.title = 'Ajustar clases Tailwind de espacio';
+            toggle.textContent = '📏';
+            dropdown.appendChild(toggle);
+
+            const panel = document.createElement('div');
+            panel.className = 'symbol-dropdown-content tailwind-spacing-panel';
+            dropdown.appendChild(panel);
+
+            const info = document.createElement('p');
+            info.className = 'tailwind-spacing-info';
+            info.textContent = 'Controla los márgenes mb-* y el espaciado space-y-* del bloque seleccionado.';
+            panel.appendChild(info);
+
+            const spacingPresets = [
+                { value: '', label: 'Sin cambio' },
+                { value: '0', label: '0 (0px)' },
+                { value: '1', label: '1 (4px)' },
+                { value: '2', label: '2 (8px)' },
+                { value: '3', label: '3 (12px)' },
+                { value: '4', label: '4 (16px)' },
+                { value: '5', label: '5 (20px)' },
+                { value: '6', label: '6 (24px)' },
+                { value: '8', label: '8 (32px)' },
+                { value: '10', label: '10 (40px)' },
+                { value: 'custom', label: 'Personalizado (px)' }
+            ];
+
+            const buildRow = (labelText) => {
+                const row = document.createElement('div');
+                row.className = 'tailwind-spacing-row';
+                const label = document.createElement('label');
+                label.textContent = labelText;
+                label.className = 'tailwind-spacing-label';
+                const select = document.createElement('select');
+                select.className = 'tailwind-spacing-select';
+                spacingPresets.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt.value;
+                    option.textContent = opt.label;
+                    select.appendChild(option);
+                });
+                const customWrapper = document.createElement('div');
+                customWrapper.className = 'tailwind-spacing-custom';
+                const customInput = document.createElement('input');
+                customInput.type = 'number';
+                customInput.placeholder = 'px';
+                customInput.className = 'tailwind-spacing-input';
+                customWrapper.appendChild(customInput);
+                customWrapper.hidden = true;
+                select.addEventListener('change', () => {
+                    customWrapper.hidden = select.value !== 'custom';
+                });
+                row.appendChild(label);
+                row.appendChild(select);
+                row.appendChild(customWrapper);
+                panel.appendChild(row);
+                return { row, select, customWrapper, customInput };
+            };
+
+            const marginRow = buildRow('Margen inferior (mb-*)');
+            const spaceRow = buildRow('Espaciado vertical (space-y-*)');
+
+            const parsePx = (value) => {
+                const num = parseFloat(value);
+                return Number.isFinite(num) ? Math.round(num) : null;
+            };
+
+            const setRowFromBlock = (block, { select, customWrapper, customInput }, type) => {
+                let classValue = null;
+                if (block.classList) {
+                    const prefix = type === 'margin' ? 'mb-' : 'space-y-';
+                    const match = Array.from(block.classList).find(cls => cls.startsWith(prefix));
+                    if (match) classValue = match.replace(prefix, '');
+                }
+                let unit = null;
+                let storedValue = null;
+                const valueAttr = type === 'margin' ? block.dataset.tailwindMbValue || block.dataset.tailwindMb : block.dataset.tailwindSpaceYValue || block.dataset.tailwindSpaceY;
+                const unitAttr = type === 'margin' ? block.dataset.tailwindMbUnit : block.dataset.tailwindSpaceYUnit;
+                if (classValue && tailwindSpacingScale[classValue] !== undefined) {
+                    unit = 'scale';
+                    storedValue = classValue;
+                } else if (valueAttr) {
+                    storedValue = valueAttr;
+                    unit = unitAttr || (tailwindSpacingScale[valueAttr] !== undefined ? 'scale' : 'px');
+                }
+                if (!storedValue) {
+                    const styleValue = type === 'margin'
+                        ? block.style.marginBottom || window.getComputedStyle(block).marginBottom
+                        : block.style.getPropertyValue('--tailwind-space-y') || window.getComputedStyle(block).getPropertyValue('--tailwind-space-y');
+                    const parsed = parsePx(styleValue);
+                    if (parsed !== null) {
+                        storedValue = String(parsed);
+                        unit = 'px';
+                    }
+                }
+                if (unit === 'scale' && storedValue in tailwindSpacingScale) {
+                    select.value = storedValue;
+                    customWrapper.hidden = true;
+                    customInput.value = '';
+                } else if (unit === 'px' && storedValue) {
+                    select.value = 'custom';
+                    customWrapper.hidden = false;
+                    customInput.value = storedValue.replace(/[^0-9.-]/g, '');
+                } else {
+                    select.value = '';
+                    customWrapper.hidden = true;
+                    customInput.value = '';
+                }
+            };
+
+            const syncPanelWithSelection = () => {
+                const blocks = getSelectedBlockElements().filter(block => block && notesEditor.contains(block));
+                const primary = blocks[0];
+                if (!primary) {
+                    marginRow.select.value = '';
+                    marginRow.customWrapper.hidden = true;
+                    marginRow.customInput.value = '';
+                    spaceRow.select.value = '';
+                    spaceRow.customWrapper.hidden = true;
+                    spaceRow.customInput.value = '';
+                    return;
+                }
+                setRowFromBlock(primary, marginRow, 'margin');
+                setRowFromBlock(primary, spaceRow, 'space');
+            };
+
+            const applySpacing = () => {
+                const marginChoice = marginRow.select.value;
+                const spaceChoice = spaceRow.select.value;
+                const updateMargin = marginChoice !== '';
+                const updateSpace = spaceChoice !== '';
+                if (!updateMargin && !updateSpace) {
+                    panel.classList.remove('visible');
+                    return;
+                }
+                withEditorSelection(() => {
+                    const blocks = getSelectedBlockElements().filter(block => block && notesEditor.contains(block));
+                    if (!blocks.length) return;
+                    blocks.forEach(block => {
+                        if (updateMargin) {
+                            if (block.classList) {
+                                Array.from(block.classList).forEach(cls => {
+                                    if (cls.startsWith('mb-')) block.classList.remove(cls);
+                                });
+                            }
+                            let px = null;
+                            if (marginChoice === 'custom') {
+                                const parsed = parseFloat(marginRow.customInput.value || '0');
+                                px = Number.isFinite(parsed) ? parsed : 0;
+                                block.dataset.tailwindMbUnit = 'px';
+                                block.dataset.tailwindMbValue = String(px);
+                            } else {
+                                const mapped = tailwindSpacingScale[marginChoice];
+                                px = typeof mapped === 'number' ? mapped : 0;
+                                if (block.classList) block.classList.add(`mb-${marginChoice}`);
+                                block.dataset.tailwindMbUnit = 'scale';
+                                block.dataset.tailwindMbValue = marginChoice;
+                            }
+                            block.style.marginBottom = `${px}px`;
+                        }
+                        if (updateSpace) {
+                            if (block.classList) {
+                                Array.from(block.classList).forEach(cls => {
+                                    if (cls.startsWith('space-y-')) block.classList.remove(cls);
+                                });
+                            }
+                            let px = null;
+                            if (spaceChoice === 'custom') {
+                                const parsed = parseFloat(spaceRow.customInput.value || '0');
+                                px = Number.isFinite(parsed) ? parsed : 0;
+                                block.dataset.tailwindSpaceYUnit = 'px';
+                                block.dataset.tailwindSpaceYValue = String(px);
+                            } else {
+                                const mapped = tailwindSpacingScale[spaceChoice];
+                                px = typeof mapped === 'number' ? mapped : 0;
+                                if (block.classList) block.classList.add(`space-y-${spaceChoice}`);
+                                block.dataset.tailwindSpaceYUnit = 'scale';
+                                block.dataset.tailwindSpaceYValue = spaceChoice;
+                            }
+                            block.style.setProperty('--tailwind-space-y', `${px}px`);
+                            block.style.rowGap = `${px}px`;
+                        }
+                    });
+                    recordHistory();
+                });
+                panel.classList.remove('visible');
+                notesEditor.focus({ preventScroll: true });
+            };
+
+            const resetSpacing = () => {
+                withEditorSelection(() => {
+                    const blocks = getSelectedBlockElements().filter(block => block && notesEditor.contains(block));
+                    if (!blocks.length) return;
+                    blocks.forEach(block => {
+                        if (block.classList) {
+                            Array.from(block.classList).forEach(cls => {
+                                if (cls.startsWith('mb-') || cls.startsWith('space-y-')) {
+                                    block.classList.remove(cls);
+                                }
+                            });
+                        }
+                        block.style.removeProperty('margin-bottom');
+                        block.style.removeProperty('--tailwind-space-y');
+                        block.style.removeProperty('row-gap');
+                        delete block.dataset.tailwindMbValue;
+                        delete block.dataset.tailwindMbUnit;
+                        delete block.dataset.tailwindSpaceYValue;
+                        delete block.dataset.tailwindSpaceYUnit;
+                    });
+                    recordHistory();
+                });
+                panel.classList.remove('visible');
+                notesEditor.focus({ preventScroll: true });
+            };
+
+            const actions = document.createElement('div');
+            actions.className = 'tailwind-spacing-actions';
+            const applyBtn = document.createElement('button');
+            applyBtn.type = 'button';
+            applyBtn.className = 'toolbar-btn tailwind-spacing-apply';
+            applyBtn.textContent = 'Aplicar';
+            applyBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                applySpacing();
+            });
+            const resetBtn = document.createElement('button');
+            resetBtn.type = 'button';
+            resetBtn.className = 'toolbar-btn tailwind-spacing-reset';
+            resetBtn.textContent = 'Restablecer';
+            resetBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                resetSpacing();
+            });
+            actions.appendChild(applyBtn);
+            actions.appendChild(resetBtn);
+            panel.appendChild(actions);
+
+            toggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                    if (d !== panel) d.classList.remove('visible');
+                });
+                const willShow = !panel.classList.contains('visible');
+                panel.classList.toggle('visible', willShow);
+                if (willShow) {
+                    syncPanelWithSelection();
+                }
+            });
+
+            return dropdown;
+        };
+
+        editorToolbar.appendChild(createTailwindSpacingControl());
 
         const convertListTag = (list, tagName) => {
             if (!list || list.tagName.toLowerCase() === tagName.toLowerCase()) return list;
@@ -5401,6 +5822,7 @@ ${exportTable.outerHTML}
             resizeBtn.addEventListener('click', () => {
                 tableEditMode = true;
                 editingTable = table;
+                table.classList.add('selected');
                 hideTableMenu();
             });
             tableMenu.appendChild(resizeBtn);
@@ -5807,7 +6229,7 @@ ${exportTable.outerHTML}
             tableMenu.style.left = `${left}px`;
             tableMenu.style.zIndex = 10001;
         };
-        notesEditor.addEventListener('click', (e) => {
+        notesEditor.addEventListener('dblclick', (e) => {
             if (tableEditMode) return;
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
@@ -5826,6 +6248,7 @@ ${exportTable.outerHTML}
         document.addEventListener('click', (e) => {
             if (tableEditMode && editingTable && !editingTable.contains(e.target)) {
                 tableEditMode = false;
+                editingTable.classList.remove('selected');
                 editingTable = null;
             }
         });
