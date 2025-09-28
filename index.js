@@ -1639,6 +1639,121 @@ document.addEventListener('DOMContentLoaded', function () {
     let floatingToolbar = null;
     let floatingToolbarInitialized = false;
 
+    function rangeWithinEditor(range, editor) {
+        if (!range || !editor) return false;
+        const { startContainer, endContainer } = range;
+        if (!startContainer || !endContainer) return false;
+        if (!startContainer.isConnected || !endContainer.isConnected) return false;
+        return editor.contains(startContainer) && editor.contains(endContainer);
+    }
+
+    function focusEditorAndRestoreSelection(editor, range, callback) {
+        const run = () => {
+            const selection = window.getSelection();
+            let activeRange = null;
+            if (range && rangeWithinEditor(range, editor)) {
+                selection.removeAllRanges();
+                selection.addRange(range);
+                activeRange = range;
+            } else if (selection && selection.rangeCount > 0) {
+                const current = selection.getRangeAt(0);
+                if (rangeWithinEditor(current, editor)) {
+                    activeRange = current;
+                }
+            }
+            if (typeof callback === 'function') {
+                callback(activeRange);
+            }
+        };
+
+        if (!editor) {
+            if (typeof callback === 'function') {
+                callback(null);
+            }
+            return;
+        }
+
+        const active = document.activeElement;
+        const needsFocus = !active || (active !== editor && !editor.contains(active));
+        if (needsFocus) {
+            editor.focus({ preventScroll: true });
+            requestAnimationFrame(run);
+        } else {
+            run();
+        }
+    }
+
+    function placeCaretAtEnd(element) {
+        if (!element) return;
+        const selection = window.getSelection();
+        if (!selection) return;
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+
+    function dispatchEditorInput(editor, inputType = 'insertHTML') {
+        if (!editor) return;
+        let event;
+        try {
+            event = new InputEvent('input', { bubbles: true, inputType });
+        } catch (err) {
+            event = new Event('input', { bubbles: true });
+        }
+        editor.dispatchEvent(event);
+    }
+
+    function fragmentFromHtml(html) {
+        const template = document.createElement('template');
+        template.innerHTML = html;
+        return template.content;
+    }
+
+    function insertHtmlContent(editor, html, rangeHint = null) {
+        if (!editor || !html) return false;
+        const selection = window.getSelection();
+        let range = null;
+
+        if (rangeHint && rangeWithinEditor(rangeHint, editor)) {
+            range = rangeHint;
+        } else if (selection && selection.rangeCount > 0) {
+            const current = selection.getRangeAt(0);
+            if (rangeWithinEditor(current, editor)) {
+                range = current;
+            }
+        }
+
+        if (!range) {
+            range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+        }
+
+        editor.focus({ preventScroll: true });
+
+        const fragment = fragmentFromHtml(html);
+        let lastNode = fragment.lastChild;
+        range.deleteContents();
+        range.insertNode(fragment);
+
+        if (lastNode) {
+            range.setStartAfter(lastNode);
+            range.collapse(true);
+        } else {
+            placeCaretAtEnd(editor);
+        }
+
+        if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+
+        dispatchEditorInput(editor);
+        return true;
+    }
+
     // Image selection handling within the sub-note editor
     if (subNoteEditor) {
         subNoteEditor.addEventListener('click', (e) => {
@@ -5821,6 +5936,247 @@ ${exportTable.outerHTML}
             table.style.width = '100%';
         };
 
+        async function exportTableAsPNG(table, baseName = 'tabla') {
+            const { canvas } = await renderTableToCanvas(table);
+            await new Promise((resolve, reject) => {
+                if (!canvas) {
+                    reject(new Error('No se pudo preparar el lienzo de la tabla.'));
+                    return;
+                }
+                canvas.toBlob(blob => {
+                    if (!blob) {
+                        reject(new Error('No se pudo generar la imagen PNG.'));
+                        return;
+                    }
+                    triggerDownload(blob, `${baseName}.png`);
+                    resolve();
+                }, 'image/png');
+            });
+        }
+
+        async function exportTableAsPDF(table, baseName = 'tabla') {
+            const { canvas, cssWidth, cssHeight } = await renderTableToCanvas(table);
+            if (!canvas) throw new Error('No se pudo preparar el lienzo de la tabla.');
+            const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+            const jpegBytes = dataUrlToUint8Array(jpegDataUrl);
+            const pdfBytes = createPdfFromImage(jpegBytes, canvas.width, canvas.height, cssWidth, cssHeight);
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            triggerDownload(blob, `${baseName}.pdf`);
+        }
+
+        function getTableExportBaseName(table) {
+            if (!table) return `tabla-${formatTimestampForFile()}`;
+            const caption = table.querySelector('caption');
+            const candidate = (table.getAttribute('data-title') || table.getAttribute('aria-label') || table.dataset?.sectionTitle || (caption ? caption.textContent : '') || 'tabla').trim();
+            const safeLabel = sanitizeFileNameSegment(candidate);
+            return `${safeLabel || 'tabla'}-${formatTimestampForFile()}`;
+        }
+
+        function sanitizeFileNameSegment(text) {
+            const normalized = (text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            return normalized.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        }
+
+        function formatTimestampForFile() {
+            const now = new Date();
+            const pad = (value) => String(value).padStart(2, '0');
+            return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+        }
+
+        async function renderTableToCanvas(table) {
+            if (!(table instanceof HTMLTableElement)) {
+                throw new Error('No se proporcionó una tabla válida para exportar.');
+            }
+
+            try {
+                if (document.fonts && typeof document.fonts.ready === 'object') {
+                    await document.fonts.ready.catch(() => {});
+                }
+            } catch (err) {
+                console.warn('No se pudieron preparar las fuentes antes de la exportación.', err);
+            }
+
+            const { svg, width, height } = buildTableSvgString(table);
+            const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+
+            const image = await loadImage(dataUrl);
+            const ratio = window.devicePixelRatio || 1;
+            const canvas = document.createElement('canvas');
+            const scaledWidth = Math.max(1, Math.round(width * ratio));
+            const scaledHeight = Math.max(1, Math.round(height * ratio));
+            canvas.width = scaledWidth;
+            canvas.height = scaledHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('No se pudo inicializar el lienzo.');
+            ctx.scale(ratio, ratio);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(image, 0, 0, width, height);
+            return { canvas, cssWidth: width, cssHeight: height };
+        }
+
+        function loadImage(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.decoding = 'async';
+                img.onload = () => resolve(img);
+                img.onerror = (error) => reject(new Error('No se pudo preparar la imagen de la tabla.'));
+                img.src = src;
+            });
+        }
+
+        function buildTableSvgString(table) {
+            const padding = 16;
+            const { clone, width, height } = cloneTableForExport(table);
+            const wrapper = document.createElement('div');
+            wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+            wrapper.style.display = 'inline-block';
+            wrapper.style.padding = `${padding}px`;
+            const tableStyle = window.getComputedStyle(table);
+            const background = tableStyle.backgroundColor && tableStyle.backgroundColor !== 'rgba(0, 0, 0, 0)'
+                ? tableStyle.backgroundColor
+                : '#ffffff';
+            wrapper.style.backgroundColor = background;
+            wrapper.style.color = tableStyle.color || '#111827';
+            wrapper.style.fontFamily = tableStyle.fontFamily || window.getComputedStyle(document.body).fontFamily || 'sans-serif';
+            wrapper.style.fontSize = tableStyle.fontSize || '14px';
+            wrapper.style.lineHeight = tableStyle.lineHeight || '1.4';
+            wrapper.style.boxSizing = 'border-box';
+            wrapper.style.width = `${width}px`;
+            wrapper.style.maxWidth = 'none';
+            wrapper.appendChild(clone);
+            const totalWidth = width + padding * 2;
+            const totalHeight = height + padding * 2;
+            const html = wrapper.outerHTML;
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${totalHeight}"><foreignObject width="100%" height="100%">${html}</foreignObject></svg>`;
+            return { svg, width: totalWidth, height: totalHeight };
+        }
+
+        function cloneTableForExport(table) {
+            const clone = table.cloneNode(true);
+            clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+            clone.querySelectorAll('.table-resize-handle, .table-resize-guide').forEach(el => el.remove());
+            clone.querySelectorAll('.selected, .selected-for-move').forEach(el => {
+                el.classList.remove('selected', 'selected-for-move');
+            });
+            inlineComputedStylesForExport(table, clone);
+            const measuringWrapper = document.createElement('div');
+            measuringWrapper.style.position = 'fixed';
+            measuringWrapper.style.left = '-10000px';
+            measuringWrapper.style.top = '-10000px';
+            measuringWrapper.style.visibility = 'hidden';
+            measuringWrapper.style.pointerEvents = 'none';
+            measuringWrapper.style.zIndex = '-1';
+            measuringWrapper.appendChild(clone);
+            document.body.appendChild(measuringWrapper);
+            const rect = clone.getBoundingClientRect();
+            const width = Math.max(1, Math.ceil(rect.width));
+            const height = Math.max(1, Math.ceil(rect.height));
+            measuringWrapper.remove();
+            clone.style.width = `${width}px`;
+            clone.style.margin = '0';
+            clone.style.boxSizing = 'border-box';
+            return { clone, width, height };
+        }
+
+        function inlineComputedStylesForExport(source, target) {
+            if (!(source instanceof Element) || !(target instanceof Element)) return;
+            const computed = window.getComputedStyle(source);
+            const styleString = Array.from(computed).map(prop => `${prop}:${computed.getPropertyValue(prop)};`).join('');
+            target.setAttribute('style', styleString);
+            const sourceChildren = source.children;
+            const targetChildren = target.children;
+            for (let i = 0; i < sourceChildren.length; i++) {
+                inlineComputedStylesForExport(sourceChildren[i], targetChildren[i]);
+            }
+        }
+
+        function dataUrlToUint8Array(dataUrl) {
+            const base64 = (dataUrl || '').split(',')[1];
+            if (!base64) return new Uint8Array();
+            const binary = atob(base64);
+            const len = binary.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
+        }
+
+        function createPdfFromImage(jpegBytes, imageWidthPx, imageHeightPx, cssWidth, cssHeight) {
+            const encoder = new TextEncoder();
+            const parts = [];
+            const xref = [0];
+            let offset = 0;
+
+            const append = (data) => {
+                const bytes = typeof data === 'string' ? encoder.encode(data) : data;
+                parts.push(bytes);
+                offset += bytes.length;
+                return bytes.length;
+            };
+
+            const registerObject = (index) => {
+                xref[index] = offset;
+            };
+
+            const widthPt = Math.max(1, Math.round((cssWidth || imageWidthPx) * 72 / 96));
+            const heightPt = Math.max(1, Math.round((cssHeight || imageHeightPx) * 72 / 96));
+
+            append('%PDF-1.3\n');
+
+            registerObject(1);
+            append('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+
+            registerObject(2);
+            append('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+
+            registerObject(3);
+            append(`3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /XObject << /Im0 4 0 R >> /ProcSet [/PDF /ImageC] >> /MediaBox [0 0 ${widthPt} ${heightPt}] /Contents 5 0 R >>\nendobj\n`);
+
+            registerObject(4);
+            append(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imageWidthPx} /Height ${imageHeightPx} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\nstream\n`);
+            append(jpegBytes);
+            append('\nendstream\nendobj\n');
+
+            const contentStream = `q\n${widthPt} 0 0 ${heightPt} 0 0 cm\n/Im0 Do\nQ\n`;
+            const contentBytes = encoder.encode(contentStream);
+
+            registerObject(5);
+            append(`5 0 obj\n<< /Length ${contentBytes.length} >>\nstream\n`);
+            append(contentBytes);
+            append('\nendstream\nendobj\n');
+
+            const xrefOffset = offset;
+            append('xref\n0 6\n0000000000 65535 f \n');
+            for (let i = 1; i <= 5; i++) {
+                const value = String(xref[i] || 0).padStart(10, '0');
+                append(`${value} 00000 n \n`);
+            }
+            append('trailer\n<< /Size 6 /Root 1 0 R >>\n');
+            append(`startxref\n${xrefOffset}\n%%EOF`);
+
+            const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
+            const pdfBytes = new Uint8Array(totalLength);
+            let position = 0;
+            for (const part of parts) {
+                pdfBytes.set(part, position);
+                position += part.length;
+            }
+            return pdfBytes;
+        }
+
+        function triggerDownload(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
         const ensureSpacingState = (table) => {
             if (!table) return;
             const firstCell = table.querySelector('th, td');
@@ -6101,6 +6457,96 @@ ${exportTable.outerHTML}
                 helper.className = 'table-menu-hint';
                 helper.textContent = 'Tip: selecciona una columna y aplica estilos sin cerrar este panel.';
                 tabContent.appendChild(helper);
+
+                const exportSection = document.createElement('div');
+                exportSection.className = 'table-export-section';
+
+                const exportTitle = document.createElement('div');
+                exportTitle.className = 'table-export-title';
+                exportTitle.textContent = 'Guardar tabla';
+                exportSection.appendChild(exportTitle);
+
+                const exportButtons = document.createElement('div');
+                exportButtons.className = 'table-export-buttons';
+                exportSection.appendChild(exportButtons);
+
+                const statusMessage = document.createElement('p');
+                statusMessage.className = 'table-export-status';
+                statusMessage.textContent = 'Descarga la tabla actual como imagen PNG o PDF.';
+                exportSection.appendChild(statusMessage);
+
+                let exporting = false;
+                const originalLabels = { png: 'PNG', pdf: 'PDF' };
+
+                const setExportingState = (isExporting, format) => {
+                    exporting = isExporting;
+                    pngBtn.disabled = isExporting;
+                    pdfBtn.disabled = isExporting;
+                    if (format) {
+                        const button = format === 'png' ? pngBtn : pdfBtn;
+                        if (isExporting) {
+                            button.dataset.originalLabel = button.textContent;
+                            button.textContent = 'Exportando…';
+                        } else if (button.dataset.originalLabel) {
+                            button.textContent = button.dataset.originalLabel;
+                            delete button.dataset.originalLabel;
+                        } else {
+                            button.textContent = originalLabels[format];
+                        }
+                    } else {
+                        pngBtn.textContent = originalLabels.png;
+                        pdfBtn.textContent = originalLabels.pdf;
+                    }
+                };
+
+                const showStatus = (message, delayReset = true) => {
+                    statusMessage.textContent = message;
+                    if (delayReset) {
+                        clearTimeout(statusMessage._resetTimer);
+                        statusMessage._resetTimer = setTimeout(() => {
+                            statusMessage.textContent = 'Descarga la tabla actual como imagen PNG o PDF.';
+                        }, 4000);
+                    }
+                };
+
+                const handleExport = async (format) => {
+                    if (exporting) return;
+                    const baseName = getTableExportBaseName(table);
+                    setExportingState(true, format);
+                    showStatus('Preparando exportación…', false);
+                    try {
+                        if (format === 'png') {
+                            await exportTableAsPNG(table, baseName);
+                            showStatus('Tabla guardada como PNG.');
+                        } else {
+                            await exportTableAsPDF(table, baseName);
+                            showStatus('Tabla guardada como PDF.');
+                        }
+                        hideTableMenu();
+                    } catch (error) {
+                        console.error('Error exportando tabla:', error);
+                        showStatus('No se pudo exportar la tabla. Intenta nuevamente.', false);
+                        alert('No se pudo exportar la tabla seleccionada. Revisa la consola para más detalles.');
+                    } finally {
+                        setExportingState(false, format);
+                    }
+                };
+
+                const pngBtn = document.createElement('button');
+                pngBtn.type = 'button';
+                pngBtn.className = 'toolbar-btn table-export-btn';
+                pngBtn.textContent = originalLabels.png;
+                pngBtn.addEventListener('click', () => handleExport('png'));
+                exportButtons.appendChild(pngBtn);
+
+                const pdfBtn = document.createElement('button');
+                pdfBtn.type = 'button';
+                pdfBtn.className = 'toolbar-btn table-export-btn';
+                pdfBtn.textContent = originalLabels.pdf;
+                pdfBtn.addEventListener('click', () => handleExport('pdf'));
+                exportButtons.appendChild(pdfBtn);
+
+                tabContent.appendChild(exportSection);
             };
 
             const HEADER_COLORS = [
@@ -7363,66 +7809,74 @@ ${exportTable.outerHTML}
 
     function applyNoteStyle(opts) {
         const PREDEF_CLASSES = ['note-blue-left','note-green-card','note-lila-dotted','note-peach-dashed','note-cyan-top','note-pink-double','note-yellow-corner','note-gradient','note-mint-bottom','note-violet-shadow','note-gray-neutral'];
-        if (!currentCallout) {
-            const callout = document.createElement('div');
-            callout.className = 'note-callout';
-            callout.setAttribute('role','note');
-            callout.setAttribute('aria-label','Nota');
-            if (savedEditorSelection && !savedEditorSelection.collapsed) {
-                try {
-                    savedEditorSelection.surroundContents(callout);
-                } catch (e) {
-                    callout.textContent = savedEditorSelection.toString();
-                    savedEditorSelection.deleteContents();
+
+        focusEditorAndRestoreSelection(notesEditor, savedEditorSelection, () => {
+            if (!currentCallout) {
+                const callout = document.createElement('div');
+                callout.className = 'note-callout';
+                callout.setAttribute('role','note');
+                callout.setAttribute('aria-label','Nota');
+                if (savedEditorSelection && !savedEditorSelection.collapsed && rangeWithinEditor(savedEditorSelection, notesEditor)) {
+                    try {
+                        savedEditorSelection.surroundContents(callout);
+                    } catch (e) {
+                        callout.textContent = savedEditorSelection.toString();
+                        savedEditorSelection.deleteContents();
+                        savedEditorSelection.insertNode(callout);
+                    }
+                } else if (savedEditorSelection && rangeWithinEditor(savedEditorSelection, notesEditor)) {
                     savedEditorSelection.insertNode(callout);
+                } else {
+                    notesEditor.appendChild(callout);
                 }
-            } else if (savedEditorSelection) {
-                savedEditorSelection.insertNode(callout);
+                currentCallout = callout;
+            }
+
+            if (!currentCallout.querySelector('.note-callout-content')) {
+                const innerContent = document.createElement('div');
+                innerContent.className = 'note-callout-content';
+                innerContent.contentEditable = 'true';
+                while (currentCallout.firstChild) {
+                    innerContent.appendChild(currentCallout.firstChild);
+                }
+                if (!innerContent.textContent.trim()) {
+                    innerContent.textContent = 'Escribe una nota...';
+                }
+                currentCallout.appendChild(innerContent);
+            }
+
+            const inner = currentCallout.querySelector('.note-callout-content');
+            sanitizeCalloutContent(inner);
+            currentCallout.contentEditable = 'false';
+            currentCallout.classList.remove(...PREDEF_CLASSES, 'note-shadow');
+            if (opts.presetClass) {
+                currentCallout.removeAttribute('style');
+                currentCallout.classList.add(opts.presetClass);
             } else {
-                notesEditor.appendChild(callout);
+                currentCallout.style.backgroundColor = opts.backgroundColor;
+                currentCallout.style.borderColor = opts.borderColor;
+                currentCallout.style.color = opts.textColor;
+                currentCallout.style.borderWidth = opts.borderWidth + 'px';
+                currentCallout.style.borderRadius = opts.borderRadius + 'px';
+                currentCallout.style.padding = opts.padding + 'px';
+                currentCallout.style.margin = opts.margin + 'px 0';
+                if (opts.shadow) {
+                    currentCallout.classList.add('note-shadow');
+                }
             }
-            currentCallout = callout;
-        }
-        if (!currentCallout.querySelector('.note-callout-content')) {
-            const innerContent = document.createElement('div');
-            innerContent.className = 'note-callout-content';
-            innerContent.contentEditable = 'true';
-            while (currentCallout.firstChild) {
-                innerContent.appendChild(currentCallout.firstChild);
-            }
-            if (!innerContent.textContent.trim()) {
-                innerContent.textContent = 'Escribe una nota...';
-            }
-            currentCallout.appendChild(innerContent);
-        }
-        const inner = currentCallout.querySelector('.note-callout-content');
-        sanitizeCalloutContent(inner);
-        currentCallout.contentEditable = 'false';
-        currentCallout.classList.remove(...PREDEF_CLASSES, 'note-shadow');
-        if (opts.presetClass) {
-            currentCallout.removeAttribute('style');
-            currentCallout.classList.add(opts.presetClass);
-        } else {
-            currentCallout.style.backgroundColor = opts.backgroundColor;
-            currentCallout.style.borderColor = opts.borderColor;
-            currentCallout.style.color = opts.textColor;
-            currentCallout.style.borderWidth = opts.borderWidth + 'px';
-            currentCallout.style.borderRadius = opts.borderRadius + 'px';
-            currentCallout.style.padding = opts.padding + 'px';
-            currentCallout.style.margin = opts.margin + 'px 0';
-            if (opts.shadow) {
-                currentCallout.classList.add('note-shadow');
-            }
-        }
-        const range = document.createRange();
-        range.selectNodeContents(inner);
-        range.collapse(false);
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-        inner.focus({ preventScroll: true });
-        notesEditor.focus({ preventScroll: true });
-        closeNoteStyleModal();
+
+            const range = document.createRange();
+            range.selectNodeContents(inner);
+            range.collapse(false);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            inner.focus({ preventScroll: true });
+            notesEditor.focus({ preventScroll: true });
+            recordHistory();
+            closeNoteStyleModal();
+            savedEditorSelection = null;
+        });
     }
 
 
@@ -7812,10 +8266,40 @@ ${exportTable.outerHTML}
                 uses: f.uses || 0,
                 created: f.created || Date.now()
             }));
-        } else {
-            htmlFavorites = DEFAULT_HTML_FAVORITES.map(f => ({ ...f }));
-            await saveHtmlFavorites();
+            return;
         }
+
+        let migrated = false;
+        try {
+            const hasLocalStorage = typeof window !== 'undefined' && window.localStorage;
+            const legacy = hasLocalStorage
+                ? window.localStorage.getItem('htmlFavorites')
+                : null;
+            if (legacy) {
+                const parsed = JSON.parse(legacy);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    htmlFavorites = parsed.map(f => ({
+                        name: f.name,
+                        code: f.code,
+                        tags: f.tags || [],
+                        favorite: !!f.favorite,
+                        uses: f.uses || 0,
+                        created: f.created || Date.now()
+                    }));
+                    migrated = true;
+                    if (hasLocalStorage) {
+                        window.localStorage.removeItem('htmlFavorites');
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('No se pudieron migrar las plantillas HTML guardadas previamente.', error);
+        }
+
+        if (!migrated) {
+            htmlFavorites = DEFAULT_HTML_FAVORITES.map(f => ({ ...f }));
+        }
+        await saveHtmlFavorites();
     }
 
     async function saveHtmlFavorites() {
@@ -8065,21 +8549,39 @@ ${exportTable.outerHTML}
 
     insertHtmlBtn.addEventListener('click', () => {
         let html = htmlCodeInput.value;
-        if (html) {
-            if (savedSelectedHtml) {
-                html = insertSelectedTextIntoTemplate(html, savedSelectedHtml);
-            }
-            if (savedEditorSelection) {
-                const selection = window.getSelection();
-                selection.removeAllRanges();
-                selection.addRange(savedEditorSelection);
-            }
-            document.execCommand('insertHTML', false, html);
+        if (!html) {
+            hideModal(htmlCodeModal);
+            if (currentHtmlEditor) currentHtmlEditor.focus();
+            return;
         }
-        hideModal(htmlCodeModal);
-        if (currentHtmlEditor) currentHtmlEditor.focus();
-        savedEditorSelection = null;
-        savedSelectedHtml = '';
+
+        if (savedSelectedHtml) {
+            html = insertSelectedTextIntoTemplate(html, savedSelectedHtml);
+        }
+
+        const targetEditor = currentHtmlEditor || notesEditor;
+
+        const finalize = () => {
+            hideModal(htmlCodeModal);
+            if (targetEditor) targetEditor.focus({ preventScroll: true });
+            savedEditorSelection = null;
+            savedSelectedHtml = '';
+        };
+
+        if (!targetEditor) {
+            finalize();
+            return;
+        }
+
+        const performInsert = (activeRange) => {
+            const inserted = insertHtmlContent(targetEditor, html, activeRange);
+            if (inserted && targetEditor === notesEditor) {
+                recordHistory();
+            }
+            finalize();
+        };
+
+        focusEditorAndRestoreSelection(targetEditor, savedEditorSelection, performInsert);
     });
 
     cancelHtmlBtn.addEventListener('click', () => {
