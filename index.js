@@ -1649,16 +1649,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function focusEditorAndRestoreSelection(editor, range, callback) {
         const run = () => {
+            const selection = window.getSelection();
+            let activeRange = null;
             if (range && rangeWithinEditor(range, editor)) {
-                const selection = window.getSelection();
                 selection.removeAllRanges();
                 selection.addRange(range);
+                activeRange = range;
+            } else if (selection && selection.rangeCount > 0) {
+                const current = selection.getRangeAt(0);
+                if (rangeWithinEditor(current, editor)) {
+                    activeRange = current;
+                }
             }
-            callback();
+            if (typeof callback === 'function') {
+                callback(activeRange);
+            }
         };
 
         if (!editor) {
-            callback();
+            if (typeof callback === 'function') {
+                callback(null);
+            }
             return;
         }
 
@@ -1670,6 +1681,77 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             run();
         }
+    }
+
+    function placeCaretAtEnd(element) {
+        if (!element) return;
+        const selection = window.getSelection();
+        if (!selection) return;
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+
+    function dispatchEditorInput(editor, inputType = 'insertHTML') {
+        if (!editor) return;
+        let event;
+        try {
+            event = new InputEvent('input', { bubbles: true, inputType });
+        } catch (err) {
+            event = new Event('input', { bubbles: true });
+        }
+        editor.dispatchEvent(event);
+    }
+
+    function fragmentFromHtml(html) {
+        const template = document.createElement('template');
+        template.innerHTML = html;
+        return template.content;
+    }
+
+    function insertHtmlContent(editor, html, rangeHint = null) {
+        if (!editor || !html) return false;
+        const selection = window.getSelection();
+        let range = null;
+
+        if (rangeHint && rangeWithinEditor(rangeHint, editor)) {
+            range = rangeHint;
+        } else if (selection && selection.rangeCount > 0) {
+            const current = selection.getRangeAt(0);
+            if (rangeWithinEditor(current, editor)) {
+                range = current;
+            }
+        }
+
+        if (!range) {
+            range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+        }
+
+        editor.focus({ preventScroll: true });
+
+        const fragment = fragmentFromHtml(html);
+        let lastNode = fragment.lastChild;
+        range.deleteContents();
+        range.insertNode(fragment);
+
+        if (lastNode) {
+            range.setStartAfter(lastNode);
+            range.collapse(true);
+        } else {
+            placeCaretAtEnd(editor);
+        }
+
+        if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+
+        dispatchEditorInput(editor);
+        return true;
     }
 
     // Image selection handling within the sub-note editor
@@ -5944,28 +6026,30 @@ ${exportTable.outerHTML}
         }
 
         function buildTableSvgString(table) {
-            const clone = cloneTableForExport(table);
             const padding = 16;
-            const rect = table.getBoundingClientRect();
-            const width = Math.ceil(rect.width) + padding * 2;
-            const height = Math.ceil(rect.height) + padding * 2;
+            const { clone, width, height } = cloneTableForExport(table);
             const wrapper = document.createElement('div');
             wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
             wrapper.style.display = 'inline-block';
             wrapper.style.padding = `${padding}px`;
-            wrapper.style.backgroundColor = '#ffffff';
             const tableStyle = window.getComputedStyle(table);
+            const background = tableStyle.backgroundColor && tableStyle.backgroundColor !== 'rgba(0, 0, 0, 0)'
+                ? tableStyle.backgroundColor
+                : '#ffffff';
+            wrapper.style.backgroundColor = background;
             wrapper.style.color = tableStyle.color || '#111827';
             wrapper.style.fontFamily = tableStyle.fontFamily || window.getComputedStyle(document.body).fontFamily || 'sans-serif';
             wrapper.style.fontSize = tableStyle.fontSize || '14px';
             wrapper.style.lineHeight = tableStyle.lineHeight || '1.4';
             wrapper.style.boxSizing = 'border-box';
-            wrapper.style.width = `${Math.ceil(rect.width)}px`;
+            wrapper.style.width = `${width}px`;
             wrapper.style.maxWidth = 'none';
             wrapper.appendChild(clone);
+            const totalWidth = width + padding * 2;
+            const totalHeight = height + padding * 2;
             const html = wrapper.outerHTML;
-            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${html}</foreignObject></svg>`;
-            return { svg, width, height };
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${totalHeight}"><foreignObject width="100%" height="100%">${html}</foreignObject></svg>`;
+            return { svg, width: totalWidth, height: totalHeight };
         }
 
         function cloneTableForExport(table) {
@@ -5976,10 +6060,23 @@ ${exportTable.outerHTML}
                 el.classList.remove('selected', 'selected-for-move');
             });
             inlineComputedStylesForExport(table, clone);
-            clone.style.width = `${Math.ceil(table.getBoundingClientRect().width)}px`;
+            const measuringWrapper = document.createElement('div');
+            measuringWrapper.style.position = 'fixed';
+            measuringWrapper.style.left = '-10000px';
+            measuringWrapper.style.top = '-10000px';
+            measuringWrapper.style.visibility = 'hidden';
+            measuringWrapper.style.pointerEvents = 'none';
+            measuringWrapper.style.zIndex = '-1';
+            measuringWrapper.appendChild(clone);
+            document.body.appendChild(measuringWrapper);
+            const rect = clone.getBoundingClientRect();
+            const width = Math.max(1, Math.ceil(rect.width));
+            const height = Math.max(1, Math.ceil(rect.height));
+            measuringWrapper.remove();
+            clone.style.width = `${width}px`;
             clone.style.margin = '0';
             clone.style.boxSizing = 'border-box';
-            return clone;
+            return { clone, width, height };
         }
 
         function inlineComputedStylesForExport(source, target) {
@@ -8462,24 +8559,29 @@ ${exportTable.outerHTML}
             html = insertSelectedTextIntoTemplate(html, savedSelectedHtml);
         }
 
+        const targetEditor = currentHtmlEditor || notesEditor;
+
         const finalize = () => {
             hideModal(htmlCodeModal);
-            if (currentHtmlEditor) currentHtmlEditor.focus({ preventScroll: true });
+            if (targetEditor) targetEditor.focus({ preventScroll: true });
             savedEditorSelection = null;
             savedSelectedHtml = '';
         };
 
-        const insertHtml = () => {
-            document.execCommand('insertHTML', false, html);
-            recordHistory();
+        if (!targetEditor) {
+            finalize();
+            return;
+        }
+
+        const performInsert = (activeRange) => {
+            const inserted = insertHtmlContent(targetEditor, html, activeRange);
+            if (inserted && targetEditor === notesEditor) {
+                recordHistory();
+            }
             finalize();
         };
 
-        if (currentHtmlEditor) {
-            focusEditorAndRestoreSelection(currentHtmlEditor, savedEditorSelection, insertHtml);
-        } else {
-            insertHtml();
-        }
+        focusEditorAndRestoreSelection(targetEditor, savedEditorSelection, performInsert);
     });
 
     cancelHtmlBtn.addEventListener('click', () => {
