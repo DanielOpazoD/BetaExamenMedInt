@@ -1,4 +1,8 @@
 export function makeTableResizable(table, { minSize = 30 } = {}) {
+  if (!table || table.dataset.resizableInitialized === 'true') {
+    return;
+  }
+
   let hoverEdge = null;
   let activeResize = null;
   let startX = 0;
@@ -8,32 +12,38 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   let startHeight = 0;
   const isTableElement = table instanceof HTMLTableElement;
 
+  const isResizeEnabled = () => table.classList.contains('resizing-active');
+
   table.style.position = 'relative';
   const handle = document.createElement('div');
   handle.className = 'table-resize-handle';
   table.appendChild(handle);
   handle.addEventListener('mousemove', e => {
+    if (!isResizeEnabled()) return;
     e.stopPropagation();
     table.style.cursor = 'se-resize';
   });
 
   table.addEventListener('mousemove', onHover);
   table.addEventListener('mousedown', e => {
+    if (!isResizeEnabled()) return;
     table.classList.add('selected');
     startResize(e);
   });
   document.addEventListener('mousedown', e => {
-    if (!table.contains(e.target)) {
+    if (!table.contains(e.target) && !table.classList.contains('resizing-active')) {
       table.classList.remove('selected');
+      resetHoverState();
     }
   });
   handle.addEventListener('mousedown', startTableResize);
   document.addEventListener('mousemove', onDrag);
   document.addEventListener('mouseup', stopResize);
   document.addEventListener('keydown', cancelOnEsc);
+  table.dataset.resizableInitialized = 'true';
 
   function onHover(e) {
-    if (!isTableElement || activeResize) return;
+    if (!isTableElement || activeResize || !isResizeEnabled()) return;
     const rect = table.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -55,7 +65,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   }
 
   function startResize(e) {
-    if (!isTableElement || !hoverEdge) return;
+    if (!isTableElement || !hoverEdge || !isResizeEnabled()) return;
     e.preventDefault();
     activeResize = hoverEdge;
     startX = e.clientX;
@@ -66,6 +76,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   }
 
   function startTableResize(e) {
+    if (!isResizeEnabled()) return;
     e.stopPropagation();
     e.preventDefault();
     activeResize = { type: 'table' };
@@ -77,7 +88,7 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
   }
 
   function onDrag(e) {
-    if (!activeResize) return;
+    if (!activeResize || !isResizeEnabled()) return;
     if (activeResize.type === 'col') {
       const dx = e.clientX - startX;
       const newWidth = Math.max(minSize, startSize + dx);
@@ -117,6 +128,13 @@ export function makeTableResizable(table, { minSize = 30 } = {}) {
     }
     activeResize = null;
     table.style.cursor = '';
+  }
+
+  function resetHoverState() {
+    hoverEdge = null;
+    if (!activeResize) {
+      table.style.cursor = '';
+    }
   }
 
   function findColEdge(x) {

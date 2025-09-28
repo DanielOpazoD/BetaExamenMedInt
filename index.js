@@ -4229,11 +4229,7 @@ ${exportTable.outerHTML}
         editorToolbar.appendChild(createSeparator());
 
         // Basic formatting
-        editorToolbar.appendChild(createButton('Negrita', '<b>B</b>', 'bold'));
-        editorToolbar.appendChild(createButton('Cursiva', '<i>I</i>', 'italic'));
-        editorToolbar.appendChild(createButton('Subrayado', '<u>U</u>', 'underline'));
         editorToolbar.appendChild(createButton('Tachado', '<s>S</s>', 'strikeThrough'));
-        editorToolbar.appendChild(createButton('Superíndice', 'X²', 'superscript'));
         editorToolbar.appendChild(createButton('Deshacer', '↺', null, null, undoAction));
         editorToolbar.appendChild(createButton('Rehacer', '↻', null, null, redoAction));
 
@@ -4336,14 +4332,454 @@ ${exportTable.outerHTML}
         const typeIcon = UI_ICON_STRINGS.type;
         const highlighterIcon = UI_ICON_STRINGS.highlighter;
 
-        const textPalette = createColorPalette('Color de Texto', applyForeColor, textColors, extraTextColors, typeIcon);
-        editorToolbar.appendChild(textPalette);
+        let floatingToolbar = document.querySelector('.floating-format-bar');
+        if (!floatingToolbar) {
+            floatingToolbar = document.createElement('div');
+            floatingToolbar.className = 'floating-format-bar';
+            floatingToolbar.style.top = '-9999px';
+            floatingToolbar.style.left = '-9999px';
+            document.body.appendChild(floatingToolbar);
+        } else {
+            floatingToolbar.innerHTML = '';
+        }
 
-        const highlightPalette = createColorPalette('Color de Resaltado', applyHiliteColor, highlightColors, extraHighlightColors, highlighterIcon);
-        editorToolbar.appendChild(highlightPalette);
+        let floatingRange = null;
 
-        const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
-        editorToolbar.appendChild(lineHighlightPalette);
+        const hideFloatingToolbar = () => {
+            if (!floatingToolbar) return;
+            floatingToolbar.classList.remove('visible');
+            floatingToolbar.style.top = '-9999px';
+            floatingToolbar.style.left = '-9999px';
+        };
+
+        const getRangeRect = (range) => {
+            if (!range) return null;
+            const rects = range.getClientRects();
+            for (const rect of rects) {
+                if (rect.width || rect.height) return rect;
+            }
+            const rect = range.getBoundingClientRect();
+            if (rect && (rect.width || rect.height)) return rect;
+            return null;
+        };
+
+        const positionFloatingToolbar = (range) => {
+            const rect = getRangeRect(range);
+            if (!rect) {
+                hideFloatingToolbar();
+                return;
+            }
+            floatingToolbar.classList.add('visible');
+            const width = floatingToolbar.offsetWidth;
+            const height = floatingToolbar.offsetHeight;
+            const viewportLeft = window.scrollX;
+            const viewportRight = viewportLeft + window.innerWidth;
+            let left = rect.left + window.scrollX + rect.width / 2 - width / 2;
+            const minLeft = viewportLeft + 8;
+            const maxLeft = viewportRight - width - 8;
+            if (left < minLeft) left = minLeft;
+            if (left > maxLeft) left = maxLeft;
+            const top = Math.max(window.scrollY + 8, rect.top + window.scrollY - height - 10);
+            floatingToolbar.style.left = `${left}px`;
+            floatingToolbar.style.top = `${top}px`;
+        };
+
+        const runFloatingAction = (action) => {
+            if (!floatingRange) return;
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(floatingRange);
+            withEditorSelection(action);
+            const updated = window.getSelection();
+            if (updated.rangeCount > 0 && !updated.getRangeAt(0).collapsed) {
+                floatingRange = updated.getRangeAt(0).cloneRange();
+                positionFloatingToolbar(floatingRange);
+            } else {
+                floatingRange = null;
+                hideFloatingToolbar();
+            }
+            notesEditor.focus({ preventScroll: true });
+        };
+
+        const createFloatingButton = (title, content, command) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'toolbar-btn';
+            btn.title = title;
+            btn.innerHTML = content;
+            btn.addEventListener('mousedown', e => e.preventDefault());
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                runFloatingAction(() => document.execCommand(command, false, null));
+            });
+            return btn;
+        };
+
+        const createFloatingPalette = (title, applyFn, mainColors, extraColors, iconSVG) => {
+            const group = document.createElement('div');
+            group.className = 'color-palette-group';
+
+            const applyColor = (color) => {
+                runFloatingAction(() => applyFn(color));
+            };
+
+            mainColors.forEach(color => {
+                const swatch = document.createElement('button');
+                swatch.className = 'color-swatch toolbar-btn';
+                if (color === 'transparent') {
+                    swatch.style.backgroundImage = 'linear-gradient(to top left, transparent calc(50% - 1px), red, transparent calc(50% + 1px))';
+                    swatch.style.backgroundColor = 'var(--bg-secondary)';
+                    swatch.title = 'Sin color';
+                } else {
+                    swatch.style.backgroundColor = color;
+                    swatch.title = color;
+                }
+                swatch.addEventListener('mousedown', (e) => e.preventDefault());
+                swatch.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    applyColor(color);
+                });
+                group.appendChild(swatch);
+            });
+
+            const otherBtn = document.createElement('button');
+            otherBtn.className = 'other-colors-btn toolbar-btn';
+            otherBtn.innerHTML = iconSVG;
+            otherBtn.title = title;
+            group.appendChild(otherBtn);
+
+            const submenu = document.createElement('div');
+            submenu.className = 'color-submenu';
+            extraColors.forEach(color => {
+                const swatch = document.createElement('button');
+                swatch.className = 'color-swatch';
+                if (color === 'transparent') {
+                    swatch.style.backgroundImage = 'linear-gradient(to top left, transparent calc(50% - 1px), red, transparent calc(50% + 1px))';
+                    swatch.style.backgroundColor = 'var(--bg-secondary)';
+                    swatch.title = 'Sin color';
+                } else {
+                    swatch.style.backgroundColor = color;
+                    swatch.title = color;
+                }
+                swatch.addEventListener('mousedown', (e) => e.preventDefault());
+                swatch.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    applyColor(color);
+                    submenu.classList.remove('visible');
+                });
+                submenu.appendChild(swatch);
+            });
+
+            const customColorLabel = document.createElement('label');
+            customColorLabel.className = 'toolbar-btn';
+            customColorLabel.title = 'Color personalizado';
+            customColorLabel.innerHTML = '🎨';
+            const customColorInput = document.createElement('input');
+            customColorInput.type = 'color';
+            customColorInput.style.width = '0';
+            customColorInput.style.height = '0';
+            customColorInput.style.opacity = '0';
+            customColorInput.style.position = 'absolute';
+            customColorLabel.appendChild(customColorInput);
+            customColorInput.addEventListener('input', (e) => {
+                if (e.target.value) {
+                    applyColor(e.target.value);
+                    submenu.classList.remove('visible');
+                }
+            });
+            customColorInput.addEventListener('click', (e) => e.stopPropagation());
+            submenu.appendChild(customColorLabel);
+            group.appendChild(submenu);
+
+            otherBtn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+            });
+            otherBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => {
+                    if (d !== submenu) d.classList.remove('visible');
+                });
+                submenu.classList.toggle('visible');
+            });
+
+            return group;
+        };
+
+        floatingToolbar.appendChild(createFloatingButton('Negrita', '<b>B</b>', 'bold'));
+        floatingToolbar.appendChild(createFloatingButton('Cursiva', '<i>I</i>', 'italic'));
+        floatingToolbar.appendChild(createFloatingButton('Subrayado', '<u>U</u>', 'underline'));
+        floatingToolbar.appendChild(createFloatingButton('Superíndice', 'X²', 'superscript'));
+        floatingToolbar.appendChild(createFloatingPalette('Color de texto', applyForeColor, textColors, extraTextColors, typeIcon));
+        floatingToolbar.appendChild(createFloatingPalette('Color de resaltado', applyHiliteColor, highlightColors, extraHighlightColors, highlighterIcon));
+        floatingToolbar.appendChild(createFloatingPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon));
+
+        const selectionWithinEditor = (range) => {
+            if (!range) return false;
+            let node = range.commonAncestorContainer;
+            if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+            return !!node && notesEditor.contains(node);
+        };
+
+        const updateFloatingToolbar = () => {
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) {
+                if (!floatingToolbar.contains(document.activeElement)) {
+                    floatingRange = null;
+                    hideFloatingToolbar();
+                }
+                return;
+            }
+            const range = sel.getRangeAt(0);
+            if (range.collapsed || !selectionWithinEditor(range)) {
+                if (!floatingToolbar.contains(document.activeElement)) {
+                    floatingRange = null;
+                    hideFloatingToolbar();
+                }
+                return;
+            }
+            floatingRange = range.cloneRange();
+            positionFloatingToolbar(floatingRange);
+        };
+
+        const handleGlobalScroll = () => {
+            if (floatingRange) {
+                positionFloatingToolbar(floatingRange);
+            }
+        };
+
+        if (!floatingToolbar.dataset.initialized) {
+            document.addEventListener('selectionchange', updateFloatingToolbar);
+            document.addEventListener('mousedown', (e) => {
+                if (!floatingToolbar.contains(e.target) && !notesEditor.contains(e.target)) {
+                    floatingRange = null;
+                    hideFloatingToolbar();
+                }
+            });
+            window.addEventListener('scroll', handleGlobalScroll, true);
+            if (notesModalContent) {
+                notesModalContent.addEventListener('scroll', handleGlobalScroll);
+            }
+            notesEditor.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    floatingRange = null;
+                    hideFloatingToolbar();
+                }
+            });
+            floatingToolbar.dataset.initialized = 'true';
+        }
+
+        let spacingSelection = null;
+        const spacingDropdown = document.createElement('div');
+        spacingDropdown.className = 'spacing-dropdown';
+        const spacingBtn = document.createElement('button');
+        spacingBtn.type = 'button';
+        spacingBtn.className = 'toolbar-btn';
+        spacingBtn.title = 'Ajustar espaciado de bloques';
+        spacingBtn.innerHTML = '↕️ Espaciado';
+        spacingDropdown.appendChild(spacingBtn);
+        const spacingPanel = document.createElement('div');
+        spacingPanel.className = 'spacing-panel';
+        spacingDropdown.appendChild(spacingPanel);
+
+        const captureSpacingSelection = () => {
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            const range = sel.getRangeAt(0);
+            if (!selectionWithinEditor(range)) return;
+            spacingSelection = range.cloneRange();
+        };
+
+        const runSpacingAction = (fn) => {
+            if (!spacingSelection) captureSpacingSelection();
+            if (!spacingSelection) return;
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(spacingSelection);
+            withEditorSelection(fn);
+            const updated = window.getSelection();
+            if (updated.rangeCount > 0) {
+                spacingSelection = updated.getRangeAt(0).cloneRange();
+            }
+            notesEditor.focus({ preventScroll: true });
+        };
+
+        const getSelectedBlocksForSpacing = () => {
+            return getSelectedBlockElements().filter(block => block && notesEditor.contains(block));
+        };
+
+        const applyMarginBottom = (value) => {
+            const blocks = getSelectedBlocksForSpacing();
+            blocks.forEach(block => {
+                if (!Number.isFinite(value) || value <= 0) {
+                    block.style.marginBottom = '';
+                    delete block.dataset.customTailwindMb;
+                } else {
+                    block.style.marginBottom = `${value}px`;
+                    block.dataset.customTailwindMb = String(value);
+                }
+            });
+        };
+
+        const applySpaceY = (value) => {
+            const blocks = getSelectedBlocksForSpacing();
+            if (!blocks.length) return;
+            if (!Number.isFinite(value) || value <= 0) {
+                blocks.forEach(block => {
+                    block.style.marginTop = '';
+                    delete block.dataset.customTailwindSpaceY;
+                });
+                return;
+            }
+            blocks.forEach((block, index) => {
+                if (blocks.length === 1) {
+                    block.style.marginTop = `${value}px`;
+                } else if (index === 0) {
+                    block.style.marginTop = '';
+                } else {
+                    block.style.marginTop = `${value}px`;
+                }
+                block.dataset.customTailwindSpaceY = String(value);
+            });
+        };
+
+        const createSpacingRow = (labelText, input, valueLabel) => {
+            const row = document.createElement('div');
+            row.className = 'spacing-row';
+            const label = document.createElement('span');
+            label.textContent = labelText;
+            row.appendChild(label);
+            row.appendChild(input);
+            row.appendChild(valueLabel);
+            return row;
+        };
+
+        const marginInput = document.createElement('input');
+        marginInput.type = 'range';
+        marginInput.min = '0';
+        marginInput.max = '64';
+        marginInput.step = '1';
+        marginInput.value = '0';
+        const marginValue = document.createElement('span');
+        marginValue.className = 'spacing-value';
+        marginValue.textContent = '0 px';
+        const marginRow = createSpacingRow('Margen inferior (mb)', marginInput, marginValue);
+
+        const spaceInput = document.createElement('input');
+        spaceInput.type = 'range';
+        spaceInput.min = '0';
+        spaceInput.max = '64';
+        spaceInput.step = '1';
+        spaceInput.value = '0';
+        const spaceValue = document.createElement('span');
+        spaceValue.className = 'spacing-value';
+        spaceValue.textContent = '0 px';
+        const spaceRow = createSpacingRow('Espaciado entre líneas (space-y)', spaceInput, spaceValue);
+
+        spacingPanel.appendChild(marginRow);
+        spacingPanel.appendChild(spaceRow);
+
+        const actionsRow = document.createElement('div');
+        actionsRow.className = 'spacing-actions';
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'toolbar-btn';
+        resetBtn.textContent = 'Restablecer';
+        resetBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            runSpacingAction(() => {
+                applyMarginBottom(NaN);
+                applySpaceY(NaN);
+            });
+            marginInput.value = '0';
+            marginValue.textContent = '0 px';
+            spaceInput.value = '0';
+            spaceValue.textContent = '0 px';
+        });
+        actionsRow.appendChild(resetBtn);
+        spacingPanel.appendChild(actionsRow);
+
+        const updateSpacingInputs = () => {
+            const blocks = getSelectedBlocksForSpacing();
+            if (!blocks.length) {
+                marginInput.value = '0';
+                marginValue.textContent = '0 px';
+                spaceInput.value = '0';
+                spaceValue.textContent = '0 px';
+                return;
+            }
+            const first = blocks[0];
+            let marginVal = parseFloat(window.getComputedStyle(first).marginBottom);
+            if (!Number.isFinite(marginVal) || marginVal < 0) marginVal = 0;
+            marginVal = Math.max(0, Math.min(64, Math.round(marginVal)));
+            marginInput.value = String(marginVal);
+            marginValue.textContent = `${marginVal} px`;
+
+            let spaceVal = 0;
+            if (blocks.length === 1) {
+                spaceVal = parseFloat(window.getComputedStyle(first).marginTop);
+            } else {
+                for (let i = 1; i < blocks.length; i++) {
+                    const val = parseFloat(window.getComputedStyle(blocks[i]).marginTop);
+                    if (Number.isFinite(val)) {
+                        spaceVal = Math.max(spaceVal, Math.round(val));
+                    }
+                }
+            }
+            if (!Number.isFinite(spaceVal) || spaceVal < 0) spaceVal = 0;
+            spaceVal = Math.max(0, Math.min(64, Math.round(spaceVal)));
+            spaceInput.value = String(spaceVal);
+            spaceValue.textContent = `${spaceVal} px`;
+        };
+
+        marginInput.addEventListener('mousedown', captureSpacingSelection);
+        spaceInput.addEventListener('mousedown', captureSpacingSelection);
+
+        marginInput.addEventListener('input', () => {
+            const value = parseInt(marginInput.value, 10) || 0;
+            marginValue.textContent = `${value} px`;
+            runSpacingAction(() => applyMarginBottom(value));
+        });
+
+        spaceInput.addEventListener('input', () => {
+            const value = parseInt(spaceInput.value, 10) || 0;
+            spaceValue.textContent = `${value} px`;
+            runSpacingAction(() => applySpaceY(value));
+        });
+
+        spacingBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            captureSpacingSelection();
+        });
+
+        spacingBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const willShow = !spacingPanel.classList.contains('visible');
+            document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(d => d.classList.remove('visible'));
+            spacingPanel.classList.toggle('visible', willShow);
+            if (willShow) {
+                captureSpacingSelection();
+                updateSpacingInputs();
+            } else {
+                spacingSelection = null;
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!spacingDropdown.contains(e.target)) {
+                spacingPanel.classList.remove('visible');
+                spacingSelection = null;
+            }
+        });
+
+        document.addEventListener('selectionchange', () => {
+            if (spacingPanel.classList.contains('visible')) {
+                captureSpacingSelection();
+                updateSpacingInputs();
+            }
+        });
+
+        editorToolbar.appendChild(spacingDropdown);
 
         const convertListTag = (list, tagName) => {
             if (!list || list.tagName.toLowerCase() === tagName.toLowerCase()) return list;
@@ -5079,6 +5515,29 @@ ${exportTable.outerHTML}
         let currentTable = null;
         let editingTable = null;
         let tableEditMode = false;
+        const deactivateTableResizeMode = () => {
+            tableEditMode = false;
+            if (editingTable) {
+                editingTable.classList.remove('resizing-active');
+                editingTable.classList.remove('selected');
+                editingTable = null;
+            }
+        };
+        const activateTableResizeMode = (table) => {
+            if (!table) return;
+            initTableResize(table);
+            document.querySelectorAll('table.resizable-table.resizing-active').forEach(t => {
+                if (t !== table) {
+                    t.classList.remove('resizing-active');
+                    t.classList.remove('selected');
+                }
+            });
+            editingTable = table;
+            tableEditMode = true;
+            table.classList.add('resizing-active');
+            table.classList.add('selected');
+            hideTableMenu();
+        };
         const hideTableMenu = () => {
             tableMenu.style.display = 'none';
             currentTable = null;
@@ -5399,9 +5858,7 @@ ${exportTable.outerHTML}
             resizeBtn.className = 'toolbar-btn';
             resizeBtn.innerHTML = '↔️ Ajustar tamaño';
             resizeBtn.addEventListener('click', () => {
-                tableEditMode = true;
-                editingTable = table;
-                hideTableMenu();
+                activateTableResizeMode(table);
             });
             tableMenu.appendChild(resizeBtn);
 
@@ -5807,7 +6264,7 @@ ${exportTable.outerHTML}
             tableMenu.style.left = `${left}px`;
             tableMenu.style.zIndex = 10001;
         };
-        notesEditor.addEventListener('click', (e) => {
+        notesEditor.addEventListener('dblclick', (e) => {
             if (tableEditMode) return;
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
@@ -5824,13 +6281,16 @@ ${exportTable.outerHTML}
             e.stopPropagation();
         });
         document.addEventListener('click', (e) => {
-            if (tableEditMode && editingTable && !editingTable.contains(e.target)) {
-                tableEditMode = false;
-                editingTable = null;
+            if (tableEditMode && editingTable && !editingTable.contains(e.target) && !tableMenu.contains(e.target)) {
+                deactivateTableResizeMode();
             }
-        });
-        document.addEventListener('click', (e) => {
             if (!tableMenu.contains(e.target)) hideTableMenu();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                deactivateTableResizeMode();
+                hideTableMenu();
+            }
         });
 
         const applyBlockVerticalPadding = (level) => {
@@ -7701,8 +8161,6 @@ ${exportTable.outerHTML}
     }
     function initTableResize(element) {
         if (!element) return;
-        element.querySelector('.table-resize-handle')?.remove();
-        element.querySelector('.table-resize-guide')?.remove();
         if (element instanceof HTMLTableElement) {
             element.classList.add('resizable-table');
             element.classList.remove('resizable-block');
@@ -7710,7 +8168,7 @@ ${exportTable.outerHTML}
             element.classList.add('resizable-block');
             element.classList.remove('resizable-table');
         }
-        element.removeAttribute('data-resizable-initialized');
+        if (element.dataset.resizableInitialized === 'true') return;
         makeTableResizable(element);
     }
 
