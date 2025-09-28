@@ -567,6 +567,99 @@
             z-index: 10001;
         }
 
+        .floating-format-bar {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px;
+            border-radius: 10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+            z-index: 10002;
+        }
+
+        .floating-format-bar.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .floating-format-bar .toolbar-btn {
+            min-width: 28px;
+            min-height: 28px;
+        }
+
+        .floating-format-bar .color-palette-group {
+            margin: 0;
+        }
+
+        .floating-format-bar .color-submenu {
+            top: 100%;
+            margin-top: 6px;
+        }
+
+        .spacing-dropdown {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .spacing-panel {
+            position: absolute;
+            top: 110%;
+            left: 0;
+            min-width: 240px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 16px 30px rgba(15, 23, 42, 0.2);
+            padding: 12px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .spacing-panel.visible {
+            display: flex;
+        }
+
+        .spacing-panel .spacing-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .spacing-panel .spacing-row span:first-child {
+            flex: 1;
+            font-size: 0.85rem;
+        }
+
+        .spacing-panel input[type="range"] {
+            flex: 1;
+        }
+
+        .spacing-panel .spacing-value {
+            width: 54px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-muted);
+        }
+
+        .spacing-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .spacing-actions .toolbar-btn {
+            font-size: 0.75rem;
+            padding: 4px 10px;
+        }
+
         .inline-color-menu .color-palette-group {
             display: inline-flex;
             flex-wrap: wrap;
@@ -848,7 +941,8 @@ table.resizable-table th {
     box-sizing: border-box;
     display: none;
 }
-:is(table.resizable-table, .resizable-block).selected .table-resize-handle {
+:is(table.resizable-table, .resizable-block).selected .table-resize-handle,
+:is(table.resizable-table, .resizable-block).resizing-active .table-resize-handle {
     display: block;
 }
 
