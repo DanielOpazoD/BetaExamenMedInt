@@ -1632,9 +1632,12 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeTooltipState = null;
     let editingQuickNote = false;
     let savedEditorSelection = null;
+    let dismissFloatingToolbar = () => {};
     let savedSelectedHtml = '';
     let currentCallout = null;
     let lineEraseMode = false;
+    let floatingToolbar = null;
+    let floatingToolbarInitialized = false;
 
     // Image selection handling within the sub-note editor
     if (subNoteEditor) {
@@ -2715,6 +2718,10 @@ ${exportTable.outerHTML}
 
     function setupEditorToolbar() {
         editorToolbar.innerHTML = ''; // Clear existing toolbar
+        if (!editorToolbar.dataset.hideFloatingBound) {
+            editorToolbar.addEventListener('mousedown', () => dismissFloatingToolbar(), { capture: true });
+            editorToolbar.dataset.hideFloatingBound = 'true';
+        }
 
         // Run a callback while preserving the current text selection
         const withEditorSelection = (fn) => {
@@ -2739,6 +2746,7 @@ ${exportTable.outerHTML}
             btn.addEventListener('mousedown', e => e.preventDefault());
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
+                dismissFloatingToolbar();
                 withEditorSelection(() => {
                     if (command) {
                         document.execCommand(command, false, value);
@@ -3622,6 +3630,287 @@ ${exportTable.outerHTML}
             return sep;
         };
         
+        const removeTailwindSpacingClasses = (element) => {
+            if (!element || !element.classList) return;
+            const classesToRemove = Array.from(element.classList).filter(cls => /^(?:m[trblxy]|space-y)-/i.test(cls));
+            classesToRemove.forEach(cls => element.classList.remove(cls));
+        };
+
+        const createTailwindSpacingControl = () => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'spacing-adjuster';
+
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'toolbar-btn spacing-adjuster-toggle';
+            toggleBtn.type = 'button';
+            toggleBtn.title = 'Ajustar márgenes y espacio vertical';
+            toggleBtn.innerHTML = '↕️⚙️';
+            toggleBtn.addEventListener('mousedown', (e) => e.preventDefault());
+
+            const panel = document.createElement('div');
+            panel.className = 'spacing-adjuster-panel';
+
+            let spacingSelection = null;
+
+            const ensureSelection = () => {
+                if (!spacingSelection) return;
+                const selection = window.getSelection();
+                if (!selection) return;
+                selection.removeAllRanges();
+                selection.addRange(spacingSelection.cloneRange());
+            };
+
+            const updateStoredSelection = () => {
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    spacingSelection = selection.getRangeAt(0).cloneRange();
+                    savedEditorSelection = spacingSelection.cloneRange();
+                }
+            };
+
+            const applySpacing = (topValue, bottomValue, betweenValue) => {
+                const blocks = getSelectedBlockElements();
+                const topPx = topValue !== null ? `${topValue}px` : null;
+                const bottomPx = bottomValue !== null ? `${bottomValue}px` : null;
+                const betweenPx = betweenValue !== null ? `${betweenValue}px` : null;
+
+                const processedParents = new WeakSet();
+
+                blocks.forEach((block, index) => {
+                    if (!block || !notesEditor.contains(block)) return;
+                    removeTailwindSpacingClasses(block);
+                    if (block.parentElement && block.parentElement !== notesEditor && !processedParents.has(block.parentElement)) {
+                        removeTailwindSpacingClasses(block.parentElement);
+                        if (betweenPx !== null) {
+                            block.parentElement.style.gap = betweenPx;
+                            block.parentElement.style.rowGap = betweenPx;
+                            block.parentElement.dataset.customSpaceY = betweenPx;
+                        } else {
+                            block.parentElement.style.removeProperty('gap');
+                            block.parentElement.style.removeProperty('row-gap');
+                            delete block.parentElement.dataset.customSpaceY;
+                        }
+                        processedParents.add(block.parentElement);
+                    }
+
+                    if (betweenPx !== null) {
+                        const isSingle = blocks.length === 1;
+                        if (isSingle) {
+                            block.style.marginTop = betweenPx;
+                            block.style.marginBottom = betweenPx;
+                        } else {
+                            if (index === 0) {
+                                block.style.marginBottom = betweenPx;
+                                block.style.marginTop = topPx !== null ? topPx : '';
+                            } else if (index === blocks.length - 1) {
+                                block.style.marginTop = betweenPx;
+                                block.style.marginBottom = bottomPx !== null ? bottomPx : '';
+                            } else {
+                                block.style.marginTop = betweenPx;
+                                block.style.marginBottom = betweenPx;
+                            }
+                        }
+                    } else {
+                        if (topPx !== null) {
+                            block.style.marginTop = topPx;
+                        } else {
+                            block.style.removeProperty('margin-top');
+                        }
+                        if (bottomPx !== null) {
+                            block.style.marginBottom = bottomPx;
+                        } else {
+                            block.style.removeProperty('margin-bottom');
+                        }
+                    }
+                });
+            };
+
+            const sliderRefs = {};
+
+            const updateSliderVisual = (slider, badge) => {
+                const value = Number(slider.value);
+                const min = Number(slider.min);
+                const max = Number(slider.max);
+                const percent = max > min ? ((value - min) / (max - min)) * 100 : 0;
+                slider.style.background = `linear-gradient(90deg, #0ea5e9 0%, #38bdf8 ${percent}%, rgba(148,163,184,0.25) ${percent}%)`;
+                badge.textContent = `${value} px`;
+            };
+
+            const handleLiveSpacing = () => {
+                if (!spacingSelection) return;
+                ensureSelection();
+                const topValue = Number(sliderRefs.top.slider.value);
+                const bottomValue = Number(sliderRefs.bottom.slider.value);
+                const betweenValue = Number(sliderRefs.between.slider.value);
+                withEditorSelection(() => applySpacing(topValue, bottomValue, betweenValue));
+                Object.values(sliderRefs).forEach(ref => ref.update());
+                updateStoredSelection();
+            };
+
+            const buildSlider = (labelText, { min = 0, max = 96, step = 1 } = {}) => {
+                const field = document.createElement('div');
+                field.className = 'spacing-adjuster-field';
+
+                const header = document.createElement('div');
+                header.className = 'spacing-slider-header';
+
+                const label = document.createElement('span');
+                label.textContent = labelText;
+
+                const badge = document.createElement('span');
+                badge.className = 'spacing-slider-value';
+                badge.textContent = '0 px';
+
+                header.appendChild(label);
+                header.appendChild(badge);
+                field.appendChild(header);
+
+                const slider = document.createElement('input');
+                slider.type = 'range';
+                slider.className = 'spacing-slider-input';
+                slider.min = String(min);
+                slider.max = String(max);
+                slider.step = String(step);
+                slider.value = '0';
+
+                field.appendChild(slider);
+                panel.appendChild(field);
+
+                slider.addEventListener('input', () => {
+                    updateSliderVisual(slider, badge);
+                    handleLiveSpacing();
+                });
+                slider.addEventListener('change', () => {
+                    updateSliderVisual(slider, badge);
+                    updateStoredSelection();
+                });
+                slider.addEventListener('pointerdown', ensureSelection);
+                slider.addEventListener('touchstart', ensureSelection, { passive: true });
+
+                const update = () => updateSliderVisual(slider, badge);
+                update();
+
+                return { slider, badge, update };
+            };
+
+            sliderRefs.top = buildSlider('Margen superior (px)', { max: 120 });
+            sliderRefs.bottom = buildSlider('Margen inferior (px)', { max: 120 });
+            sliderRefs.between = buildSlider('Espacio entre bloques (px)', { max: 120 });
+
+            const clearBtn = document.createElement('button');
+            clearBtn.type = 'button';
+            clearBtn.className = 'toolbar-btn spacing-clear-btn';
+            clearBtn.textContent = 'Restablecer';
+            clearBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (!spacingSelection) return;
+                Object.values(sliderRefs).forEach(ref => {
+                    ref.slider.value = '0';
+                    ref.update();
+                });
+                ensureSelection();
+                withEditorSelection(() => applySpacing(null, null, null));
+                updateStoredSelection();
+                hidePanel();
+                notesEditor.focus({ preventScroll: true });
+            });
+
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.className = 'toolbar-btn spacing-apply-btn';
+            closeBtn.textContent = 'Cerrar';
+            closeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                hidePanel();
+                notesEditor.focus({ preventScroll: true });
+            });
+
+            const footer = document.createElement('div');
+            footer.className = 'spacing-adjuster-footer';
+            footer.appendChild(clearBtn);
+            footer.appendChild(closeBtn);
+            panel.appendChild(footer);
+
+            const clampValue = (value, slider) => {
+                const min = Number(slider.min);
+                const max = Number(slider.max);
+                if (!Number.isFinite(value)) return 0;
+                return Math.min(max, Math.max(min, Math.round(value)));
+            };
+
+            const syncSlidersWithSelection = () => {
+                ensureSelection();
+                const blocks = getSelectedBlockElements();
+                if (!blocks.length) return;
+                const firstBlock = blocks[0];
+                const blockStyles = window.getComputedStyle(firstBlock);
+                const parent = firstBlock.parentElement;
+
+                const topValue = clampValue(parseFloat(firstBlock.style.marginTop || blockStyles.marginTop || '0'), sliderRefs.top.slider);
+                const bottomValue = clampValue(parseFloat(firstBlock.style.marginBottom || blockStyles.marginBottom || '0'), sliderRefs.bottom.slider);
+
+                let betweenValue = 0;
+                if (parent) {
+                    if (parent.dataset.customSpaceY) {
+                        betweenValue = clampValue(parseFloat(parent.dataset.customSpaceY), sliderRefs.between.slider);
+                    } else {
+                        const parentStyles = window.getComputedStyle(parent);
+                        const rowGap = parseFloat(parentStyles.rowGap || '0');
+                        const gap = parseFloat(parentStyles.gap || '0');
+                        const largestGap = Number.isFinite(rowGap) && rowGap > 0 ? rowGap : gap;
+                        if (Number.isFinite(largestGap)) {
+                            betweenValue = clampValue(largestGap, sliderRefs.between.slider);
+                        }
+                    }
+                }
+
+                sliderRefs.top.slider.value = String(topValue);
+                sliderRefs.bottom.slider.value = String(bottomValue);
+                sliderRefs.between.slider.value = String(betweenValue);
+                Object.values(sliderRefs).forEach(ref => ref.update());
+            };
+
+            const hidePanel = () => {
+                panel.classList.remove('visible');
+                toggleBtn.classList.remove('active');
+                spacingSelection = null;
+                savedEditorSelection = null;
+            };
+
+            toggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0 || !notesEditor.contains(selection.anchorNode)) {
+                    hidePanel();
+                    return;
+                }
+                spacingSelection = selection.getRangeAt(0).cloneRange();
+                savedEditorSelection = spacingSelection.cloneRange();
+                const isVisible = panel.classList.contains('visible');
+                document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(el => {
+                    if (!panel.contains(el)) el.classList.remove('visible');
+                });
+                if (isVisible) {
+                    hidePanel();
+                } else {
+                    panel.classList.add('visible');
+                    toggleBtn.classList.add('active');
+                    syncSlidersWithSelection();
+                }
+            });
+
+            document.addEventListener('click', (evt) => {
+                if (!panel.contains(evt.target) && evt.target !== toggleBtn) {
+                    hidePanel();
+                }
+            });
+
+            wrapper.appendChild(toggleBtn);
+            wrapper.appendChild(panel);
+            return wrapper;
+        };
+
         const createColorPalette = (title, action, mainColors, extraColors, iconSVG) => {
             const group = document.createElement('div');
             group.className = 'color-palette-group';
@@ -4229,11 +4518,7 @@ ${exportTable.outerHTML}
         editorToolbar.appendChild(createSeparator());
 
         // Basic formatting
-        editorToolbar.appendChild(createButton('Negrita', '<b>B</b>', 'bold'));
-        editorToolbar.appendChild(createButton('Cursiva', '<i>I</i>', 'italic'));
-        editorToolbar.appendChild(createButton('Subrayado', '<u>U</u>', 'underline'));
         editorToolbar.appendChild(createButton('Tachado', '<s>S</s>', 'strikeThrough'));
-        editorToolbar.appendChild(createButton('Superíndice', 'X²', 'superscript'));
         editorToolbar.appendChild(createButton('Deshacer', '↺', null, null, undoAction));
         editorToolbar.appendChild(createButton('Rehacer', '↻', null, null, redoAction));
 
@@ -4278,7 +4563,7 @@ ${exportTable.outerHTML}
         
         const applyForeColor = (color) => document.execCommand('foreColor', false, color);
         const applyHiliteColor = (color) => document.execCommand('hiliteColor', false, color);
-        
+
         const applyLineHighlight = (color) => {
             let elements = getSelectedBlockElements();
             if (elements.length === 0 || (elements.length === 1 && !elements[0])) {
@@ -4336,14 +4621,300 @@ ${exportTable.outerHTML}
         const typeIcon = UI_ICON_STRINGS.type;
         const highlighterIcon = UI_ICON_STRINGS.highlighter;
 
-        const textPalette = createColorPalette('Color de Texto', applyForeColor, textColors, extraTextColors, typeIcon);
-        editorToolbar.appendChild(textPalette);
+        const tailwindSpacingPanel = createTailwindSpacingControl();
+        editorToolbar.appendChild(tailwindSpacingPanel);
 
-        const highlightPalette = createColorPalette('Color de Resaltado', applyHiliteColor, highlightColors, extraHighlightColors, highlighterIcon);
-        editorToolbar.appendChild(highlightPalette);
+        const initializeFloatingToolbar = () => {
+            if (!floatingToolbar) {
+                floatingToolbar = document.createElement('div');
+                floatingToolbar.id = 'floating-format-toolbar';
+                floatingToolbar.className = 'floating-format-toolbar';
+                document.body.appendChild(floatingToolbar);
+            }
 
-        const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
-        editorToolbar.appendChild(lineHighlightPalette);
+            floatingToolbar.innerHTML = '';
+
+            let floatingStyleMenu = document.getElementById('floating-style-menu');
+            if (!floatingStyleMenu) {
+                floatingStyleMenu = document.createElement('div');
+                floatingStyleMenu.id = 'floating-style-menu';
+                document.body.appendChild(floatingStyleMenu);
+            }
+            floatingStyleMenu.className = 'floating-style-menu preset-style-panel';
+            floatingStyleMenu.innerHTML = '';
+            floatingStyleMenu.style.display = 'none';
+
+            let floatingStyleControls = null;
+
+            const closeColorMenus = () => {
+                floatingToolbar.querySelectorAll('.floating-color-menu.visible').forEach(menu => menu.classList.remove('visible'));
+            };
+
+            const hideFloatingStyleMenu = () => {
+                if (!floatingStyleMenu) return;
+                floatingStyleMenu.classList.remove('visible');
+                floatingStyleMenu.style.display = 'none';
+                if (floatingStyleControls && typeof floatingStyleControls.closeAll === 'function') {
+                    floatingStyleControls.closeAll();
+                }
+            };
+
+            const hideFloatingMenus = () => {
+                closeColorMenus();
+                hideFloatingStyleMenu();
+                hidePillTextPopup();
+            };
+
+            const ensureFloatingStyleMenu = () => {
+                if (!floatingStyleControls) {
+                    floatingStyleControls = buildPresetStylePanel(floatingStyleMenu, (style, { closeAll }) => {
+                        if (savedEditorSelection) {
+                            const selection = window.getSelection();
+                            if (selection) {
+                                selection.removeAllRanges();
+                                selection.addRange(savedEditorSelection);
+                            }
+                        }
+                        withEditorSelection(() => applyPresetStyle(style));
+                        if (closeAll) closeAll();
+                        hideFloatingStyleMenu();
+                        savedEditorSelection = null;
+                        notesEditor.focus({ preventScroll: true });
+                    });
+                }
+            };
+
+            const executeCommand = (command, value = null) => {
+                withEditorSelection(() => document.execCommand(command, false, value));
+                hideFloatingMenus();
+                notesEditor.focus({ preventScroll: true });
+            };
+
+            const createFloatingButton = (title, html, handler) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'toolbar-btn floating-toolbar-btn';
+                btn.title = title;
+                btn.innerHTML = html;
+                btn.addEventListener('mousedown', (e) => e.preventDefault());
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    handler();
+                });
+                return btn;
+            };
+
+            const createFloatingPaletteControl = (title, iconSVG, mainColors, extraColors, applyAction) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'floating-color-control';
+
+                const trigger = document.createElement('button');
+                trigger.type = 'button';
+                trigger.className = 'toolbar-btn floating-toolbar-btn';
+                trigger.innerHTML = iconSVG;
+                trigger.title = title;
+                trigger.addEventListener('mousedown', (e) => e.preventDefault());
+
+                const menu = document.createElement('div');
+                menu.className = 'floating-color-menu';
+
+                const createSwatch = (color) => {
+                    const swatch = document.createElement('button');
+                    swatch.type = 'button';
+                    swatch.className = 'color-swatch';
+                    if (color === 'transparent') {
+                        swatch.style.backgroundImage = 'linear-gradient(to top left, transparent calc(50% - 1px), red, transparent calc(50% + 1px))';
+                        swatch.style.backgroundColor = 'var(--bg-secondary)';
+                        swatch.title = 'Sin color';
+                    } else {
+                        swatch.style.backgroundColor = color;
+                        swatch.title = color;
+                    }
+                    swatch.addEventListener('mousedown', (e) => e.preventDefault());
+                    swatch.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        if (savedEditorSelection) {
+                            const selection = window.getSelection();
+                            selection.removeAllRanges();
+                            selection.addRange(savedEditorSelection);
+                        }
+                        withEditorSelection(() => applyAction(color));
+                        hideFloatingMenus();
+                        savedEditorSelection = null;
+                        notesEditor.focus({ preventScroll: true });
+                    });
+                    return swatch;
+                };
+
+                mainColors.forEach(color => menu.appendChild(createSwatch(color)));
+
+                if (extraColors.length > 0) {
+                    const divider = document.createElement('div');
+                    divider.className = 'floating-color-divider';
+                    menu.appendChild(divider);
+                    extraColors.forEach(color => menu.appendChild(createSwatch(color)));
+                }
+
+                trigger.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const selection = window.getSelection();
+                    if (selection && selection.rangeCount > 0) {
+                        savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                    }
+                    const willShow = !menu.classList.contains('visible');
+                    closeColorMenus();
+                    hideFloatingStyleMenu();
+                    hidePillTextPopup();
+                    if (willShow) {
+                        menu.classList.add('visible');
+                    }
+                });
+
+                wrapper.appendChild(trigger);
+                wrapper.appendChild(menu);
+                return wrapper;
+            };
+
+            const floatingButtons = [
+                createFloatingButton('Negrita', '<b>B</b>', () => executeCommand('bold')),
+                createFloatingButton('Cursiva', '<i>I</i>', () => executeCommand('italic')),
+                createFloatingButton('Subrayado', '<u>U</u>', () => executeCommand('underline')),
+                createFloatingButton('Superíndice', 'X²', () => executeCommand('superscript'))
+            ];
+
+            floatingButtons.forEach(btn => floatingToolbar.appendChild(btn));
+
+            floatingToolbar.appendChild(createFloatingPaletteControl('Color de texto', UI_ICON_STRINGS.type, textColors, extraTextColors, applyForeColor));
+            floatingToolbar.appendChild(createFloatingPaletteControl('Color de resaltado', UI_ICON_STRINGS.highlighter, highlightColors, extraHighlightColors, applyHiliteColor));
+            floatingToolbar.appendChild(createFloatingPaletteControl('Color de fondo de línea', UI_ICON_STRINGS.highlighter, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), applyLineHighlight));
+
+            const floatingStyleBtn = createFloatingButton('Estilos de texto', '🖌️', () => {
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0 || !notesEditor.contains(selection.anchorNode)) {
+                    hideFloatingStyleMenu();
+                    return;
+                }
+                savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                const willShow = !floatingStyleMenu.classList.contains('visible');
+                closeColorMenus();
+                hidePillTextPopup();
+                hideFloatingStyleMenu();
+                if (!willShow) return;
+                ensureFloatingStyleMenu();
+                if (floatingStyleControls && typeof floatingStyleControls.closeAll === 'function') {
+                    floatingStyleControls.closeAll();
+                }
+                floatingStyleMenu.style.display = 'block';
+                floatingStyleMenu.classList.add('visible');
+                const buttonRect = floatingStyleBtn.getBoundingClientRect();
+                const menuRect = floatingStyleMenu.getBoundingClientRect();
+                let top = window.scrollY + buttonRect.bottom + 8;
+                if (top + menuRect.height > window.scrollY + window.innerHeight - 8) {
+                    top = window.scrollY + buttonRect.top - menuRect.height - 8;
+                }
+                if (top < window.scrollY + 8) {
+                    top = window.scrollY + 8;
+                }
+                let left = window.scrollX + buttonRect.left + (buttonRect.width / 2) - (menuRect.width / 2);
+                const minLeft = window.scrollX + 8;
+                const maxLeft = window.scrollX + window.innerWidth - menuRect.width - 8;
+                if (left < minLeft) left = minLeft;
+                if (left > maxLeft) left = maxLeft;
+                floatingStyleMenu.style.top = `${top}px`;
+                floatingStyleMenu.style.left = `${left}px`;
+            });
+            floatingToolbar.appendChild(floatingStyleBtn);
+
+            const floatingPillBtn = createFloatingButton('Texto Píldora', '💊', () => {
+                const hasCurrentSelection = capturePillSelection();
+                if (!hasCurrentSelection && !savedEditorSelection) return;
+                closeColorMenus();
+                hideFloatingStyleMenu();
+                setPillsText(null, floatingPillBtn);
+            });
+            floatingPillBtn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                capturePillSelection();
+            });
+            floatingToolbar.appendChild(floatingPillBtn);
+
+            const hideFloatingToolbar = () => {
+                if (!floatingToolbar) return;
+                floatingToolbar.classList.remove('visible');
+                hideFloatingMenus();
+            };
+
+            dismissFloatingToolbar = () => {
+                hideFloatingToolbar();
+            };
+
+            const positionFloatingToolbar = () => {
+                if (!floatingToolbar) return;
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+                    hideFloatingToolbar();
+                    return;
+                }
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                if (!rect || (rect.width === 0 && rect.height === 0)) {
+                    hideFloatingToolbar();
+                    return;
+                }
+                const withinEditor = notesEditor.contains(range.commonAncestorContainer);
+                if (!withinEditor) {
+                    hideFloatingToolbar();
+                    return;
+                }
+
+                floatingToolbar.classList.add('visible');
+
+                const toolbarRect = floatingToolbar.getBoundingClientRect();
+                let top = window.scrollY + rect.top - toolbarRect.height - 8;
+                let left = window.scrollX + rect.left + (rect.width / 2) - (toolbarRect.width / 2);
+
+                if (top < window.scrollY + 8) {
+                    top = window.scrollY + rect.bottom + 8;
+                }
+
+                const maxLeft = window.scrollX + document.documentElement.clientWidth - toolbarRect.width - 8;
+                const minLeft = window.scrollX + 8;
+                if (left < minLeft) left = minLeft;
+                if (left > maxLeft) left = maxLeft;
+
+                floatingToolbar.style.top = `${top}px`;
+                floatingToolbar.style.left = `${left}px`;
+            };
+
+            if (!floatingToolbarInitialized) {
+                const handleSelectionChange = () => {
+                    requestAnimationFrame(positionFloatingToolbar);
+                };
+
+                document.addEventListener('selectionchange', handleSelectionChange);
+                notesEditor.addEventListener('mouseup', handleSelectionChange);
+                notesEditor.addEventListener('keyup', handleSelectionChange);
+                notesEditor.addEventListener('mouseleave', () => {
+                    setTimeout(() => {
+                        const selection = window.getSelection();
+                        if (!selection || selection.isCollapsed) hideFloatingToolbar();
+                    }, 120);
+                });
+                window.addEventListener('scroll', hideFloatingToolbar, true);
+                window.addEventListener('resize', hideFloatingToolbar);
+                notesModalContent.addEventListener('scroll', hideFloatingToolbar);
+                document.addEventListener('click', (e) => {
+                    if ((floatingToolbar && floatingToolbar.contains(e.target)) || (floatingStyleMenu && floatingStyleMenu.contains(e.target))) {
+                        return;
+                    }
+                    hideFloatingMenus();
+                });
+                floatingToolbarInitialized = true;
+            }
+        };
+
+        initializeFloatingToolbar();
 
         const convertListTag = (list, tagName) => {
             if (!list || list.tagName.toLowerCase() === tagName.toLowerCase()) return list;
@@ -4497,8 +5068,6 @@ ${exportTable.outerHTML}
             removeBullets();
         });
         editorToolbar.appendChild(removeBulletsBtn);
-
-        editorToolbar.appendChild(createPresetStyleDropdown());
 
         const inlineColorMenu = document.createElement('div');
         inlineColorMenu.className = 'inline-color-menu';
@@ -4814,110 +5383,55 @@ ${exportTable.outerHTML}
 
         // Popup to change existing preset styles
         const stylePopup = document.createElement('div');
-        stylePopup.className = 'styled-style-popup';
+        stylePopup.id = 'inline-style-popup';
+        stylePopup.className = 'preset-style-popup preset-style-panel inline-style-popup';
+        stylePopup.style.display = 'none';
         document.body.appendChild(stylePopup);
         let currentStyledSpan = null;
-
-        const renderStyledPopup = () => {
-            stylePopup.innerHTML = '';
-            const header = document.createElement('div');
-            header.className = 'styled-style-popup-header';
-            const title = document.createElement('span');
-            title.textContent = 'Cambiar estilo';
-            header.appendChild(title);
-            const closeBtn = document.createElement('button');
-            closeBtn.type = 'button';
-            closeBtn.className = 'styled-style-popup-close';
-            closeBtn.innerHTML = '&times;';
-            closeBtn.addEventListener('click', hideStylePopup);
-            header.appendChild(closeBtn);
-            stylePopup.appendChild(header);
-
-            const grid = document.createElement('div');
-            grid.className = 'styled-style-popup-grid';
-
-            PRESET_STYLE_GROUPS.forEach(group => {
-                const card = document.createElement('div');
-                card.className = 'styled-style-card';
-
-                const mainBtn = document.createElement('button');
-                mainBtn.type = 'button';
-                mainBtn.className = 'styled-style-main';
-                const mainPreview = document.createElement('span');
-                mainPreview.className = 'styled-style-preview';
-                mainPreview.setAttribute('style', group.style);
-                mainPreview.textContent = formatPresetLabel(group.label);
-                mainBtn.appendChild(mainPreview);
-                mainBtn.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    if (!currentStyledSpan) return;
-                    applyPresetStyle(group.style, currentStyledSpan);
-                    hideStylePopup();
-                    notesEditor.focus({ preventScroll: true });
-                });
-                card.appendChild(mainBtn);
-
-                if (group.variants && group.variants.length) {
-                    const variantsRow = document.createElement('div');
-                    variantsRow.className = 'styled-style-variants';
-                    group.variants.forEach(variant => {
-                        const variantBtn = document.createElement('button');
-                        variantBtn.type = 'button';
-                        variantBtn.className = 'styled-style-variant-btn';
-                        const variantPreview = document.createElement('span');
-                        variantPreview.className = 'styled-style-preview';
-                        variantPreview.setAttribute('style', variant.style);
-                        variantPreview.textContent = formatPresetLabel(variant.label);
-                        variantBtn.appendChild(variantPreview);
-                        const variantName = document.createElement('span');
-                        variantName.className = 'styled-style-variant-label';
-                        const labelText = variant.label.replace(`${group.label} `, '').trim();
-                        variantName.textContent = labelText || 'Variante';
-                        variantBtn.appendChild(variantName);
-                        variantBtn.addEventListener('click', (event) => {
-                            event.preventDefault();
-                            if (!currentStyledSpan) return;
-                            applyPresetStyle(variant.style, currentStyledSpan);
-                            hideStylePopup();
-                            notesEditor.focus({ preventScroll: true });
-                        });
-                        variantsRow.appendChild(variantBtn);
-                    });
-                    card.appendChild(variantsRow);
-                }
-
-                grid.appendChild(card);
-            });
-
-            stylePopup.appendChild(grid);
-        };
+        let inlineStyleControls = null;
 
         const hideStylePopup = () => {
             stylePopup.classList.remove('visible');
+            stylePopup.style.display = 'none';
             currentStyledSpan = null;
+            if (inlineStyleControls && typeof inlineStyleControls.closeAll === 'function') {
+                inlineStyleControls.closeAll();
+            }
+        };
+
+        const ensureInlineStylePanel = () => {
+            if (inlineStyleControls) return;
+            inlineStyleControls = buildPresetStylePanel(stylePopup, (style, { closeAll }) => {
+                if (!currentStyledSpan) return;
+                applyPresetStyle(style, currentStyledSpan);
+                if (closeAll) closeAll();
+                hideStylePopup();
+                notesEditor.focus({ preventScroll: true });
+            });
         };
 
         const showStylePopup = (span) => {
             currentStyledSpan = span;
-            renderStyledPopup();
+            ensureInlineStylePanel();
+            stylePopup.style.display = 'flex';
             stylePopup.classList.add('visible');
             requestAnimationFrame(() => {
                 if (!currentStyledSpan) return;
                 const editorRect = notesEditor.getBoundingClientRect();
-                const desiredWidth = Math.min(560, Math.max(320, editorRect.width - 16));
+                const desiredWidth = Math.min(420, Math.max(240, editorRect.width - 24));
                 stylePopup.style.maxWidth = `${desiredWidth}px`;
                 const spanRect = span.getBoundingClientRect();
                 const popupRect = stylePopup.getBoundingClientRect();
-                let top = spanRect.bottom + window.scrollY + 8;
-                if (top + popupRect.height > window.scrollY + window.innerHeight - 8) {
-                    top = spanRect.top + window.scrollY - popupRect.height - 8;
+                let top = spanRect.bottom + window.scrollY + 6;
+                if (top + popupRect.height > window.scrollY + window.innerHeight - 6) {
+                    top = spanRect.top + window.scrollY - popupRect.height - 6;
                 }
                 let left = spanRect.left + window.scrollX;
-                if (left + popupRect.width > window.scrollX + window.innerWidth - 8) {
-                    left = Math.max(window.scrollX + 8, window.scrollX + window.innerWidth - popupRect.width - 8);
+                if (left + popupRect.width > window.scrollX + window.innerWidth - 6) {
+                    left = Math.max(window.scrollX + 6, window.scrollX + window.innerWidth - popupRect.width - 6);
                 }
-                stylePopup.style.top = `${Math.max(window.scrollY + 8, top)}px`;
-                stylePopup.style.left = `${Math.max(window.scrollX + 8, left)}px`;
+                stylePopup.style.top = `${Math.max(window.scrollY + 6, top)}px`;
+                stylePopup.style.left = `${Math.max(window.scrollX + 6, left)}px`;
             });
         };
 
@@ -4958,106 +5472,220 @@ ${exportTable.outerHTML}
         const pillTextPopup = document.createElement('div');
         pillTextPopup.className = 'preset-style-popup';
         document.body.appendChild(pillTextPopup);
-        let currentPillSpan = null;
 
-        const hidePillTextPopup = () => {
-            pillTextPopup.style.display = 'none';
-            currentPillSpan = null;
+        const createPillPreview = (colors, textContent) => {
+            const preview = document.createElement('span');
+            preview.textContent = textContent || 'Texto';
+            preview.style.cssText = [
+                `background:linear-gradient(to right, ${colors[0]}, ${colors[1]})`,
+                `color:${colors[2]}`,
+                'padding:2px 8px',
+                'border-radius:20px',
+                'font-weight:bold'
+            ].join(';');
+            return preview;
         };
 
-        const applyPillTextStyle = (colors, existingSpan = null) => {
-            const css = `background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;`;
-            if (existingSpan) {
-                existingSpan.style.cssText = css;
-                existingSpan.dataset.pillText = colors.join('|');
+        const pillTextManager = (() => {
+            let activeSpan = null;
+            let storedRange = null;
+
+            const clearState = () => {
+                activeSpan = null;
+                storedRange = null;
+                savedEditorSelection = null;
+            };
+
+            const hide = () => {
+                pillTextPopup.style.display = 'none';
+                pillTextPopup.innerHTML = '';
+                clearState();
+            };
+
+            const captureSelection = () => {
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0) return false;
+                const range = selection.getRangeAt(0);
+                if (!range || range.collapsed) return false;
+                if (!notesEditor.contains(range.commonAncestorContainer)) return false;
+                storedRange = range.cloneRange();
+                savedEditorSelection = storedRange.cloneRange();
+                return true;
+            };
+
+            const restoreStoredRange = () => {
+                if (!storedRange) return null;
+                const selection = window.getSelection();
+                if (!selection) return null;
+                selection.removeAllRanges();
+                selection.addRange(storedRange);
+                storedRange = selection.getRangeAt(0).cloneRange();
+                savedEditorSelection = storedRange.cloneRange();
+                return selection.getRangeAt(0);
+            };
+
+            const applyToExistingSpan = (colors) => {
+                if (!activeSpan) return;
+                const css = `background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;`;
+                activeSpan.style.cssText = css;
+                activeSpan.dataset.pillText = colors.join('|');
+                recordHistory();
+                notesEditor.dispatchEvent(new Event('input', { bubbles: true }));
+            };
+
+            const wrapRangeWithSpan = (range, span, fallbackText = '') => {
+                try {
+                    range.surroundContents(span);
+                } catch (error) {
+                    const extracted = range.extractContents();
+                    if (!extracted || extracted.childNodes.length === 0) {
+                        const safeText = (fallbackText || '').trim() || 'Texto';
+                        span.textContent = safeText;
+                    } else {
+                        span.appendChild(extracted);
+                    }
+                    range.insertNode(span);
+                }
+            };
+
+            const applyToSelection = (colors) => {
+                const css = `background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;`;
+                if (!storedRange && !captureSelection()) return;
+                const range = restoreStoredRange();
+                if (!range || range.collapsed) {
+                    clearState();
+                    return;
+                }
+                const span = document.createElement('span');
+                span.style.cssText = css;
+                span.dataset.pillText = colors.join('|');
+                const selectedText = range.toString();
+                wrapRangeWithSpan(range, span, selectedText);
+                const selection = window.getSelection();
+                if (selection) {
+                    const after = document.createRange();
+                    after.setStartAfter(span);
+                    after.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(after);
+                }
+                clearState();
+                recordHistory();
+                notesEditor.dispatchEvent(new Event('input', { bubbles: true }));
+            };
+
+            const positionPopup = (anchor) => {
+                if (!pillTextPopup.isConnected) document.body.appendChild(pillTextPopup);
+                const rectCandidates = [];
+                if (anchor && typeof anchor.getBoundingClientRect === 'function') {
+                    rectCandidates.push(anchor.getBoundingClientRect());
+                }
+                if (activeSpan) {
+                    rectCandidates.push(activeSpan.getBoundingClientRect());
+                }
+                if (storedRange) {
+                    rectCandidates.push(storedRange.getBoundingClientRect());
+                }
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    rectCandidates.push(selection.getRangeAt(0).getBoundingClientRect());
+                }
+                const rect = rectCandidates.find(r => r && (r.width || r.height));
+                if (!rect) return;
+                requestAnimationFrame(() => {
+                    const popupRect = pillTextPopup.getBoundingClientRect();
+                    let top = window.scrollY + rect.top - popupRect.height - 8;
+                    if (top < window.scrollY + 8) {
+                        top = window.scrollY + rect.bottom + 8;
+                    }
+                    let left = window.scrollX + rect.left;
+                    const maxLeft = window.scrollX + window.innerWidth - popupRect.width - 8;
+                    const minLeft = window.scrollX + 8;
+                    if (left > maxLeft) left = maxLeft;
+                    if (left < minLeft) left = minLeft;
+                    pillTextPopup.style.top = `${top}px`;
+                    pillTextPopup.style.left = `${left}px`;
+                });
+            };
+
+            const renderMenu = (anchor) => {
+                const sampleText = (activeSpan && activeSpan.textContent) ||
+                    (storedRange && storedRange.toString()) ||
+                    (window.getSelection()?.toString()) ||
+                    'Texto';
+                pillTextPopup.innerHTML = '';
+                PILL_TEXT_STYLES.forEach(colors => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'toolbar-btn pill-style-btn';
+                    btn.appendChild(createPillPreview(colors, sampleText.trim() || 'Texto'));
+                    btn.addEventListener('mousedown', (e) => e.preventDefault());
+                    btn.addEventListener('click', () => {
+                        if (activeSpan) {
+                            applyToExistingSpan(colors);
+                        } else {
+                            applyToSelection(colors);
+                        }
+                        hide();
+                        notesEditor.focus({ preventScroll: true });
+                    });
+                    if (activeSpan && activeSpan.dataset?.pillText === colors.join('|')) {
+                        btn.classList.add('active');
+                    }
+                    pillTextPopup.appendChild(btn);
+                });
+                pillTextPopup.style.display = 'flex';
+                positionPopup(anchor || activeSpan);
+            };
+
+            return {
+                hide,
+                captureSelection,
+                showForSelection(anchor) {
+                    activeSpan = null;
+                    if (!storedRange && !captureSelection()) {
+                        hide();
+                        return;
+                    }
+                    renderMenu(anchor);
+                },
+                showForSpan(span, anchor) {
+                    activeSpan = span;
+                    storedRange = null;
+                    savedEditorSelection = null;
+                    renderMenu(anchor || span);
+                }
+            };
+        })();
+
+        const hidePillTextPopup = () => pillTextManager.hide();
+        const capturePillSelection = () => pillTextManager.captureSelection();
+        const setPillsText = (span = null, anchor = null) => {
+            if (span) {
+                pillTextManager.showForSpan(span, anchor);
+            } else {
+                pillTextManager.showForSelection(anchor);
+            }
+        };
+
+        const pillTextToolbarBtn = createButton('Texto píldora', '💊', null, null, () => {
+            const hasSelection = capturePillSelection();
+            if (!hasSelection) {
+                hidePillTextPopup();
                 return;
             }
-            if (savedEditorSelection) {
-                const selection = window.getSelection();
-                selection.removeAllRanges();
-                selection.addRange(savedEditorSelection);
-            }
-            const sel = window.getSelection();
-            if (!sel || !sel.rangeCount || sel.isCollapsed) return;
-            const range = sel.getRangeAt(0);
-            const span = document.createElement('span');
-            span.style.cssText = css;
-            span.dataset.pillText = colors.join('|');
-            span.textContent = range.toString();
-            range.deleteContents();
-            range.insertNode(span);
-            const newRange = document.createRange();
-            newRange.setStartAfter(span);
-            newRange.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(newRange);
-            savedEditorSelection = null;
-        };
-
-        const showPillTextPopup = (span = null, anchor = null) => {
-            const sample = span ? span.textContent : (savedEditorSelection ? savedEditorSelection.toString() : window.getSelection().toString());
-            pillTextPopup.innerHTML = '';
-            PILL_TEXT_STYLES.forEach(colors => {
-                const b = document.createElement('button');
-                b.className = 'toolbar-btn';
-                b.innerHTML = `<span style=\"background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;\">${sample}</span>`;
-                b.addEventListener('click', () => {
-                    applyPillTextStyle(colors, currentPillSpan);
-                    hidePillTextPopup();
-                    notesEditor.focus({ preventScroll: true });
-                });
-                pillTextPopup.appendChild(b);
-            });
-            pillTextPopup.style.display = 'block';
-            let rect;
-            if (span) {
-                rect = span.getBoundingClientRect();
-            } else if (savedEditorSelection) {
-                rect = savedEditorSelection.getBoundingClientRect();
-            } else if (anchor) {
-                rect = anchor.getBoundingClientRect();
-            } else {
-                const sel = window.getSelection();
-                if (sel && sel.rangeCount) rect = sel.getRangeAt(0).getBoundingClientRect();
-            }
-            if (rect) {
-                pillTextPopup.style.top = `${window.scrollY + rect.top - pillTextPopup.offsetHeight - 8}px`;
-                pillTextPopup.style.left = `${window.scrollX + rect.left}px`;
-            }
-        };
-
-        const setPillsText = (span = null, anchor = null) => {
-            currentPillSpan = span;
-            showPillTextPopup(span, anchor);
-        };
-
-        const pillTextBtn = createButton('Texto Píldora', '💊', null, null, null);
-        pillTextBtn.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            const selection = window.getSelection();
-            if (selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
-                savedEditorSelection = selection.getRangeAt(0).cloneRange();
-            } else {
-                savedEditorSelection = null;
-            }
+            setPillsText(null, pillTextToolbarBtn);
         });
-        pillTextBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (savedEditorSelection && !savedEditorSelection.collapsed) {
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(savedEditorSelection);
-                setPillsText(null, pillTextBtn);
-            }
-        });
-        editorToolbar.appendChild(pillTextBtn);
+        if (tailwindSpacingPanel && tailwindSpacingPanel.parentElement === editorToolbar) {
+            editorToolbar.insertBefore(pillTextToolbarBtn, tailwindSpacingPanel);
+        } else {
+            editorToolbar.appendChild(pillTextToolbarBtn);
+        }
 
         notesEditor.addEventListener('click', (e) => {
             const span = e.target.closest('span[data-pill-text]');
             if (span) {
                 e.stopPropagation();
-                savedEditorSelection = null;
                 setPillsText(span);
             } else if (!e.target.closest('.preset-style-popup')) {
                 hidePillTextPopup();
@@ -5229,6 +5857,40 @@ ${exportTable.outerHTML}
             }
         };
 
+        const toggleHeaderRow = (table) => {
+            if (!table || !table.rows.length) return false;
+            const firstRow = table.rows[0];
+            const isHeader = Array.from(firstRow.cells).every(cell => cell.tagName === 'TH');
+            Array.from(firstRow.cells).forEach(cell => convertCellTag(cell, isHeader ? 'td' : 'th'));
+            return !isHeader;
+        };
+
+        const toggleTableStriping = (table) => {
+            if (!table) return false;
+            const willActivate = !table.classList.contains('table-striped');
+            table.classList.toggle('table-striped', willActivate);
+            if (willActivate) {
+                table.dataset.striped = 'true';
+            } else {
+                delete table.dataset.striped;
+            }
+            return willActivate;
+        };
+
+        const autoFitTableColumns = (table) => {
+            if (!table || !table.rows.length) return;
+            const firstRow = table.rows[0];
+            const columns = firstRow ? firstRow.cells.length : 0;
+            if (!columns) return;
+            const widthPercent = 100 / columns;
+            Array.from(table.rows).forEach(row => {
+                Array.from(row.cells).forEach(cell => {
+                    cell.style.width = `${widthPercent}%`;
+                });
+            });
+            table.style.width = '100%';
+        };
+
         const ensureSpacingState = (table) => {
             if (!table) return;
             const firstCell = table.querySelector('th, td');
@@ -5395,15 +6057,33 @@ ${exportTable.outerHTML}
             currentTable = table;
             tableMenu.innerHTML = '';
 
+            const headerBar = document.createElement('div');
+            headerBar.className = 'table-menu-header';
+
+            const summary = document.createElement('span');
+            summary.className = 'table-menu-summary';
+            const totalRows = table.rows.length;
+            const totalCols = table.rows[0] ? table.rows[0].cells.length : 0;
+            summary.textContent = `${totalRows || 0}×${totalCols || 0} celdas`;
+            headerBar.appendChild(summary);
+
             const resizeBtn = document.createElement('button');
-            resizeBtn.className = 'toolbar-btn';
-            resizeBtn.innerHTML = '↔️ Ajustar tamaño';
+            resizeBtn.type = 'button';
+            resizeBtn.className = 'toolbar-btn table-header-btn';
+            resizeBtn.innerHTML = '<span class="table-menu-icon">↔️</span><span class="table-menu-label">Tamaño</span>';
+            resizeBtn.title = 'Activar controles de tamaño';
             resizeBtn.addEventListener('click', () => {
                 tableEditMode = true;
                 editingTable = table;
+                if (!table.querySelector('.table-resize-handle')) {
+                    initTableResize(table);
+                }
+                table.classList.add('selected');
                 hideTableMenu();
             });
-            tableMenu.appendChild(resizeBtn);
+            headerBar.appendChild(resizeBtn);
+
+            tableMenu.appendChild(headerBar);
 
             const tabsBar = document.createElement('div');
             tabsBar.className = 'table-menu-tabs';
@@ -5417,41 +6097,80 @@ ${exportTable.outerHTML}
 
             const buildEditTab = () => {
                 tabContent.innerHTML = '';
-                const layout = document.createElement('div');
-                layout.className = 'table-edit-layout';
-                const createGroup = (title) => {
-                    const group = document.createElement('div');
-                    group.className = 'table-edit-group';
-                    const heading = document.createElement('div');
-                    heading.className = 'table-edit-group-title';
-                    heading.textContent = title;
-                    group.appendChild(heading);
-                    return group;
+                const quickGrid = document.createElement('div');
+                quickGrid.className = 'table-quick-grid';
+                const actionConfigs = [
+                    { icon: '⬆️', label: 'Fila ↑', onClick: () => addRow(table, rIndex) },
+                    { icon: '⬇️', label: 'Fila ↓', onClick: () => addRow(table, rIndex + 1) },
+                    { icon: '🗑️', label: 'Fila -', onClick: () => deleteRow(table, rIndex) },
+                    { icon: '⬅️', label: 'Col ←', onClick: () => addColumn(table, cIndex) },
+                    { icon: '➡️', label: 'Col →', onClick: () => addColumn(table, cIndex + 1) },
+                    { icon: '🧹', label: 'Col -', onClick: () => deleteColumn(table, cIndex) },
+                    {
+                        icon: '🔎',
+                        label: 'Ver col',
+                        onClick: () => selectColumn(table, cIndex),
+                        persistent: true
+                    },
+                    {
+                        icon: '🔠',
+                        label: 'Cabecera',
+                        onClick: () => toggleHeaderRow(table),
+                        state: () => {
+                            const firstRow = table.rows[0];
+                            return firstRow ? Array.from(firstRow.cells).every(cell => cell.tagName === 'TH') : false;
+                        },
+                        persistent: true
+                    },
+                    {
+                        icon: '🦓',
+                        label: 'Cebra',
+                        onClick: () => toggleTableStriping(table),
+                        state: () => table.classList.contains('table-striped'),
+                        persistent: true
+                    },
+                    {
+                        icon: '📐',
+                        label: 'Auto ancho',
+                        onClick: () => autoFitTableColumns(table)
+                    }
+                ];
+
+                const quickButtons = [];
+                const updateQuickActionStates = () => {
+                    quickButtons.forEach(({ action, button }) => {
+                        if (typeof action.state === 'function') {
+                            const active = !!action.state();
+                            button.classList.toggle('active', active);
+                            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+                        }
+                    });
                 };
-                const createActionButton = (label, icon, handler) => {
+
+                actionConfigs.forEach(action => {
                     const btn = document.createElement('button');
                     btn.type = 'button';
-                    btn.className = 'toolbar-btn table-edit-btn';
-                    btn.innerHTML = `<span class="table-edit-icon">${icon}</span><span>${label}</span>`;
+                    btn.className = 'toolbar-btn table-quick-action';
+                    btn.innerHTML = `<span class="table-quick-icon">${action.icon}</span><span class="table-quick-label">${action.label}</span>`;
                     btn.addEventListener('click', () => {
-                        handler();
-                        hideTableMenu();
+                        action.onClick();
+                        updateQuickActionStates();
                         notesEditor.focus({ preventScroll: true });
+                        if (!action.persistent) {
+                            hideTableMenu();
+                        }
                     });
-                    return btn;
-                };
-                const rowsGroup = createGroup('Filas');
-                rowsGroup.appendChild(createActionButton('Agregar arriba', '⬆️', () => addRow(table, rIndex)));
-                rowsGroup.appendChild(createActionButton('Agregar abajo', '⬇️', () => addRow(table, rIndex + 1)));
-                rowsGroup.appendChild(createActionButton('Eliminar fila', '🗑️', () => deleteRow(table, rIndex)));
-                const colsGroup = createGroup('Columnas');
-                colsGroup.appendChild(createActionButton('Añadir a la izquierda', '⬅️', () => addColumn(table, cIndex)));
-                colsGroup.appendChild(createActionButton('Añadir a la derecha', '➡️', () => addColumn(table, cIndex + 1)));
-                colsGroup.appendChild(createActionButton('Eliminar columna', '🗑️', () => deleteColumn(table, cIndex)));
-                colsGroup.appendChild(createActionButton('Seleccionar columna', '🔎', () => selectColumn(table, cIndex)));
-                layout.appendChild(rowsGroup);
-                layout.appendChild(colsGroup);
-                tabContent.appendChild(layout);
+                    quickGrid.appendChild(btn);
+                    quickButtons.push({ action, button: btn });
+                });
+
+                tabContent.appendChild(quickGrid);
+                updateQuickActionStates();
+
+                const helper = document.createElement('p');
+                helper.className = 'table-menu-hint';
+                helper.textContent = 'Tip: selecciona una columna y aplica estilos sin cerrar este panel.';
+                tabContent.appendChild(helper);
             };
 
             const HEADER_COLORS = [
@@ -5790,7 +6509,7 @@ ${exportTable.outerHTML}
             const editorWidth = Math.max(280, editorRect.width - 16);
             const viewportLimit = Math.max(280, window.innerWidth - 32);
             const maxWidth = Math.min(editorWidth, viewportLimit);
-            const preferredWidth = Math.max(420, Math.min(maxWidth, 640));
+            const preferredWidth = Math.max(340, Math.min(maxWidth, 520));
             const targetWidth = Math.min(preferredWidth, maxWidth);
             tableMenu.style.maxWidth = `${maxWidth}px`;
             tableMenu.style.width = `${targetWidth}px`;
@@ -5807,7 +6526,7 @@ ${exportTable.outerHTML}
             tableMenu.style.left = `${left}px`;
             tableMenu.style.zIndex = 10001;
         };
-        notesEditor.addEventListener('click', (e) => {
+        notesEditor.addEventListener('dblclick', (e) => {
             if (tableEditMode) return;
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
@@ -5825,8 +6544,19 @@ ${exportTable.outerHTML}
         });
         document.addEventListener('click', (e) => {
             if (tableEditMode && editingTable && !editingTable.contains(e.target)) {
+                editingTable.classList.remove('selected');
                 tableEditMode = false;
                 editingTable = null;
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && tableEditMode) {
+                if (editingTable) {
+                    editingTable.classList.remove('selected');
+                }
+                tableEditMode = false;
+                editingTable = null;
+                hideTableMenu();
             }
         });
         document.addEventListener('click', (e) => {
