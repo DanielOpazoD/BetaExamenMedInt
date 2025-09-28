@@ -5479,7 +5479,7 @@ ${exportTable.outerHTML}
             currentPillSpan = null;
         };
 
-        const ensureSavedSelectionForPills = () => {
+        function ensureSavedSelectionForPills() {
             if (savedEditorSelection && !savedEditorSelection.collapsed) {
                 return true;
             }
@@ -5489,7 +5489,7 @@ ${exportTable.outerHTML}
             if (!notesEditor.contains(range.commonAncestorContainer)) return false;
             savedEditorSelection = range.cloneRange();
             return true;
-        };
+        }
 
         const applyPillTextStyle = (colors, existingSpan = null) => {
             const css = `background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;`;
