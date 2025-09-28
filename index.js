@@ -4827,7 +4827,8 @@ ${exportTable.outerHTML}
             floatingToolbar.appendChild(floatingStyleBtn);
 
             const floatingPillBtn = createFloatingButton('Texto Píldora', '💊', () => {
-                if (!pillSelectionRange && !capturePillSelection()) return;
+                const hasCurrentSelection = capturePillSelection();
+                if (!hasCurrentSelection && !savedEditorSelection) return;
                 closeColorMenus();
                 hideFloatingStyleMenu();
                 setPillsText(null, floatingPillBtn);
@@ -5471,128 +5472,215 @@ ${exportTable.outerHTML}
         const pillTextPopup = document.createElement('div');
         pillTextPopup.className = 'preset-style-popup';
         document.body.appendChild(pillTextPopup);
-        let currentPillSpan = null;
-        let pillSelectionRange = null;
 
-        const hidePillTextPopup = () => {
-            pillTextPopup.style.display = 'none';
-            currentPillSpan = null;
-            pillSelectionRange = null;
+        const createPillPreview = (colors, textContent) => {
+            const preview = document.createElement('span');
+            preview.textContent = textContent || 'Texto';
+            preview.style.cssText = [
+                `background:linear-gradient(to right, ${colors[0]}, ${colors[1]})`,
+                `color:${colors[2]}`,
+                'padding:2px 8px',
+                'border-radius:20px',
+                'font-weight:bold'
+            ].join(';');
+            return preview;
         };
 
-        function capturePillSelection() {
-            const selection = window.getSelection();
-            if (!selection || selection.rangeCount === 0) return false;
-            const range = selection.getRangeAt(0);
-            if (!range || range.collapsed) return false;
-            if (!notesEditor.contains(range.commonAncestorContainer)) return false;
-            pillSelectionRange = range.cloneRange();
-            savedEditorSelection = pillSelectionRange.cloneRange();
-            return true;
-        }
+        const pillTextManager = (() => {
+            let activeSpan = null;
+            let storedRange = null;
 
-        const restorePillSelection = () => {
-            if (!pillSelectionRange) return null;
-            const selection = window.getSelection();
-            if (!selection) return null;
-            selection.removeAllRanges();
-            const workingRange = pillSelectionRange.cloneRange();
-            selection.addRange(workingRange);
-            pillSelectionRange = workingRange.cloneRange();
-            savedEditorSelection = pillSelectionRange.cloneRange();
-            return selection.getRangeAt(0);
-        };
+            const clearState = () => {
+                activeSpan = null;
+                storedRange = null;
+                savedEditorSelection = null;
+            };
 
-        const applyPillTextStyle = (colors, existingSpan = null) => {
-            const css = `background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;`;
-            if (existingSpan) {
-                existingSpan.style.cssText = css;
-                existingSpan.dataset.pillText = colors.join('|');
+            const hide = () => {
+                pillTextPopup.style.display = 'none';
+                pillTextPopup.innerHTML = '';
+                clearState();
+            };
+
+            const captureSelection = () => {
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0) return false;
+                const range = selection.getRangeAt(0);
+                if (!range || range.collapsed) return false;
+                if (!notesEditor.contains(range.commonAncestorContainer)) return false;
+                storedRange = range.cloneRange();
+                savedEditorSelection = storedRange.cloneRange();
+                return true;
+            };
+
+            const restoreStoredRange = () => {
+                if (!storedRange) return null;
+                const selection = window.getSelection();
+                if (!selection) return null;
+                selection.removeAllRanges();
+                selection.addRange(storedRange);
+                storedRange = selection.getRangeAt(0).cloneRange();
+                savedEditorSelection = storedRange.cloneRange();
+                return selection.getRangeAt(0);
+            };
+
+            const applyToExistingSpan = (colors) => {
+                if (!activeSpan) return;
+                const css = `background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;`;
+                activeSpan.style.cssText = css;
+                activeSpan.dataset.pillText = colors.join('|');
                 recordHistory();
                 notesEditor.dispatchEvent(new Event('input', { bubbles: true }));
-                return;
-            }
-            if (!pillSelectionRange && !capturePillSelection()) return;
-            const range = restorePillSelection();
-            if (!range || range.collapsed) {
-                pillSelectionRange = null;
-                savedEditorSelection = null;
-                return;
-            }
-            const fallbackText = pillSelectionRange ? pillSelectionRange.toString() : range.toString();
-            const extracted = range.extractContents();
-            const span = document.createElement('span');
-            span.style.cssText = css;
-            span.dataset.pillText = colors.join('|');
-            if (!extracted || extracted.childNodes.length === 0) {
-                span.textContent = fallbackText;
-            } else {
-                span.appendChild(extracted);
-            }
-            range.insertNode(span);
-            const newRange = document.createRange();
-            newRange.setStartAfter(span);
-            newRange.collapse(true);
-            const selection = window.getSelection();
-            if (selection) {
-                selection.removeAllRanges();
-                selection.addRange(newRange);
-            }
-            pillSelectionRange = null;
-            savedEditorSelection = null;
-            recordHistory();
-            notesEditor.dispatchEvent(new Event('input', { bubbles: true }));
-        };
+            };
 
-        const showPillTextPopup = (span = null, anchor = null) => {
-            const activeRange = pillSelectionRange || savedEditorSelection;
-            const sample = span ? span.textContent : (activeRange ? activeRange.toString() : window.getSelection().toString());
-            pillTextPopup.innerHTML = '';
-            PILL_TEXT_STYLES.forEach(colors => {
-                const b = document.createElement('button');
-                b.className = 'toolbar-btn';
-                b.innerHTML = `<span style=\"background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;\">${sample}</span>`;
-                b.addEventListener('click', () => {
-                    applyPillTextStyle(colors, currentPillSpan);
-                    hidePillTextPopup();
-                    notesEditor.focus({ preventScroll: true });
-                });
-                pillTextPopup.appendChild(b);
-            });
-            pillTextPopup.style.display = 'block';
-            let rect;
-            if (span) {
-                rect = span.getBoundingClientRect();
-            } else if (pillSelectionRange) {
-                rect = pillSelectionRange.getBoundingClientRect();
-            } else if (savedEditorSelection) {
-                rect = savedEditorSelection.getBoundingClientRect();
-            } else if (anchor) {
-                rect = anchor.getBoundingClientRect();
-            } else {
-                const sel = window.getSelection();
-                if (sel && sel.rangeCount) rect = sel.getRangeAt(0).getBoundingClientRect();
-            }
-            if (rect) {
-                pillTextPopup.style.top = `${window.scrollY + rect.top - pillTextPopup.offsetHeight - 8}px`;
-                pillTextPopup.style.left = `${window.scrollX + rect.left}px`;
-            }
-        };
+            const wrapRangeWithSpan = (range, span, fallbackText = '') => {
+                try {
+                    range.surroundContents(span);
+                } catch (error) {
+                    const extracted = range.extractContents();
+                    if (!extracted || extracted.childNodes.length === 0) {
+                        const safeText = (fallbackText || '').trim() || 'Texto';
+                        span.textContent = safeText;
+                    } else {
+                        span.appendChild(extracted);
+                    }
+                    range.insertNode(span);
+                }
+            };
 
-        const setPillsText = (span = null, anchor = null) => {
-            if (!span) {
-                if (!pillSelectionRange && !capturePillSelection()) {
-                    hidePillTextPopup();
+            const applyToSelection = (colors) => {
+                const css = `background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;`;
+                if (!storedRange && !captureSelection()) return;
+                const range = restoreStoredRange();
+                if (!range || range.collapsed) {
+                    clearState();
                     return;
                 }
-                currentPillSpan = null;
+                const span = document.createElement('span');
+                span.style.cssText = css;
+                span.dataset.pillText = colors.join('|');
+                const selectedText = range.toString();
+                wrapRangeWithSpan(range, span, selectedText);
+                const selection = window.getSelection();
+                if (selection) {
+                    const after = document.createRange();
+                    after.setStartAfter(span);
+                    after.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(after);
+                }
+                clearState();
+                recordHistory();
+                notesEditor.dispatchEvent(new Event('input', { bubbles: true }));
+            };
+
+            const positionPopup = (anchor) => {
+                if (!pillTextPopup.isConnected) document.body.appendChild(pillTextPopup);
+                const rectCandidates = [];
+                if (anchor && typeof anchor.getBoundingClientRect === 'function') {
+                    rectCandidates.push(anchor.getBoundingClientRect());
+                }
+                if (activeSpan) {
+                    rectCandidates.push(activeSpan.getBoundingClientRect());
+                }
+                if (storedRange) {
+                    rectCandidates.push(storedRange.getBoundingClientRect());
+                }
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    rectCandidates.push(selection.getRangeAt(0).getBoundingClientRect());
+                }
+                const rect = rectCandidates.find(r => r && (r.width || r.height));
+                if (!rect) return;
+                requestAnimationFrame(() => {
+                    const popupRect = pillTextPopup.getBoundingClientRect();
+                    let top = window.scrollY + rect.top - popupRect.height - 8;
+                    if (top < window.scrollY + 8) {
+                        top = window.scrollY + rect.bottom + 8;
+                    }
+                    let left = window.scrollX + rect.left;
+                    const maxLeft = window.scrollX + window.innerWidth - popupRect.width - 8;
+                    const minLeft = window.scrollX + 8;
+                    if (left > maxLeft) left = maxLeft;
+                    if (left < minLeft) left = minLeft;
+                    pillTextPopup.style.top = `${top}px`;
+                    pillTextPopup.style.left = `${left}px`;
+                });
+            };
+
+            const renderMenu = (anchor) => {
+                const sampleText = (activeSpan && activeSpan.textContent) ||
+                    (storedRange && storedRange.toString()) ||
+                    (window.getSelection()?.toString()) ||
+                    'Texto';
+                pillTextPopup.innerHTML = '';
+                PILL_TEXT_STYLES.forEach(colors => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'toolbar-btn pill-style-btn';
+                    btn.appendChild(createPillPreview(colors, sampleText.trim() || 'Texto'));
+                    btn.addEventListener('mousedown', (e) => e.preventDefault());
+                    btn.addEventListener('click', () => {
+                        if (activeSpan) {
+                            applyToExistingSpan(colors);
+                        } else {
+                            applyToSelection(colors);
+                        }
+                        hide();
+                        notesEditor.focus({ preventScroll: true });
+                    });
+                    if (activeSpan && activeSpan.dataset?.pillText === colors.join('|')) {
+                        btn.classList.add('active');
+                    }
+                    pillTextPopup.appendChild(btn);
+                });
+                pillTextPopup.style.display = 'flex';
+                positionPopup(anchor || activeSpan);
+            };
+
+            return {
+                hide,
+                captureSelection,
+                showForSelection(anchor) {
+                    activeSpan = null;
+                    if (!storedRange && !captureSelection()) {
+                        hide();
+                        return;
+                    }
+                    renderMenu(anchor);
+                },
+                showForSpan(span, anchor) {
+                    activeSpan = span;
+                    storedRange = null;
+                    savedEditorSelection = null;
+                    renderMenu(anchor || span);
+                }
+            };
+        })();
+
+        const hidePillTextPopup = () => pillTextManager.hide();
+        const capturePillSelection = () => pillTextManager.captureSelection();
+        const setPillsText = (span = null, anchor = null) => {
+            if (span) {
+                pillTextManager.showForSpan(span, anchor);
             } else {
-                currentPillSpan = span;
-                pillSelectionRange = null;
-                savedEditorSelection = null;
+                pillTextManager.showForSelection(anchor);
             }
-            showPillTextPopup(span, anchor);
         };
+
+        const pillTextToolbarBtn = createButton('Texto píldora', '💊', null, null, () => {
+            const hasSelection = capturePillSelection();
+            if (!hasSelection) {
+                hidePillTextPopup();
+                return;
+            }
+            setPillsText(null, pillTextToolbarBtn);
+        });
+        if (tailwindSpacingPanel && tailwindSpacingPanel.parentElement === editorToolbar) {
+            editorToolbar.insertBefore(pillTextToolbarBtn, tailwindSpacingPanel);
+        } else {
+            editorToolbar.appendChild(pillTextToolbarBtn);
+        }
 
         notesEditor.addEventListener('click', (e) => {
             const span = e.target.closest('span[data-pill-text]');

@@ -1626,6 +1626,22 @@ table.resizable-table th {
     margin: 2px 0;
 }
 
+.preset-style-popup .pill-style-btn {
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+.preset-style-popup .pill-style-btn span {
+    display: block;
+    font-size: 0.75rem;
+    text-align: center;
+}
+
+.preset-style-popup .pill-style-btn.active {
+    outline: 2px solid var(--btn-primary-bg, #2563eb);
+    outline-offset: 1px;
+}
+
 .inline-style-popup {
     width: min(320px, calc(100vw - 32px));
     font-size: 0.8rem;
