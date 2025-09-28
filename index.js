@@ -1639,6 +1639,39 @@ document.addEventListener('DOMContentLoaded', function () {
     let floatingToolbar = null;
     let floatingToolbarInitialized = false;
 
+    function rangeWithinEditor(range, editor) {
+        if (!range || !editor) return false;
+        const { startContainer, endContainer } = range;
+        if (!startContainer || !endContainer) return false;
+        if (!startContainer.isConnected || !endContainer.isConnected) return false;
+        return editor.contains(startContainer) && editor.contains(endContainer);
+    }
+
+    function focusEditorAndRestoreSelection(editor, range, callback) {
+        const run = () => {
+            if (range && rangeWithinEditor(range, editor)) {
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+            callback();
+        };
+
+        if (!editor) {
+            callback();
+            return;
+        }
+
+        const active = document.activeElement;
+        const needsFocus = !active || (active !== editor && !editor.contains(active));
+        if (needsFocus) {
+            editor.focus({ preventScroll: true });
+            requestAnimationFrame(run);
+        } else {
+            run();
+        }
+    }
+
     // Image selection handling within the sub-note editor
     if (subNoteEditor) {
         subNoteEditor.addEventListener('click', (e) => {
@@ -7679,66 +7712,74 @@ ${exportTable.outerHTML}
 
     function applyNoteStyle(opts) {
         const PREDEF_CLASSES = ['note-blue-left','note-green-card','note-lila-dotted','note-peach-dashed','note-cyan-top','note-pink-double','note-yellow-corner','note-gradient','note-mint-bottom','note-violet-shadow','note-gray-neutral'];
-        if (!currentCallout) {
-            const callout = document.createElement('div');
-            callout.className = 'note-callout';
-            callout.setAttribute('role','note');
-            callout.setAttribute('aria-label','Nota');
-            if (savedEditorSelection && !savedEditorSelection.collapsed) {
-                try {
-                    savedEditorSelection.surroundContents(callout);
-                } catch (e) {
-                    callout.textContent = savedEditorSelection.toString();
-                    savedEditorSelection.deleteContents();
+
+        focusEditorAndRestoreSelection(notesEditor, savedEditorSelection, () => {
+            if (!currentCallout) {
+                const callout = document.createElement('div');
+                callout.className = 'note-callout';
+                callout.setAttribute('role','note');
+                callout.setAttribute('aria-label','Nota');
+                if (savedEditorSelection && !savedEditorSelection.collapsed && rangeWithinEditor(savedEditorSelection, notesEditor)) {
+                    try {
+                        savedEditorSelection.surroundContents(callout);
+                    } catch (e) {
+                        callout.textContent = savedEditorSelection.toString();
+                        savedEditorSelection.deleteContents();
+                        savedEditorSelection.insertNode(callout);
+                    }
+                } else if (savedEditorSelection && rangeWithinEditor(savedEditorSelection, notesEditor)) {
                     savedEditorSelection.insertNode(callout);
+                } else {
+                    notesEditor.appendChild(callout);
                 }
-            } else if (savedEditorSelection) {
-                savedEditorSelection.insertNode(callout);
+                currentCallout = callout;
+            }
+
+            if (!currentCallout.querySelector('.note-callout-content')) {
+                const innerContent = document.createElement('div');
+                innerContent.className = 'note-callout-content';
+                innerContent.contentEditable = 'true';
+                while (currentCallout.firstChild) {
+                    innerContent.appendChild(currentCallout.firstChild);
+                }
+                if (!innerContent.textContent.trim()) {
+                    innerContent.textContent = 'Escribe una nota...';
+                }
+                currentCallout.appendChild(innerContent);
+            }
+
+            const inner = currentCallout.querySelector('.note-callout-content');
+            sanitizeCalloutContent(inner);
+            currentCallout.contentEditable = 'false';
+            currentCallout.classList.remove(...PREDEF_CLASSES, 'note-shadow');
+            if (opts.presetClass) {
+                currentCallout.removeAttribute('style');
+                currentCallout.classList.add(opts.presetClass);
             } else {
-                notesEditor.appendChild(callout);
+                currentCallout.style.backgroundColor = opts.backgroundColor;
+                currentCallout.style.borderColor = opts.borderColor;
+                currentCallout.style.color = opts.textColor;
+                currentCallout.style.borderWidth = opts.borderWidth + 'px';
+                currentCallout.style.borderRadius = opts.borderRadius + 'px';
+                currentCallout.style.padding = opts.padding + 'px';
+                currentCallout.style.margin = opts.margin + 'px 0';
+                if (opts.shadow) {
+                    currentCallout.classList.add('note-shadow');
+                }
             }
-            currentCallout = callout;
-        }
-        if (!currentCallout.querySelector('.note-callout-content')) {
-            const innerContent = document.createElement('div');
-            innerContent.className = 'note-callout-content';
-            innerContent.contentEditable = 'true';
-            while (currentCallout.firstChild) {
-                innerContent.appendChild(currentCallout.firstChild);
-            }
-            if (!innerContent.textContent.trim()) {
-                innerContent.textContent = 'Escribe una nota...';
-            }
-            currentCallout.appendChild(innerContent);
-        }
-        const inner = currentCallout.querySelector('.note-callout-content');
-        sanitizeCalloutContent(inner);
-        currentCallout.contentEditable = 'false';
-        currentCallout.classList.remove(...PREDEF_CLASSES, 'note-shadow');
-        if (opts.presetClass) {
-            currentCallout.removeAttribute('style');
-            currentCallout.classList.add(opts.presetClass);
-        } else {
-            currentCallout.style.backgroundColor = opts.backgroundColor;
-            currentCallout.style.borderColor = opts.borderColor;
-            currentCallout.style.color = opts.textColor;
-            currentCallout.style.borderWidth = opts.borderWidth + 'px';
-            currentCallout.style.borderRadius = opts.borderRadius + 'px';
-            currentCallout.style.padding = opts.padding + 'px';
-            currentCallout.style.margin = opts.margin + 'px 0';
-            if (opts.shadow) {
-                currentCallout.classList.add('note-shadow');
-            }
-        }
-        const range = document.createRange();
-        range.selectNodeContents(inner);
-        range.collapse(false);
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-        inner.focus({ preventScroll: true });
-        notesEditor.focus({ preventScroll: true });
-        closeNoteStyleModal();
+
+            const range = document.createRange();
+            range.selectNodeContents(inner);
+            range.collapse(false);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            inner.focus({ preventScroll: true });
+            notesEditor.focus({ preventScroll: true });
+            recordHistory();
+            closeNoteStyleModal();
+            savedEditorSelection = null;
+        });
     }
 
 
@@ -8411,25 +8452,34 @@ ${exportTable.outerHTML}
 
     insertHtmlBtn.addEventListener('click', () => {
         let html = htmlCodeInput.value;
-        if (html) {
-            if (savedSelectedHtml) {
-                html = insertSelectedTextIntoTemplate(html, savedSelectedHtml);
-            }
-            if (savedEditorSelection) {
-                const selection = window.getSelection();
-                selection.removeAllRanges();
-                selection.addRange(savedEditorSelection);
-            }
-            if (currentHtmlEditor) {
-                currentHtmlEditor.focus({ preventScroll: true });
-            }
+        if (!html) {
+            hideModal(htmlCodeModal);
+            if (currentHtmlEditor) currentHtmlEditor.focus();
+            return;
+        }
+
+        if (savedSelectedHtml) {
+            html = insertSelectedTextIntoTemplate(html, savedSelectedHtml);
+        }
+
+        const finalize = () => {
+            hideModal(htmlCodeModal);
+            if (currentHtmlEditor) currentHtmlEditor.focus({ preventScroll: true });
+            savedEditorSelection = null;
+            savedSelectedHtml = '';
+        };
+
+        const insertHtml = () => {
             document.execCommand('insertHTML', false, html);
             recordHistory();
+            finalize();
+        };
+
+        if (currentHtmlEditor) {
+            focusEditorAndRestoreSelection(currentHtmlEditor, savedEditorSelection, insertHtml);
+        } else {
+            insertHtml();
         }
-        hideModal(htmlCodeModal);
-        if (currentHtmlEditor) currentHtmlEditor.focus();
-        savedEditorSelection = null;
-        savedSelectedHtml = '';
     });
 
     cancelHtmlBtn.addEventListener('click', () => {
