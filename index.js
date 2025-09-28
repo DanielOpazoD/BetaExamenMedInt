@@ -1635,6 +1635,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let savedSelectedHtml = '';
     let currentCallout = null;
     let lineEraseMode = false;
+    let floatingToolbar = null;
+    let floatingToolbarInitialized = false;
 
     // Image selection handling within the sub-note editor
     if (subNoteEditor) {
@@ -3622,6 +3624,181 @@ ${exportTable.outerHTML}
             return sep;
         };
         
+        const removeTailwindSpacingClasses = (element) => {
+            if (!element || !element.classList) return;
+            const classesToRemove = Array.from(element.classList).filter(cls => /^(?:m[trblxy]|space-y)-/i.test(cls));
+            classesToRemove.forEach(cls => element.classList.remove(cls));
+        };
+
+        const createTailwindSpacingControl = () => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'spacing-adjuster';
+
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'toolbar-btn spacing-adjuster-toggle';
+            toggleBtn.type = 'button';
+            toggleBtn.title = 'Ajustar márgenes y espacio vertical';
+            toggleBtn.innerHTML = '↕️⚙️';
+            toggleBtn.addEventListener('mousedown', (e) => e.preventDefault());
+
+            const panel = document.createElement('div');
+            panel.className = 'spacing-adjuster-panel';
+
+            const buildInput = (labelText, placeholder) => {
+                const field = document.createElement('label');
+                field.className = 'spacing-adjuster-field';
+                const span = document.createElement('span');
+                span.textContent = labelText;
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.min = '-24';
+                input.max = '120';
+                input.step = '1';
+                input.placeholder = placeholder;
+                input.className = 'spacing-adjuster-input';
+                field.appendChild(span);
+                field.appendChild(input);
+                panel.appendChild(field);
+                return input;
+            };
+
+            const topInput = buildInput('Margen superior (px)', 'vacío = auto');
+            const bottomInput = buildInput('Margen inferior (px)', 'vacío = auto');
+            const betweenInput = buildInput('Espacio entre bloques (px)', 'vacío = sin cambio');
+
+            const applyBtn = document.createElement('button');
+            applyBtn.type = 'button';
+            applyBtn.className = 'toolbar-btn spacing-apply-btn';
+            applyBtn.textContent = 'Aplicar';
+
+            const clearBtn = document.createElement('button');
+            clearBtn.type = 'button';
+            clearBtn.className = 'toolbar-btn spacing-clear-btn';
+            clearBtn.textContent = 'Limpiar';
+
+            const hidePanel = () => {
+                panel.classList.remove('visible');
+                toggleBtn.classList.remove('active');
+            };
+
+            const parseValue = (value) => {
+                const trimmed = String(value || '').trim();
+                if (trimmed === '') return null;
+                const num = Number(trimmed);
+                return Number.isFinite(num) ? num : null;
+            };
+
+            const applySpacing = (topValue, bottomValue, betweenValue) => {
+                const blocks = getSelectedBlockElements();
+                const topPx = topValue !== null ? `${topValue}px` : null;
+                const bottomPx = bottomValue !== null ? `${bottomValue}px` : null;
+                const betweenPx = betweenValue !== null ? `${betweenValue}px` : null;
+
+                const processedParents = new WeakSet();
+
+                blocks.forEach((block, index) => {
+                    if (!block || !notesEditor.contains(block)) return;
+                    removeTailwindSpacingClasses(block);
+                    if (block.parentElement && block.parentElement !== notesEditor && !processedParents.has(block.parentElement)) {
+                        removeTailwindSpacingClasses(block.parentElement);
+                        if (betweenPx !== null) {
+                            block.parentElement.style.gap = betweenPx;
+                            block.parentElement.style.rowGap = betweenPx;
+                            block.parentElement.dataset.customSpaceY = betweenPx;
+                        } else {
+                            block.parentElement.style.removeProperty('gap');
+                            block.parentElement.style.removeProperty('row-gap');
+                            delete block.parentElement.dataset.customSpaceY;
+                        }
+                        processedParents.add(block.parentElement);
+                    }
+
+                    if (betweenPx !== null) {
+                        const isSingle = blocks.length === 1;
+                        if (isSingle) {
+                            block.style.marginTop = betweenPx;
+                            block.style.marginBottom = betweenPx;
+                        } else {
+                            if (index === 0) {
+                                block.style.marginBottom = betweenPx;
+                                block.style.marginTop = topPx !== null ? topPx : '';
+                            } else if (index === blocks.length - 1) {
+                                block.style.marginTop = betweenPx;
+                                block.style.marginBottom = bottomPx !== null ? bottomPx : '';
+                            } else {
+                                block.style.marginTop = betweenPx;
+                                block.style.marginBottom = betweenPx;
+                            }
+                        }
+                    } else {
+                        if (topPx !== null) {
+                            block.style.marginTop = topPx;
+                        } else {
+                            block.style.removeProperty('margin-top');
+                        }
+                        if (bottomPx !== null) {
+                            block.style.marginBottom = bottomPx;
+                        } else {
+                            block.style.removeProperty('margin-bottom');
+                        }
+                    }
+                });
+            };
+
+            applyBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const topValue = parseValue(topInput.value);
+                const bottomValue = parseValue(bottomInput.value);
+                const betweenValue = parseValue(betweenInput.value);
+
+                withEditorSelection(() => applySpacing(topValue, bottomValue, betweenValue));
+                notesEditor.focus({ preventScroll: true });
+                hidePanel();
+            });
+
+            clearBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                topInput.value = '';
+                bottomInput.value = '';
+                betweenInput.value = '';
+                withEditorSelection(() => applySpacing(null, null, null));
+                notesEditor.focus({ preventScroll: true });
+                hidePanel();
+            });
+
+            panel.appendChild(applyBtn);
+            panel.appendChild(clearBtn);
+
+            toggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                }
+                const isVisible = panel.classList.contains('visible');
+                document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(el => {
+                    if (!panel.contains(el)) el.classList.remove('visible');
+                });
+                if (isVisible) {
+                    hidePanel();
+                } else {
+                    panel.classList.add('visible');
+                    toggleBtn.classList.add('active');
+                }
+            });
+
+            document.addEventListener('click', (evt) => {
+                if (!panel.contains(evt.target) && evt.target !== toggleBtn) {
+                    hidePanel();
+                }
+            });
+
+            wrapper.appendChild(toggleBtn);
+            wrapper.appendChild(panel);
+            return wrapper;
+        };
+
         const createColorPalette = (title, action, mainColors, extraColors, iconSVG) => {
             const group = document.createElement('div');
             group.className = 'color-palette-group';
@@ -4229,11 +4406,7 @@ ${exportTable.outerHTML}
         editorToolbar.appendChild(createSeparator());
 
         // Basic formatting
-        editorToolbar.appendChild(createButton('Negrita', '<b>B</b>', 'bold'));
-        editorToolbar.appendChild(createButton('Cursiva', '<i>I</i>', 'italic'));
-        editorToolbar.appendChild(createButton('Subrayado', '<u>U</u>', 'underline'));
         editorToolbar.appendChild(createButton('Tachado', '<s>S</s>', 'strikeThrough'));
-        editorToolbar.appendChild(createButton('Superíndice', 'X²', 'superscript'));
         editorToolbar.appendChild(createButton('Deshacer', '↺', null, null, undoAction));
         editorToolbar.appendChild(createButton('Rehacer', '↻', null, null, redoAction));
 
@@ -4278,7 +4451,7 @@ ${exportTable.outerHTML}
         
         const applyForeColor = (color) => document.execCommand('foreColor', false, color);
         const applyHiliteColor = (color) => document.execCommand('hiliteColor', false, color);
-        
+
         const applyLineHighlight = (color) => {
             let elements = getSelectedBlockElements();
             if (elements.length === 0 || (elements.length === 1 && !elements[0])) {
@@ -4336,14 +4509,196 @@ ${exportTable.outerHTML}
         const typeIcon = UI_ICON_STRINGS.type;
         const highlighterIcon = UI_ICON_STRINGS.highlighter;
 
-        const textPalette = createColorPalette('Color de Texto', applyForeColor, textColors, extraTextColors, typeIcon);
-        editorToolbar.appendChild(textPalette);
+        const tailwindSpacingPanel = createTailwindSpacingControl();
+        editorToolbar.appendChild(tailwindSpacingPanel);
 
-        const highlightPalette = createColorPalette('Color de Resaltado', applyHiliteColor, highlightColors, extraHighlightColors, highlighterIcon);
-        editorToolbar.appendChild(highlightPalette);
+        const initializeFloatingToolbar = () => {
+            if (!floatingToolbar) {
+                floatingToolbar = document.createElement('div');
+                floatingToolbar.id = 'floating-format-toolbar';
+                floatingToolbar.className = 'floating-format-toolbar';
+                document.body.appendChild(floatingToolbar);
+            }
 
-        const lineHighlightPalette = createColorPalette('Color de fondo de línea', applyLineHighlight, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), highlighterIcon);
-        editorToolbar.appendChild(lineHighlightPalette);
+            floatingToolbar.innerHTML = '';
+
+            const hideColorMenus = () => {
+                floatingToolbar.querySelectorAll('.floating-color-menu.visible').forEach(menu => menu.classList.remove('visible'));
+            };
+
+            const executeCommand = (command, value = null) => {
+                withEditorSelection(() => document.execCommand(command, false, value));
+                hideColorMenus();
+                notesEditor.focus({ preventScroll: true });
+            };
+
+            const createFloatingButton = (title, html, handler) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'toolbar-btn floating-toolbar-btn';
+                btn.title = title;
+                btn.innerHTML = html;
+                btn.addEventListener('mousedown', (e) => e.preventDefault());
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    handler();
+                });
+                return btn;
+            };
+
+            const createFloatingPaletteControl = (title, iconSVG, mainColors, extraColors, applyAction) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'floating-color-control';
+
+                const trigger = document.createElement('button');
+                trigger.type = 'button';
+                trigger.className = 'toolbar-btn floating-toolbar-btn';
+                trigger.innerHTML = iconSVG;
+                trigger.title = title;
+                trigger.addEventListener('mousedown', (e) => e.preventDefault());
+
+                const menu = document.createElement('div');
+                menu.className = 'floating-color-menu';
+
+                const createSwatch = (color) => {
+                    const swatch = document.createElement('button');
+                    swatch.type = 'button';
+                    swatch.className = 'color-swatch';
+                    if (color === 'transparent') {
+                        swatch.style.backgroundImage = 'linear-gradient(to top left, transparent calc(50% - 1px), red, transparent calc(50% + 1px))';
+                        swatch.style.backgroundColor = 'var(--bg-secondary)';
+                        swatch.title = 'Sin color';
+                    } else {
+                        swatch.style.backgroundColor = color;
+                        swatch.title = color;
+                    }
+                    swatch.addEventListener('mousedown', (e) => e.preventDefault());
+                    swatch.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        if (savedEditorSelection) {
+                            const selection = window.getSelection();
+                            selection.removeAllRanges();
+                            selection.addRange(savedEditorSelection);
+                        }
+                        withEditorSelection(() => applyAction(color));
+                        hideColorMenus();
+                        savedEditorSelection = null;
+                        notesEditor.focus({ preventScroll: true });
+                    });
+                    return swatch;
+                };
+
+                mainColors.forEach(color => menu.appendChild(createSwatch(color)));
+
+                if (extraColors.length > 0) {
+                    const divider = document.createElement('div');
+                    divider.className = 'floating-color-divider';
+                    menu.appendChild(divider);
+                    extraColors.forEach(color => menu.appendChild(createSwatch(color)));
+                }
+
+                trigger.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const selection = window.getSelection();
+                    if (selection && selection.rangeCount > 0) {
+                        savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                    }
+                    const willShow = !menu.classList.contains('visible');
+                    hideColorMenus();
+                    if (willShow) {
+                        menu.classList.add('visible');
+                    }
+                });
+
+                wrapper.appendChild(trigger);
+                wrapper.appendChild(menu);
+                return wrapper;
+            };
+
+            const floatingButtons = [
+                createFloatingButton('Negrita', '<b>B</b>', () => executeCommand('bold')),
+                createFloatingButton('Cursiva', '<i>I</i>', () => executeCommand('italic')),
+                createFloatingButton('Subrayado', '<u>U</u>', () => executeCommand('underline')),
+                createFloatingButton('Superíndice', 'X²', () => executeCommand('superscript'))
+            ];
+
+            floatingButtons.forEach(btn => floatingToolbar.appendChild(btn));
+
+            floatingToolbar.appendChild(createFloatingPaletteControl('Color de texto', UI_ICON_STRINGS.type, textColors, extraTextColors, applyForeColor));
+            floatingToolbar.appendChild(createFloatingPaletteControl('Color de resaltado', UI_ICON_STRINGS.highlighter, highlightColors, extraHighlightColors, applyHiliteColor));
+            floatingToolbar.appendChild(createFloatingPaletteControl('Color de fondo de línea', UI_ICON_STRINGS.highlighter, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), applyLineHighlight));
+
+            const hideFloatingToolbar = () => {
+                if (!floatingToolbar) return;
+                floatingToolbar.classList.remove('visible');
+                hideColorMenus();
+            };
+
+            const positionFloatingToolbar = () => {
+                if (!floatingToolbar) return;
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+                    hideFloatingToolbar();
+                    return;
+                }
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                if (!rect || (rect.width === 0 && rect.height === 0)) {
+                    hideFloatingToolbar();
+                    return;
+                }
+                const withinEditor = notesEditor.contains(range.commonAncestorContainer);
+                if (!withinEditor) {
+                    hideFloatingToolbar();
+                    return;
+                }
+
+                floatingToolbar.classList.add('visible');
+
+                const toolbarRect = floatingToolbar.getBoundingClientRect();
+                let top = window.scrollY + rect.top - toolbarRect.height - 8;
+                let left = window.scrollX + rect.left + (rect.width / 2) - (toolbarRect.width / 2);
+
+                if (top < window.scrollY + 8) {
+                    top = window.scrollY + rect.bottom + 8;
+                }
+
+                const maxLeft = window.scrollX + document.documentElement.clientWidth - toolbarRect.width - 8;
+                const minLeft = window.scrollX + 8;
+                if (left < minLeft) left = minLeft;
+                if (left > maxLeft) left = maxLeft;
+
+                floatingToolbar.style.top = `${top}px`;
+                floatingToolbar.style.left = `${left}px`;
+            };
+
+            if (!floatingToolbarInitialized) {
+                const handleSelectionChange = () => {
+                    requestAnimationFrame(positionFloatingToolbar);
+                };
+
+                document.addEventListener('selectionchange', handleSelectionChange);
+                notesEditor.addEventListener('mouseup', handleSelectionChange);
+                notesEditor.addEventListener('keyup', handleSelectionChange);
+                notesEditor.addEventListener('mouseleave', () => {
+                    setTimeout(() => {
+                        const selection = window.getSelection();
+                        if (!selection || selection.isCollapsed) hideFloatingToolbar();
+                    }, 120);
+                });
+                window.addEventListener('scroll', hideFloatingToolbar, true);
+                window.addEventListener('resize', hideFloatingToolbar);
+                notesModalContent.addEventListener('scroll', hideFloatingToolbar);
+                document.addEventListener('click', (e) => {
+                    if (floatingToolbar && floatingToolbar.contains(e.target)) return;
+                    hideColorMenus();
+                });
+                floatingToolbarInitialized = true;
+            }
+        };
+
+        initializeFloatingToolbar();
 
         const convertListTag = (list, tagName) => {
             if (!list || list.tagName.toLowerCase() === tagName.toLowerCase()) return list;
@@ -5401,6 +5756,10 @@ ${exportTable.outerHTML}
             resizeBtn.addEventListener('click', () => {
                 tableEditMode = true;
                 editingTable = table;
+                if (!table.querySelector('.table-resize-handle')) {
+                    initTableResize(table);
+                }
+                table.classList.add('selected');
                 hideTableMenu();
             });
             tableMenu.appendChild(resizeBtn);
@@ -5807,7 +6166,7 @@ ${exportTable.outerHTML}
             tableMenu.style.left = `${left}px`;
             tableMenu.style.zIndex = 10001;
         };
-        notesEditor.addEventListener('click', (e) => {
+        notesEditor.addEventListener('dblclick', (e) => {
             if (tableEditMode) return;
             const cell = e.target.closest('td, th');
             const table = e.target.closest('table');
@@ -5825,8 +6184,19 @@ ${exportTable.outerHTML}
         });
         document.addEventListener('click', (e) => {
             if (tableEditMode && editingTable && !editingTable.contains(e.target)) {
+                editingTable.classList.remove('selected');
                 tableEditMode = false;
                 editingTable = null;
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && tableEditMode) {
+                if (editingTable) {
+                    editingTable.classList.remove('selected');
+                }
+                tableEditMode = false;
+                editingTable = null;
+                hideTableMenu();
             }
         });
         document.addEventListener('click', (e) => {
