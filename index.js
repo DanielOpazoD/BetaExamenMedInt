@@ -5824,6 +5824,10 @@ ${exportTable.outerHTML}
         async function exportTableAsPNG(table, baseName = 'tabla') {
             const { canvas } = await renderTableToCanvas(table);
             await new Promise((resolve, reject) => {
+                if (!canvas) {
+                    reject(new Error('No se pudo preparar el lienzo de la tabla.'));
+                    return;
+                }
                 canvas.toBlob(blob => {
                     if (!blob) {
                         reject(new Error('No se pudo generar la imagen PNG.'));
@@ -5837,6 +5841,7 @@ ${exportTable.outerHTML}
 
         async function exportTableAsPDF(table, baseName = 'tabla') {
             const { canvas, cssWidth, cssHeight } = await renderTableToCanvas(table);
+            if (!canvas) throw new Error('No se pudo preparar el lienzo de la tabla.');
             const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.92);
             const jpegBytes = dataUrlToUint8Array(jpegDataUrl);
             const pdfBytes = createPdfFromImage(jpegBytes, canvas.width, canvas.height, cssWidth, cssHeight);
@@ -5863,42 +5868,45 @@ ${exportTable.outerHTML}
             return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
         }
 
-        function renderTableToCanvas(table) {
-            return new Promise((resolve, reject) => {
-                try {
-                    const { svg, width, height } = buildTableSvgString(table);
-                    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-                    const url = URL.createObjectURL(blob);
-                    const image = new Image();
-                    image.decoding = 'async';
-                    image.onload = () => {
-                        const ratio = window.devicePixelRatio || 1;
-                        const canvas = document.createElement('canvas');
-                        const scaledWidth = Math.max(1, Math.round(width * ratio));
-                        const scaledHeight = Math.max(1, Math.round(height * ratio));
-                        canvas.width = scaledWidth;
-                        canvas.height = scaledHeight;
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx) {
-                            URL.revokeObjectURL(url);
-                            reject(new Error('No se pudo inicializar el lienzo.'));
-                            return;
-                        }
-                        ctx.scale(ratio, ratio);
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, width, height);
-                        ctx.drawImage(image, 0, 0, width, height);
-                        URL.revokeObjectURL(url);
-                        resolve({ canvas, cssWidth: width, cssHeight: height });
-                    };
-                    image.onerror = () => {
-                        URL.revokeObjectURL(url);
-                        reject(new Error('No se pudo preparar la imagen de la tabla.'));
-                    };
-                    image.src = url;
-                } catch (error) {
-                    reject(error);
+        async function renderTableToCanvas(table) {
+            if (!(table instanceof HTMLTableElement)) {
+                throw new Error('No se proporcionó una tabla válida para exportar.');
+            }
+
+            try {
+                if (document.fonts && typeof document.fonts.ready === 'object') {
+                    await document.fonts.ready.catch(() => {});
                 }
+            } catch (err) {
+                console.warn('No se pudieron preparar las fuentes antes de la exportación.', err);
+            }
+
+            const { svg, width, height } = buildTableSvgString(table);
+            const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+
+            const image = await loadImage(dataUrl);
+            const ratio = window.devicePixelRatio || 1;
+            const canvas = document.createElement('canvas');
+            const scaledWidth = Math.max(1, Math.round(width * ratio));
+            const scaledHeight = Math.max(1, Math.round(height * ratio));
+            canvas.width = scaledWidth;
+            canvas.height = scaledHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('No se pudo inicializar el lienzo.');
+            ctx.scale(ratio, ratio);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(image, 0, 0, width, height);
+            return { canvas, cssWidth: width, cssHeight: height };
+        }
+
+        function loadImage(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.decoding = 'async';
+                img.onload = () => resolve(img);
+                img.onerror = (error) => reject(new Error('No se pudo preparar la imagen de la tabla.'));
+                img.src = src;
             });
         }
 
@@ -8120,10 +8128,40 @@ ${exportTable.outerHTML}
                 uses: f.uses || 0,
                 created: f.created || Date.now()
             }));
-        } else {
-            htmlFavorites = DEFAULT_HTML_FAVORITES.map(f => ({ ...f }));
-            await saveHtmlFavorites();
+            return;
         }
+
+        let migrated = false;
+        try {
+            const hasLocalStorage = typeof window !== 'undefined' && window.localStorage;
+            const legacy = hasLocalStorage
+                ? window.localStorage.getItem('htmlFavorites')
+                : null;
+            if (legacy) {
+                const parsed = JSON.parse(legacy);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    htmlFavorites = parsed.map(f => ({
+                        name: f.name,
+                        code: f.code,
+                        tags: f.tags || [],
+                        favorite: !!f.favorite,
+                        uses: f.uses || 0,
+                        created: f.created || Date.now()
+                    }));
+                    migrated = true;
+                    if (hasLocalStorage) {
+                        window.localStorage.removeItem('htmlFavorites');
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('No se pudieron migrar las plantillas HTML guardadas previamente.', error);
+        }
+
+        if (!migrated) {
+            htmlFavorites = DEFAULT_HTML_FAVORITES.map(f => ({ ...f }));
+        }
+        await saveHtmlFavorites();
     }
 
     async function saveHtmlFavorites() {
@@ -8382,7 +8420,11 @@ ${exportTable.outerHTML}
                 selection.removeAllRanges();
                 selection.addRange(savedEditorSelection);
             }
+            if (currentHtmlEditor) {
+                currentHtmlEditor.focus({ preventScroll: true });
+            }
             document.execCommand('insertHTML', false, html);
+            recordHistory();
         }
         hideModal(htmlCodeModal);
         if (currentHtmlEditor) currentHtmlEditor.focus();
