@@ -3644,48 +3644,22 @@ ${exportTable.outerHTML}
             const panel = document.createElement('div');
             panel.className = 'spacing-adjuster-panel';
 
-            const buildInput = (labelText, placeholder) => {
-                const field = document.createElement('label');
-                field.className = 'spacing-adjuster-field';
-                const span = document.createElement('span');
-                span.textContent = labelText;
-                const input = document.createElement('input');
-                input.type = 'number';
-                input.min = '-24';
-                input.max = '120';
-                input.step = '1';
-                input.placeholder = placeholder;
-                input.className = 'spacing-adjuster-input';
-                field.appendChild(span);
-                field.appendChild(input);
-                panel.appendChild(field);
-                return input;
+            let spacingSelection = null;
+
+            const ensureSelection = () => {
+                if (!spacingSelection) return;
+                const selection = window.getSelection();
+                if (!selection) return;
+                selection.removeAllRanges();
+                selection.addRange(spacingSelection.cloneRange());
             };
 
-            const topInput = buildInput('Margen superior (px)', 'vacío = auto');
-            const bottomInput = buildInput('Margen inferior (px)', 'vacío = auto');
-            const betweenInput = buildInput('Espacio entre bloques (px)', 'vacío = sin cambio');
-
-            const applyBtn = document.createElement('button');
-            applyBtn.type = 'button';
-            applyBtn.className = 'toolbar-btn spacing-apply-btn';
-            applyBtn.textContent = 'Aplicar';
-
-            const clearBtn = document.createElement('button');
-            clearBtn.type = 'button';
-            clearBtn.className = 'toolbar-btn spacing-clear-btn';
-            clearBtn.textContent = 'Limpiar';
-
-            const hidePanel = () => {
-                panel.classList.remove('visible');
-                toggleBtn.classList.remove('active');
-            };
-
-            const parseValue = (value) => {
-                const trimmed = String(value || '').trim();
-                if (trimmed === '') return null;
-                const num = Number(trimmed);
-                return Number.isFinite(num) ? num : null;
+            const updateStoredSelection = () => {
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    spacingSelection = selection.getRangeAt(0).cloneRange();
+                    savedEditorSelection = spacingSelection.cloneRange();
+                }
             };
 
             const applySpacing = (topValue, bottomValue, betweenValue) => {
@@ -3745,37 +3719,168 @@ ${exportTable.outerHTML}
                 });
             };
 
-            applyBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const topValue = parseValue(topInput.value);
-                const bottomValue = parseValue(bottomInput.value);
-                const betweenValue = parseValue(betweenInput.value);
+            const sliderRefs = {};
 
+            const updateSliderVisual = (slider, badge) => {
+                const value = Number(slider.value);
+                const min = Number(slider.min);
+                const max = Number(slider.max);
+                const percent = max > min ? ((value - min) / (max - min)) * 100 : 0;
+                slider.style.background = `linear-gradient(90deg, #0ea5e9 0%, #38bdf8 ${percent}%, rgba(148,163,184,0.25) ${percent}%)`;
+                badge.textContent = `${value} px`;
+            };
+
+            const handleLiveSpacing = () => {
+                if (!spacingSelection) return;
+                ensureSelection();
+                const topValue = Number(sliderRefs.top.slider.value);
+                const bottomValue = Number(sliderRefs.bottom.slider.value);
+                const betweenValue = Number(sliderRefs.between.slider.value);
                 withEditorSelection(() => applySpacing(topValue, bottomValue, betweenValue));
-                notesEditor.focus({ preventScroll: true });
-                hidePanel();
-            });
+                Object.values(sliderRefs).forEach(ref => ref.update());
+                updateStoredSelection();
+            };
 
+            const buildSlider = (labelText, { min = 0, max = 96, step = 1 } = {}) => {
+                const field = document.createElement('div');
+                field.className = 'spacing-adjuster-field';
+
+                const header = document.createElement('div');
+                header.className = 'spacing-slider-header';
+
+                const label = document.createElement('span');
+                label.textContent = labelText;
+
+                const badge = document.createElement('span');
+                badge.className = 'spacing-slider-value';
+                badge.textContent = '0 px';
+
+                header.appendChild(label);
+                header.appendChild(badge);
+                field.appendChild(header);
+
+                const slider = document.createElement('input');
+                slider.type = 'range';
+                slider.className = 'spacing-slider-input';
+                slider.min = String(min);
+                slider.max = String(max);
+                slider.step = String(step);
+                slider.value = '0';
+
+                field.appendChild(slider);
+                panel.appendChild(field);
+
+                slider.addEventListener('input', () => {
+                    updateSliderVisual(slider, badge);
+                    handleLiveSpacing();
+                });
+                slider.addEventListener('change', () => {
+                    updateSliderVisual(slider, badge);
+                    updateStoredSelection();
+                });
+                slider.addEventListener('pointerdown', ensureSelection);
+                slider.addEventListener('touchstart', ensureSelection, { passive: true });
+
+                const update = () => updateSliderVisual(slider, badge);
+                update();
+
+                return { slider, badge, update };
+            };
+
+            sliderRefs.top = buildSlider('Margen superior (px)', { max: 120 });
+            sliderRefs.bottom = buildSlider('Margen inferior (px)', { max: 120 });
+            sliderRefs.between = buildSlider('Espacio entre bloques (px)', { max: 120 });
+
+            const clearBtn = document.createElement('button');
+            clearBtn.type = 'button';
+            clearBtn.className = 'toolbar-btn spacing-clear-btn';
+            clearBtn.textContent = 'Restablecer';
             clearBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                topInput.value = '';
-                bottomInput.value = '';
-                betweenInput.value = '';
+                if (!spacingSelection) return;
+                Object.values(sliderRefs).forEach(ref => {
+                    ref.slider.value = '0';
+                    ref.update();
+                });
+                ensureSelection();
                 withEditorSelection(() => applySpacing(null, null, null));
-                notesEditor.focus({ preventScroll: true });
+                updateStoredSelection();
                 hidePanel();
+                notesEditor.focus({ preventScroll: true });
             });
 
-            panel.appendChild(applyBtn);
-            panel.appendChild(clearBtn);
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.className = 'toolbar-btn spacing-apply-btn';
+            closeBtn.textContent = 'Cerrar';
+            closeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                hidePanel();
+                notesEditor.focus({ preventScroll: true });
+            });
+
+            const footer = document.createElement('div');
+            footer.className = 'spacing-adjuster-footer';
+            footer.appendChild(clearBtn);
+            footer.appendChild(closeBtn);
+            panel.appendChild(footer);
+
+            const clampValue = (value, slider) => {
+                const min = Number(slider.min);
+                const max = Number(slider.max);
+                if (!Number.isFinite(value)) return 0;
+                return Math.min(max, Math.max(min, Math.round(value)));
+            };
+
+            const syncSlidersWithSelection = () => {
+                ensureSelection();
+                const blocks = getSelectedBlockElements();
+                if (!blocks.length) return;
+                const firstBlock = blocks[0];
+                const blockStyles = window.getComputedStyle(firstBlock);
+                const parent = firstBlock.parentElement;
+
+                const topValue = clampValue(parseFloat(firstBlock.style.marginTop || blockStyles.marginTop || '0'), sliderRefs.top.slider);
+                const bottomValue = clampValue(parseFloat(firstBlock.style.marginBottom || blockStyles.marginBottom || '0'), sliderRefs.bottom.slider);
+
+                let betweenValue = 0;
+                if (parent) {
+                    if (parent.dataset.customSpaceY) {
+                        betweenValue = clampValue(parseFloat(parent.dataset.customSpaceY), sliderRefs.between.slider);
+                    } else {
+                        const parentStyles = window.getComputedStyle(parent);
+                        const rowGap = parseFloat(parentStyles.rowGap || '0');
+                        const gap = parseFloat(parentStyles.gap || '0');
+                        const largestGap = Number.isFinite(rowGap) && rowGap > 0 ? rowGap : gap;
+                        if (Number.isFinite(largestGap)) {
+                            betweenValue = clampValue(largestGap, sliderRefs.between.slider);
+                        }
+                    }
+                }
+
+                sliderRefs.top.slider.value = String(topValue);
+                sliderRefs.bottom.slider.value = String(bottomValue);
+                sliderRefs.between.slider.value = String(betweenValue);
+                Object.values(sliderRefs).forEach(ref => ref.update());
+            };
+
+            const hidePanel = () => {
+                panel.classList.remove('visible');
+                toggleBtn.classList.remove('active');
+                spacingSelection = null;
+                savedEditorSelection = null;
+            };
 
             toggleBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 const selection = window.getSelection();
-                if (selection && selection.rangeCount > 0) {
-                    savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                if (!selection || selection.rangeCount === 0 || !notesEditor.contains(selection.anchorNode)) {
+                    hidePanel();
+                    return;
                 }
+                spacingSelection = selection.getRangeAt(0).cloneRange();
+                savedEditorSelection = spacingSelection.cloneRange();
                 const isVisible = panel.classList.contains('visible');
                 document.querySelectorAll('.color-submenu.visible, .symbol-dropdown-content.visible').forEach(el => {
                     if (!panel.contains(el)) el.classList.remove('visible');
@@ -3785,6 +3890,7 @@ ${exportTable.outerHTML}
                 } else {
                     panel.classList.add('visible');
                     toggleBtn.classList.add('active');
+                    syncSlidersWithSelection();
                 }
             });
 
@@ -4522,13 +4628,59 @@ ${exportTable.outerHTML}
 
             floatingToolbar.innerHTML = '';
 
-            const hideColorMenus = () => {
+            let floatingStyleMenu = document.getElementById('floating-style-menu');
+            if (!floatingStyleMenu) {
+                floatingStyleMenu = document.createElement('div');
+                floatingStyleMenu.id = 'floating-style-menu';
+                document.body.appendChild(floatingStyleMenu);
+            }
+            floatingStyleMenu.className = 'floating-style-menu preset-style-panel';
+            floatingStyleMenu.innerHTML = '';
+            floatingStyleMenu.style.display = 'none';
+
+            let floatingStyleControls = null;
+
+            const closeColorMenus = () => {
                 floatingToolbar.querySelectorAll('.floating-color-menu.visible').forEach(menu => menu.classList.remove('visible'));
+            };
+
+            const hideFloatingStyleMenu = () => {
+                if (!floatingStyleMenu) return;
+                floatingStyleMenu.classList.remove('visible');
+                floatingStyleMenu.style.display = 'none';
+                if (floatingStyleControls && typeof floatingStyleControls.closeAll === 'function') {
+                    floatingStyleControls.closeAll();
+                }
+            };
+
+            const hideFloatingMenus = () => {
+                closeColorMenus();
+                hideFloatingStyleMenu();
+                hidePillTextPopup();
+            };
+
+            const ensureFloatingStyleMenu = () => {
+                if (!floatingStyleControls) {
+                    floatingStyleControls = buildPresetStylePanel(floatingStyleMenu, (style, { closeAll }) => {
+                        if (savedEditorSelection) {
+                            const selection = window.getSelection();
+                            if (selection) {
+                                selection.removeAllRanges();
+                                selection.addRange(savedEditorSelection);
+                            }
+                        }
+                        withEditorSelection(() => applyPresetStyle(style));
+                        if (closeAll) closeAll();
+                        hideFloatingStyleMenu();
+                        savedEditorSelection = null;
+                        notesEditor.focus({ preventScroll: true });
+                    });
+                }
             };
 
             const executeCommand = (command, value = null) => {
                 withEditorSelection(() => document.execCommand(command, false, value));
-                hideColorMenus();
+                hideFloatingMenus();
                 notesEditor.focus({ preventScroll: true });
             };
 
@@ -4581,7 +4733,7 @@ ${exportTable.outerHTML}
                             selection.addRange(savedEditorSelection);
                         }
                         withEditorSelection(() => applyAction(color));
-                        hideColorMenus();
+                        hideFloatingMenus();
                         savedEditorSelection = null;
                         notesEditor.focus({ preventScroll: true });
                     });
@@ -4605,7 +4757,9 @@ ${exportTable.outerHTML}
                         savedEditorSelection = selection.getRangeAt(0).cloneRange();
                     }
                     const willShow = !menu.classList.contains('visible');
-                    hideColorMenus();
+                    closeColorMenus();
+                    hideFloatingStyleMenu();
+                    hidePillTextPopup();
                     if (willShow) {
                         menu.classList.add('visible');
                     }
@@ -4629,10 +4783,67 @@ ${exportTable.outerHTML}
             floatingToolbar.appendChild(createFloatingPaletteControl('Color de resaltado', UI_ICON_STRINGS.highlighter, highlightColors, extraHighlightColors, applyHiliteColor));
             floatingToolbar.appendChild(createFloatingPaletteControl('Color de fondo de línea', UI_ICON_STRINGS.highlighter, ['#FFFFFF'], extraHighlightColors.concat(highlightColors), applyLineHighlight));
 
+            const floatingStyleBtn = createFloatingButton('Estilos de texto', '🖌️', () => {
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0 || !notesEditor.contains(selection.anchorNode)) {
+                    hideFloatingStyleMenu();
+                    return;
+                }
+                savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                const willShow = !floatingStyleMenu.classList.contains('visible');
+                closeColorMenus();
+                hidePillTextPopup();
+                hideFloatingStyleMenu();
+                if (!willShow) return;
+                ensureFloatingStyleMenu();
+                if (floatingStyleControls && typeof floatingStyleControls.closeAll === 'function') {
+                    floatingStyleControls.closeAll();
+                }
+                floatingStyleMenu.style.display = 'block';
+                floatingStyleMenu.classList.add('visible');
+                const buttonRect = floatingStyleBtn.getBoundingClientRect();
+                const menuRect = floatingStyleMenu.getBoundingClientRect();
+                let top = window.scrollY + buttonRect.bottom + 8;
+                if (top + menuRect.height > window.scrollY + window.innerHeight - 8) {
+                    top = window.scrollY + buttonRect.top - menuRect.height - 8;
+                }
+                if (top < window.scrollY + 8) {
+                    top = window.scrollY + 8;
+                }
+                let left = window.scrollX + buttonRect.left + (buttonRect.width / 2) - (menuRect.width / 2);
+                const minLeft = window.scrollX + 8;
+                const maxLeft = window.scrollX + window.innerWidth - menuRect.width - 8;
+                if (left < minLeft) left = minLeft;
+                if (left > maxLeft) left = maxLeft;
+                floatingStyleMenu.style.top = `${top}px`;
+                floatingStyleMenu.style.left = `${left}px`;
+            });
+            floatingToolbar.appendChild(floatingStyleBtn);
+
+            const floatingPillBtn = createFloatingButton('Texto Píldora', '💊', () => {
+                if (!savedEditorSelection || savedEditorSelection.collapsed) return;
+                const selection = window.getSelection();
+                if (!selection) return;
+                selection.removeAllRanges();
+                selection.addRange(savedEditorSelection);
+                closeColorMenus();
+                hideFloatingStyleMenu();
+                setPillsText(null, floatingPillBtn);
+            });
+            floatingPillBtn.addEventListener('mousedown', () => {
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
+                    savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                } else {
+                    savedEditorSelection = null;
+                }
+            });
+            floatingToolbar.appendChild(floatingPillBtn);
+
             const hideFloatingToolbar = () => {
                 if (!floatingToolbar) return;
                 floatingToolbar.classList.remove('visible');
-                hideColorMenus();
+                hideFloatingMenus();
             };
 
             const positionFloatingToolbar = () => {
@@ -4691,8 +4902,10 @@ ${exportTable.outerHTML}
                 window.addEventListener('resize', hideFloatingToolbar);
                 notesModalContent.addEventListener('scroll', hideFloatingToolbar);
                 document.addEventListener('click', (e) => {
-                    if (floatingToolbar && floatingToolbar.contains(e.target)) return;
-                    hideColorMenus();
+                    if ((floatingToolbar && floatingToolbar.contains(e.target)) || (floatingStyleMenu && floatingStyleMenu.contains(e.target))) {
+                        return;
+                    }
+                    hideFloatingMenus();
                 });
                 floatingToolbarInitialized = true;
             }
@@ -4852,8 +5065,6 @@ ${exportTable.outerHTML}
             removeBullets();
         });
         editorToolbar.appendChild(removeBulletsBtn);
-
-        editorToolbar.appendChild(createPresetStyleDropdown());
 
         const inlineColorMenu = document.createElement('div');
         inlineColorMenu.className = 'inline-color-menu';
@@ -5385,28 +5596,6 @@ ${exportTable.outerHTML}
             currentPillSpan = span;
             showPillTextPopup(span, anchor);
         };
-
-        const pillTextBtn = createButton('Texto Píldora', '💊', null, null, null);
-        pillTextBtn.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            const selection = window.getSelection();
-            if (selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
-                savedEditorSelection = selection.getRangeAt(0).cloneRange();
-            } else {
-                savedEditorSelection = null;
-            }
-        });
-        pillTextBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (savedEditorSelection && !savedEditorSelection.collapsed) {
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(savedEditorSelection);
-                setPillsText(null, pillTextBtn);
-            }
-        });
-        editorToolbar.appendChild(pillTextBtn);
 
         notesEditor.addEventListener('click', (e) => {
             const span = e.target.closest('span[data-pill-text]');
