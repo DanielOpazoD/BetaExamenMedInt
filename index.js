@@ -5821,6 +5821,224 @@ ${exportTable.outerHTML}
             table.style.width = '100%';
         };
 
+        async function exportTableAsPNG(table, baseName = 'tabla') {
+            const { canvas } = await renderTableToCanvas(table);
+            await new Promise((resolve, reject) => {
+                canvas.toBlob(blob => {
+                    if (!blob) {
+                        reject(new Error('No se pudo generar la imagen PNG.'));
+                        return;
+                    }
+                    triggerDownload(blob, `${baseName}.png`);
+                    resolve();
+                }, 'image/png');
+            });
+        }
+
+        async function exportTableAsPDF(table, baseName = 'tabla') {
+            const { canvas, cssWidth, cssHeight } = await renderTableToCanvas(table);
+            const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+            const jpegBytes = dataUrlToUint8Array(jpegDataUrl);
+            const pdfBytes = createPdfFromImage(jpegBytes, canvas.width, canvas.height, cssWidth, cssHeight);
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            triggerDownload(blob, `${baseName}.pdf`);
+        }
+
+        function getTableExportBaseName(table) {
+            if (!table) return `tabla-${formatTimestampForFile()}`;
+            const caption = table.querySelector('caption');
+            const candidate = (table.getAttribute('data-title') || table.getAttribute('aria-label') || table.dataset?.sectionTitle || (caption ? caption.textContent : '') || 'tabla').trim();
+            const safeLabel = sanitizeFileNameSegment(candidate);
+            return `${safeLabel || 'tabla'}-${formatTimestampForFile()}`;
+        }
+
+        function sanitizeFileNameSegment(text) {
+            const normalized = (text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            return normalized.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        }
+
+        function formatTimestampForFile() {
+            const now = new Date();
+            const pad = (value) => String(value).padStart(2, '0');
+            return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+        }
+
+        function renderTableToCanvas(table) {
+            return new Promise((resolve, reject) => {
+                try {
+                    const { svg, width, height } = buildTableSvgString(table);
+                    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const image = new Image();
+                    image.decoding = 'async';
+                    image.onload = () => {
+                        const ratio = window.devicePixelRatio || 1;
+                        const canvas = document.createElement('canvas');
+                        const scaledWidth = Math.max(1, Math.round(width * ratio));
+                        const scaledHeight = Math.max(1, Math.round(height * ratio));
+                        canvas.width = scaledWidth;
+                        canvas.height = scaledHeight;
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) {
+                            URL.revokeObjectURL(url);
+                            reject(new Error('No se pudo inicializar el lienzo.'));
+                            return;
+                        }
+                        ctx.scale(ratio, ratio);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, width, height);
+                        ctx.drawImage(image, 0, 0, width, height);
+                        URL.revokeObjectURL(url);
+                        resolve({ canvas, cssWidth: width, cssHeight: height });
+                    };
+                    image.onerror = () => {
+                        URL.revokeObjectURL(url);
+                        reject(new Error('No se pudo preparar la imagen de la tabla.'));
+                    };
+                    image.src = url;
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        function buildTableSvgString(table) {
+            const clone = cloneTableForExport(table);
+            const padding = 16;
+            const rect = table.getBoundingClientRect();
+            const width = Math.ceil(rect.width) + padding * 2;
+            const height = Math.ceil(rect.height) + padding * 2;
+            const wrapper = document.createElement('div');
+            wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+            wrapper.style.display = 'inline-block';
+            wrapper.style.padding = `${padding}px`;
+            wrapper.style.backgroundColor = '#ffffff';
+            const tableStyle = window.getComputedStyle(table);
+            wrapper.style.color = tableStyle.color || '#111827';
+            wrapper.style.fontFamily = tableStyle.fontFamily || window.getComputedStyle(document.body).fontFamily || 'sans-serif';
+            wrapper.style.fontSize = tableStyle.fontSize || '14px';
+            wrapper.style.lineHeight = tableStyle.lineHeight || '1.4';
+            wrapper.style.boxSizing = 'border-box';
+            wrapper.style.width = `${Math.ceil(rect.width)}px`;
+            wrapper.style.maxWidth = 'none';
+            wrapper.appendChild(clone);
+            const html = wrapper.outerHTML;
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${html}</foreignObject></svg>`;
+            return { svg, width, height };
+        }
+
+        function cloneTableForExport(table) {
+            const clone = table.cloneNode(true);
+            clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+            clone.querySelectorAll('.table-resize-handle, .table-resize-guide').forEach(el => el.remove());
+            clone.querySelectorAll('.selected, .selected-for-move').forEach(el => {
+                el.classList.remove('selected', 'selected-for-move');
+            });
+            inlineComputedStylesForExport(table, clone);
+            clone.style.width = `${Math.ceil(table.getBoundingClientRect().width)}px`;
+            clone.style.margin = '0';
+            clone.style.boxSizing = 'border-box';
+            return clone;
+        }
+
+        function inlineComputedStylesForExport(source, target) {
+            if (!(source instanceof Element) || !(target instanceof Element)) return;
+            const computed = window.getComputedStyle(source);
+            const styleString = Array.from(computed).map(prop => `${prop}:${computed.getPropertyValue(prop)};`).join('');
+            target.setAttribute('style', styleString);
+            const sourceChildren = source.children;
+            const targetChildren = target.children;
+            for (let i = 0; i < sourceChildren.length; i++) {
+                inlineComputedStylesForExport(sourceChildren[i], targetChildren[i]);
+            }
+        }
+
+        function dataUrlToUint8Array(dataUrl) {
+            const base64 = (dataUrl || '').split(',')[1];
+            if (!base64) return new Uint8Array();
+            const binary = atob(base64);
+            const len = binary.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
+        }
+
+        function createPdfFromImage(jpegBytes, imageWidthPx, imageHeightPx, cssWidth, cssHeight) {
+            const encoder = new TextEncoder();
+            const parts = [];
+            const xref = [0];
+            let offset = 0;
+
+            const append = (data) => {
+                const bytes = typeof data === 'string' ? encoder.encode(data) : data;
+                parts.push(bytes);
+                offset += bytes.length;
+                return bytes.length;
+            };
+
+            const registerObject = (index) => {
+                xref[index] = offset;
+            };
+
+            const widthPt = Math.max(1, Math.round((cssWidth || imageWidthPx) * 72 / 96));
+            const heightPt = Math.max(1, Math.round((cssHeight || imageHeightPx) * 72 / 96));
+
+            append('%PDF-1.3\n');
+
+            registerObject(1);
+            append('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+
+            registerObject(2);
+            append('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+
+            registerObject(3);
+            append(`3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /XObject << /Im0 4 0 R >> /ProcSet [/PDF /ImageC] >> /MediaBox [0 0 ${widthPt} ${heightPt}] /Contents 5 0 R >>\nendobj\n`);
+
+            registerObject(4);
+            append(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imageWidthPx} /Height ${imageHeightPx} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\nstream\n`);
+            append(jpegBytes);
+            append('\nendstream\nendobj\n');
+
+            const contentStream = `q\n${widthPt} 0 0 ${heightPt} 0 0 cm\n/Im0 Do\nQ\n`;
+            const contentBytes = encoder.encode(contentStream);
+
+            registerObject(5);
+            append(`5 0 obj\n<< /Length ${contentBytes.length} >>\nstream\n`);
+            append(contentBytes);
+            append('\nendstream\nendobj\n');
+
+            const xrefOffset = offset;
+            append('xref\n0 6\n0000000000 65535 f \n');
+            for (let i = 1; i <= 5; i++) {
+                const value = String(xref[i] || 0).padStart(10, '0');
+                append(`${value} 00000 n \n`);
+            }
+            append('trailer\n<< /Size 6 /Root 1 0 R >>\n');
+            append(`startxref\n${xrefOffset}\n%%EOF`);
+
+            const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
+            const pdfBytes = new Uint8Array(totalLength);
+            let position = 0;
+            for (const part of parts) {
+                pdfBytes.set(part, position);
+                position += part.length;
+            }
+            return pdfBytes;
+        }
+
+        function triggerDownload(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
         const ensureSpacingState = (table) => {
             if (!table) return;
             const firstCell = table.querySelector('th, td');
@@ -6101,6 +6319,96 @@ ${exportTable.outerHTML}
                 helper.className = 'table-menu-hint';
                 helper.textContent = 'Tip: selecciona una columna y aplica estilos sin cerrar este panel.';
                 tabContent.appendChild(helper);
+
+                const exportSection = document.createElement('div');
+                exportSection.className = 'table-export-section';
+
+                const exportTitle = document.createElement('div');
+                exportTitle.className = 'table-export-title';
+                exportTitle.textContent = 'Guardar tabla';
+                exportSection.appendChild(exportTitle);
+
+                const exportButtons = document.createElement('div');
+                exportButtons.className = 'table-export-buttons';
+                exportSection.appendChild(exportButtons);
+
+                const statusMessage = document.createElement('p');
+                statusMessage.className = 'table-export-status';
+                statusMessage.textContent = 'Descarga la tabla actual como imagen PNG o PDF.';
+                exportSection.appendChild(statusMessage);
+
+                let exporting = false;
+                const originalLabels = { png: 'PNG', pdf: 'PDF' };
+
+                const setExportingState = (isExporting, format) => {
+                    exporting = isExporting;
+                    pngBtn.disabled = isExporting;
+                    pdfBtn.disabled = isExporting;
+                    if (format) {
+                        const button = format === 'png' ? pngBtn : pdfBtn;
+                        if (isExporting) {
+                            button.dataset.originalLabel = button.textContent;
+                            button.textContent = 'Exportando…';
+                        } else if (button.dataset.originalLabel) {
+                            button.textContent = button.dataset.originalLabel;
+                            delete button.dataset.originalLabel;
+                        } else {
+                            button.textContent = originalLabels[format];
+                        }
+                    } else {
+                        pngBtn.textContent = originalLabels.png;
+                        pdfBtn.textContent = originalLabels.pdf;
+                    }
+                };
+
+                const showStatus = (message, delayReset = true) => {
+                    statusMessage.textContent = message;
+                    if (delayReset) {
+                        clearTimeout(statusMessage._resetTimer);
+                        statusMessage._resetTimer = setTimeout(() => {
+                            statusMessage.textContent = 'Descarga la tabla actual como imagen PNG o PDF.';
+                        }, 4000);
+                    }
+                };
+
+                const handleExport = async (format) => {
+                    if (exporting) return;
+                    const baseName = getTableExportBaseName(table);
+                    setExportingState(true, format);
+                    showStatus('Preparando exportación…', false);
+                    try {
+                        if (format === 'png') {
+                            await exportTableAsPNG(table, baseName);
+                            showStatus('Tabla guardada como PNG.');
+                        } else {
+                            await exportTableAsPDF(table, baseName);
+                            showStatus('Tabla guardada como PDF.');
+                        }
+                        hideTableMenu();
+                    } catch (error) {
+                        console.error('Error exportando tabla:', error);
+                        showStatus('No se pudo exportar la tabla. Intenta nuevamente.', false);
+                        alert('No se pudo exportar la tabla seleccionada. Revisa la consola para más detalles.');
+                    } finally {
+                        setExportingState(false, format);
+                    }
+                };
+
+                const pngBtn = document.createElement('button');
+                pngBtn.type = 'button';
+                pngBtn.className = 'toolbar-btn table-export-btn';
+                pngBtn.textContent = originalLabels.png;
+                pngBtn.addEventListener('click', () => handleExport('png'));
+                exportButtons.appendChild(pngBtn);
+
+                const pdfBtn = document.createElement('button');
+                pdfBtn.type = 'button';
+                pdfBtn.className = 'toolbar-btn table-export-btn';
+                pdfBtn.textContent = originalLabels.pdf;
+                pdfBtn.addEventListener('click', () => handleExport('pdf'));
+                exportButtons.appendChild(pdfBtn);
+
+                tabContent.appendChild(exportSection);
             };
 
             const HEADER_COLORS = [

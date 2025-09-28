@@ -112,12 +112,17 @@ export function setupImageTools(editor, toolbar) {
       <button data-align="center">◎</button>
       <button data-align="right">◨</button>
     </div>
-    <button class="title-btn">Título</button>
+    <div class="extras-group">
+      <button class="title-btn">Título</button>
+      <button class="edit-image-btn">Editar</button>
+    </div>
   `;
   document.body.appendChild(menu);
 
   const micromoveStep = 4;
   let activeImg = null;
+
+  const imageEditor = createImageEditor();
 
   const sizeGroup = menu.querySelector('.size-group');
   const minusBtn = document.createElement('button');
@@ -164,6 +169,8 @@ export function setupImageTools(editor, toolbar) {
       applyAlignment(alignBtn.dataset.align);
     } else if (e.target.classList.contains('title-btn') && activeImg) {
       openTitleEditor();
+    } else if (e.target.classList.contains('edit-image-btn') && activeImg) {
+      imageEditor.open(activeImg);
     }
   });
 
@@ -249,6 +256,400 @@ export function setupImageTools(editor, toolbar) {
     if (caption && caption.classList.contains('image-caption')) {
       caption.style.width = activeImg.offsetWidth + 'px';
     }
+  }
+
+  function createImageEditor() {
+    const modal = document.createElement('div');
+    modal.className = 'image-editor-modal hidden';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'image-editor-title');
+    modal.innerHTML = `
+      <div class="image-editor-dialog">
+        <header class="image-editor-header">
+          <h2 id="image-editor-title">Editar imagen</h2>
+          <button type="button" class="image-editor-close" aria-label="Cerrar">×</button>
+        </header>
+        <div class="image-editor-body">
+          <div class="image-editor-preview">
+            <canvas></canvas>
+            <div class="image-editor-loading" role="status">Cargando imagen…</div>
+            <p class="image-editor-size">—</p>
+          </div>
+          <div class="image-editor-controls">
+            <section class="image-editor-section">
+              <h3>Recorte</h3>
+              <div class="image-editor-field">
+                <label>Superior
+                  <input type="range" name="crop-top" min="0" value="0">
+                  <output data-for="crop-top">0 px</output>
+                </label>
+              </div>
+              <div class="image-editor-field">
+                <label>Inferior
+                  <input type="range" name="crop-bottom" min="0" value="0">
+                  <output data-for="crop-bottom">0 px</output>
+                </label>
+              </div>
+              <div class="image-editor-field">
+                <label>Izquierda
+                  <input type="range" name="crop-left" min="0" value="0">
+                  <output data-for="crop-left">0 px</output>
+                </label>
+              </div>
+              <div class="image-editor-field">
+                <label>Derecha
+                  <input type="range" name="crop-right" min="0" value="0">
+                  <output data-for="crop-right">0 px</output>
+                </label>
+              </div>
+            </section>
+            <section class="image-editor-section">
+              <h3>Texto superpuesto</h3>
+              <div class="image-editor-field">
+                <label>Contenido
+                  <input type="text" name="overlay-text" placeholder="Añade un texto opcional">
+                </label>
+              </div>
+              <div class="image-editor-field image-editor-field--split">
+                <label>Tamaño
+                  <input type="range" name="overlay-size" min="12" max="96" value="28">
+                  <output data-for="overlay-size">28 px</output>
+                </label>
+                <label>Color
+                  <input type="color" name="overlay-color" value="#111827">
+                </label>
+              </div>
+              <div class="image-editor-field image-editor-field--split">
+                <label>Fondo
+                  <input type="color" name="overlay-bg" value="#ffffff">
+                </label>
+                <label>Opacidad del fondo
+                  <input type="range" name="overlay-bg-opacity" min="0" max="0.95" step="0.05" value="0">
+                  <output data-for="overlay-bg-opacity">0%</output>
+                </label>
+              </div>
+              <div class="image-editor-field image-editor-field--split">
+                <label>Posición X
+                  <input type="range" name="overlay-x" min="0" max="100" value="6">
+                  <output data-for="overlay-x">6%</output>
+                </label>
+                <label>Posición Y
+                  <input type="range" name="overlay-y" min="0" max="100" value="6">
+                  <output data-for="overlay-y">6%</output>
+                </label>
+              </div>
+            </section>
+          </div>
+        </div>
+        <footer class="image-editor-footer">
+          <button type="button" class="cancel-btn">Cancelar</button>
+          <button type="button" class="apply-btn">Aplicar</button>
+        </footer>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const canvas = modal.querySelector('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.warn('El editor de imágenes no pudo inicializar su lienzo.');
+      return {
+        open() {},
+        close() {}
+      };
+    }
+    const loadingIndicator = modal.querySelector('.image-editor-loading');
+    const sizeLabel = modal.querySelector('.image-editor-size');
+    const closeBtn = modal.querySelector('.image-editor-close');
+    const cancelBtn = modal.querySelector('.cancel-btn');
+    const applyBtn = modal.querySelector('.apply-btn');
+    const textInput = modal.querySelector('input[name="overlay-text"]');
+    const textSizeInput = modal.querySelector('input[name="overlay-size"]');
+    const textColorInput = modal.querySelector('input[name="overlay-color"]');
+    const textBgInput = modal.querySelector('input[name="overlay-bg"]');
+    const textBgOpacityInput = modal.querySelector('input[name="overlay-bg-opacity"]');
+    const textXInput = modal.querySelector('input[name="overlay-x"]');
+    const textYInput = modal.querySelector('input[name="overlay-y"]');
+    const cropInputs = {
+      top: modal.querySelector('input[name="crop-top"]'),
+      bottom: modal.querySelector('input[name="crop-bottom"]'),
+      left: modal.querySelector('input[name="crop-left"]'),
+      right: modal.querySelector('input[name="crop-right"]')
+    };
+    const cropOutputs = {
+      top: modal.querySelector('output[data-for="crop-top"]'),
+      bottom: modal.querySelector('output[data-for="crop-bottom"]'),
+      left: modal.querySelector('output[data-for="crop-left"]'),
+      right: modal.querySelector('output[data-for="crop-right"]')
+    };
+    const overlayOutputs = {
+      size: modal.querySelector('output[data-for="overlay-size"]'),
+      bgOpacity: modal.querySelector('output[data-for="overlay-bg-opacity"]'),
+      x: modal.querySelector('output[data-for="overlay-x"]'),
+      y: modal.querySelector('output[data-for="overlay-y"]')
+    };
+
+    const baseFontFamily = window.getComputedStyle(editor).fontFamily || 'sans-serif';
+
+    const state = {
+      target: null,
+      image: null,
+      naturalWidth: 0,
+      naturalHeight: 0,
+      crop: { top: 0, bottom: 0, left: 0, right: 0 },
+      returningFocus: null
+    };
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeEditor();
+      }
+    };
+
+    function openEditor(targetImage) {
+      if (!targetImage) return;
+      state.target = targetImage;
+      state.returningFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      modal.classList.remove('hidden');
+      document.body.classList.add('image-editor-open');
+      loadingIndicator.textContent = 'Cargando imagen…';
+      loadingIndicator.classList.remove('hidden');
+      canvas.classList.add('image-editor-canvas--hidden');
+      applyBtn.disabled = true;
+      textInput.value = '';
+      textSizeInput.value = '28';
+      textColorInput.value = '#111827';
+      textBgInput.value = '#ffffff';
+      textBgOpacityInput.value = '0';
+      textXInput.value = '6';
+      textYInput.value = '6';
+      overlayOutputs.size.textContent = '28 px';
+      overlayOutputs.bgOpacity.textContent = '0%';
+      overlayOutputs.x.textContent = '6%';
+      overlayOutputs.y.textContent = '6%';
+
+      const loader = new Image();
+      loader.decoding = 'async';
+      const expectedTarget = targetImage;
+      loader.onload = () => {
+        if (state.target !== expectedTarget) return;
+        state.image = loader;
+        state.naturalWidth = loader.naturalWidth || loader.width;
+        state.naturalHeight = loader.naturalHeight || loader.height;
+        state.crop = { top: 0, bottom: 0, left: 0, right: 0 };
+        updateCropInputs();
+        renderPreview();
+        loadingIndicator.classList.add('hidden');
+        canvas.classList.remove('image-editor-canvas--hidden');
+        applyBtn.disabled = false;
+        textInput.focus();
+      };
+      loader.onerror = () => {
+        if (state.target !== expectedTarget) return;
+        loadingIndicator.textContent = 'No se pudo cargar la imagen.';
+        applyBtn.disabled = true;
+      };
+      loader.src = targetImage.src;
+      document.addEventListener('keydown', onKeyDown, true);
+    }
+
+    function closeEditor() {
+      modal.classList.add('hidden');
+      document.body.classList.remove('image-editor-open');
+      document.removeEventListener('keydown', onKeyDown, true);
+      state.target = null;
+      if (state.returningFocus && state.returningFocus.focus) {
+        state.returningFocus.focus();
+      }
+      state.returningFocus = null;
+    }
+
+    function updateCropInputs() {
+      const maxVertical = Math.max(0, state.naturalHeight - 1);
+      const maxHorizontal = Math.max(0, state.naturalWidth - 1);
+      cropInputs.top.max = maxVertical;
+      cropInputs.bottom.max = maxVertical;
+      cropInputs.left.max = maxHorizontal;
+      cropInputs.right.max = maxHorizontal;
+      Object.keys(cropInputs).forEach(key => {
+        cropInputs[key].value = state.crop[key];
+        if (cropOutputs[key]) {
+          cropOutputs[key].textContent = `${state.crop[key]} px`;
+        }
+      });
+    }
+
+    function updateCropValue(edge, value) {
+      const numeric = Math.max(0, Math.round(Number(value) || 0));
+      state.crop[edge] = numeric;
+      if (state.crop.top + state.crop.bottom >= state.naturalHeight) {
+        if (edge === 'top') {
+          state.crop.top = Math.max(0, state.naturalHeight - state.crop.bottom - 1);
+        } else if (edge === 'bottom') {
+          state.crop.bottom = Math.max(0, state.naturalHeight - state.crop.top - 1);
+        }
+      }
+      if (state.crop.left + state.crop.right >= state.naturalWidth) {
+        if (edge === 'left') {
+          state.crop.left = Math.max(0, state.naturalWidth - state.crop.right - 1);
+        } else if (edge === 'right') {
+          state.crop.right = Math.max(0, state.naturalWidth - state.crop.left - 1);
+        }
+      }
+      if (cropInputs[edge]) {
+        cropInputs[edge].value = state.crop[edge];
+      }
+      if (cropOutputs[edge]) {
+        cropOutputs[edge].textContent = `${state.crop[edge]} px`;
+      }
+      renderPreview();
+    }
+
+    function renderPreview() {
+      if (!state.image || !ctx) return;
+      const width = Math.max(1, state.naturalWidth - state.crop.left - state.crop.right);
+      const height = Math.max(1, state.naturalHeight - state.crop.top - state.crop.bottom);
+      canvas.width = width;
+      canvas.height = height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(
+        state.image,
+        state.crop.left,
+        state.crop.top,
+        width,
+        height,
+        0,
+        0,
+        width,
+        height
+      );
+
+      const text = textInput.value.trim();
+      if (text) {
+        const fontSize = Math.max(8, Math.round(Number(textSizeInput.value) || 28));
+        const color = textColorInput.value || '#111827';
+        const bgColor = textBgInput.value || '#ffffff';
+        const bgOpacity = Math.min(0.95, Math.max(0, Number(textBgOpacityInput.value) || 0));
+        const xPercent = Math.min(100, Math.max(0, Number(textXInput.value) || 0));
+        const yPercent = Math.min(100, Math.max(0, Number(textYInput.value) || 0));
+        const textLines = text.split(/\r?\n/);
+        const lineHeight = Math.round(fontSize * 1.25);
+        ctx.font = `${fontSize}px ${baseFontFamily}`;
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = color;
+        ctx.textAlign = 'left';
+
+        let maxLineWidth = 0;
+        textLines.forEach(line => {
+          const metrics = ctx.measureText(line);
+          maxLineWidth = Math.max(maxLineWidth, metrics.width);
+        });
+        const boxWidth = Math.ceil(maxLineWidth) + 16;
+        const boxHeight = textLines.length * lineHeight + 16;
+        const rawX = Math.round((width - 1) * (xPercent / 100));
+        const rawY = Math.round((height - 1) * (yPercent / 100));
+        const maxX = Math.max(0, width - boxWidth);
+        const maxY = Math.max(0, height - boxHeight);
+        const clampedX = Math.min(maxX, Math.max(0, rawX));
+        const clampedY = Math.min(maxY, Math.max(0, rawY));
+
+        if (bgOpacity > 0) {
+          ctx.save();
+          ctx.fillStyle = hexToRgba(bgColor, bgOpacity);
+          ctx.fillRect(clampedX, clampedY, Math.min(boxWidth, width), Math.min(boxHeight, height));
+          ctx.restore();
+        }
+
+        ctx.fillStyle = color;
+        textLines.forEach((line, index) => {
+          const textX = clampedX + 8;
+          const textY = clampedY + 8 + index * lineHeight;
+          ctx.fillText(line, textX, textY);
+        });
+      }
+
+      sizeLabel.textContent = `${width} × ${height}px`;
+    }
+
+    function applyChanges() {
+      if (!state.target) return;
+      const previousWidth = state.target.style.width;
+      const previousHeight = state.target.style.height;
+      const dataUrl = canvas.toDataURL('image/png');
+      const target = state.target;
+      const refreshSelection = () => {
+        target.style.width = previousWidth;
+        target.style.height = previousHeight;
+        syncCaptionWidth();
+        positionUI();
+      };
+      target.addEventListener('load', refreshSelection, { once: true });
+      target.src = dataUrl;
+      target.dataset.edited = 'true';
+      closeEditor();
+      if (!target.complete) {
+        return;
+      }
+      refreshSelection();
+    }
+
+    function hexToRgba(hex, alpha) {
+      let normalized = (hex || '').trim().replace('#', '');
+      if (normalized.length === 3) {
+        normalized = normalized.split('').map(ch => ch + ch).join('');
+      }
+      if (normalized.length !== 6) {
+        return `rgba(255,255,255,${alpha})`;
+      }
+      const r = parseInt(normalized.substring(0, 2), 16);
+      const g = parseInt(normalized.substring(2, 4), 16);
+      const b = parseInt(normalized.substring(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    Object.entries(cropInputs).forEach(([edge, input]) => {
+      input.addEventListener('input', (event) => updateCropValue(edge, event.target.value));
+    });
+
+    textInput.addEventListener('input', renderPreview);
+    textSizeInput.addEventListener('input', (event) => {
+      const value = Math.max(8, Math.round(Number(event.target.value) || 28));
+      overlayOutputs.size.textContent = `${value} px`;
+      renderPreview();
+    });
+    textColorInput.addEventListener('input', renderPreview);
+    textBgInput.addEventListener('input', renderPreview);
+    textBgOpacityInput.addEventListener('input', (event) => {
+      const value = Math.min(0.95, Math.max(0, Number(event.target.value) || 0));
+      overlayOutputs.bgOpacity.textContent = `${Math.round(value * 100)}%`;
+      renderPreview();
+    });
+    textXInput.addEventListener('input', (event) => {
+      const value = Math.min(100, Math.max(0, Number(event.target.value) || 0));
+      overlayOutputs.x.textContent = `${Math.round(value)}%`;
+      renderPreview();
+    });
+    textYInput.addEventListener('input', (event) => {
+      const value = Math.min(100, Math.max(0, Number(event.target.value) || 0));
+      overlayOutputs.y.textContent = `${Math.round(value)}%`;
+      renderPreview();
+    });
+
+    closeBtn.addEventListener('click', closeEditor);
+    cancelBtn.addEventListener('click', closeEditor);
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) {
+        closeEditor();
+      }
+    });
+    applyBtn.addEventListener('click', applyChanges);
+
+    return {
+      open: openEditor,
+      close: closeEditor
+    };
   }
 
   editor.addEventListener('click', e => {
