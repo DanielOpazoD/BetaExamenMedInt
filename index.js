@@ -1632,6 +1632,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeTooltipState = null;
     let editingQuickNote = false;
     let savedEditorSelection = null;
+    let dismissFloatingToolbar = () => {};
     let savedSelectedHtml = '';
     let currentCallout = null;
     let lineEraseMode = false;
@@ -2717,6 +2718,10 @@ ${exportTable.outerHTML}
 
     function setupEditorToolbar() {
         editorToolbar.innerHTML = ''; // Clear existing toolbar
+        if (!editorToolbar.dataset.hideFloatingBound) {
+            editorToolbar.addEventListener('mousedown', () => dismissFloatingToolbar(), { capture: true });
+            editorToolbar.dataset.hideFloatingBound = 'true';
+        }
 
         // Run a callback while preserving the current text selection
         const withEditorSelection = (fn) => {
@@ -2741,6 +2746,7 @@ ${exportTable.outerHTML}
             btn.addEventListener('mousedown', e => e.preventDefault());
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
+                dismissFloatingToolbar();
                 withEditorSelection(() => {
                     if (command) {
                         document.execCommand(command, false, value);
@@ -4821,7 +4827,7 @@ ${exportTable.outerHTML}
             floatingToolbar.appendChild(floatingStyleBtn);
 
             const floatingPillBtn = createFloatingButton('Texto Píldora', '💊', () => {
-                if (!savedEditorSelection || savedEditorSelection.collapsed) return;
+                if (!ensureSavedSelectionForPills()) return;
                 const selection = window.getSelection();
                 if (!selection) return;
                 selection.removeAllRanges();
@@ -4830,20 +4836,17 @@ ${exportTable.outerHTML}
                 hideFloatingStyleMenu();
                 setPillsText(null, floatingPillBtn);
             });
-            floatingPillBtn.addEventListener('mousedown', () => {
-                const selection = window.getSelection();
-                if (selection && selection.rangeCount > 0 && notesEditor.contains(selection.anchorNode)) {
-                    savedEditorSelection = selection.getRangeAt(0).cloneRange();
-                } else {
-                    savedEditorSelection = null;
-                }
-            });
+            floatingPillBtn.addEventListener('mousedown', ensureSavedSelectionForPills);
             floatingToolbar.appendChild(floatingPillBtn);
 
             const hideFloatingToolbar = () => {
                 if (!floatingToolbar) return;
                 floatingToolbar.classList.remove('visible');
                 hideFloatingMenus();
+            };
+
+            dismissFloatingToolbar = () => {
+                hideFloatingToolbar();
             };
 
             const positionFloatingToolbar = () => {
@@ -5380,110 +5383,55 @@ ${exportTable.outerHTML}
 
         // Popup to change existing preset styles
         const stylePopup = document.createElement('div');
-        stylePopup.className = 'styled-style-popup';
+        stylePopup.id = 'inline-style-popup';
+        stylePopup.className = 'preset-style-popup preset-style-panel inline-style-popup';
+        stylePopup.style.display = 'none';
         document.body.appendChild(stylePopup);
         let currentStyledSpan = null;
-
-        const renderStyledPopup = () => {
-            stylePopup.innerHTML = '';
-            const header = document.createElement('div');
-            header.className = 'styled-style-popup-header';
-            const title = document.createElement('span');
-            title.textContent = 'Cambiar estilo';
-            header.appendChild(title);
-            const closeBtn = document.createElement('button');
-            closeBtn.type = 'button';
-            closeBtn.className = 'styled-style-popup-close';
-            closeBtn.innerHTML = '&times;';
-            closeBtn.addEventListener('click', hideStylePopup);
-            header.appendChild(closeBtn);
-            stylePopup.appendChild(header);
-
-            const grid = document.createElement('div');
-            grid.className = 'styled-style-popup-grid';
-
-            PRESET_STYLE_GROUPS.forEach(group => {
-                const card = document.createElement('div');
-                card.className = 'styled-style-card';
-
-                const mainBtn = document.createElement('button');
-                mainBtn.type = 'button';
-                mainBtn.className = 'styled-style-main';
-                const mainPreview = document.createElement('span');
-                mainPreview.className = 'styled-style-preview';
-                mainPreview.setAttribute('style', group.style);
-                mainPreview.textContent = formatPresetLabel(group.label);
-                mainBtn.appendChild(mainPreview);
-                mainBtn.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    if (!currentStyledSpan) return;
-                    applyPresetStyle(group.style, currentStyledSpan);
-                    hideStylePopup();
-                    notesEditor.focus({ preventScroll: true });
-                });
-                card.appendChild(mainBtn);
-
-                if (group.variants && group.variants.length) {
-                    const variantsRow = document.createElement('div');
-                    variantsRow.className = 'styled-style-variants';
-                    group.variants.forEach(variant => {
-                        const variantBtn = document.createElement('button');
-                        variantBtn.type = 'button';
-                        variantBtn.className = 'styled-style-variant-btn';
-                        const variantPreview = document.createElement('span');
-                        variantPreview.className = 'styled-style-preview';
-                        variantPreview.setAttribute('style', variant.style);
-                        variantPreview.textContent = formatPresetLabel(variant.label);
-                        variantBtn.appendChild(variantPreview);
-                        const variantName = document.createElement('span');
-                        variantName.className = 'styled-style-variant-label';
-                        const labelText = variant.label.replace(`${group.label} `, '').trim();
-                        variantName.textContent = labelText || 'Variante';
-                        variantBtn.appendChild(variantName);
-                        variantBtn.addEventListener('click', (event) => {
-                            event.preventDefault();
-                            if (!currentStyledSpan) return;
-                            applyPresetStyle(variant.style, currentStyledSpan);
-                            hideStylePopup();
-                            notesEditor.focus({ preventScroll: true });
-                        });
-                        variantsRow.appendChild(variantBtn);
-                    });
-                    card.appendChild(variantsRow);
-                }
-
-                grid.appendChild(card);
-            });
-
-            stylePopup.appendChild(grid);
-        };
+        let inlineStyleControls = null;
 
         const hideStylePopup = () => {
             stylePopup.classList.remove('visible');
+            stylePopup.style.display = 'none';
             currentStyledSpan = null;
+            if (inlineStyleControls && typeof inlineStyleControls.closeAll === 'function') {
+                inlineStyleControls.closeAll();
+            }
+        };
+
+        const ensureInlineStylePanel = () => {
+            if (inlineStyleControls) return;
+            inlineStyleControls = buildPresetStylePanel(stylePopup, (style, { closeAll }) => {
+                if (!currentStyledSpan) return;
+                applyPresetStyle(style, currentStyledSpan);
+                if (closeAll) closeAll();
+                hideStylePopup();
+                notesEditor.focus({ preventScroll: true });
+            });
         };
 
         const showStylePopup = (span) => {
             currentStyledSpan = span;
-            renderStyledPopup();
+            ensureInlineStylePanel();
+            stylePopup.style.display = 'flex';
             stylePopup.classList.add('visible');
             requestAnimationFrame(() => {
                 if (!currentStyledSpan) return;
                 const editorRect = notesEditor.getBoundingClientRect();
-                const desiredWidth = Math.min(560, Math.max(320, editorRect.width - 16));
+                const desiredWidth = Math.min(420, Math.max(240, editorRect.width - 24));
                 stylePopup.style.maxWidth = `${desiredWidth}px`;
                 const spanRect = span.getBoundingClientRect();
                 const popupRect = stylePopup.getBoundingClientRect();
-                let top = spanRect.bottom + window.scrollY + 8;
-                if (top + popupRect.height > window.scrollY + window.innerHeight - 8) {
-                    top = spanRect.top + window.scrollY - popupRect.height - 8;
+                let top = spanRect.bottom + window.scrollY + 6;
+                if (top + popupRect.height > window.scrollY + window.innerHeight - 6) {
+                    top = spanRect.top + window.scrollY - popupRect.height - 6;
                 }
                 let left = spanRect.left + window.scrollX;
-                if (left + popupRect.width > window.scrollX + window.innerWidth - 8) {
-                    left = Math.max(window.scrollX + 8, window.scrollX + window.innerWidth - popupRect.width - 8);
+                if (left + popupRect.width > window.scrollX + window.innerWidth - 6) {
+                    left = Math.max(window.scrollX + 6, window.scrollX + window.innerWidth - popupRect.width - 6);
                 }
-                stylePopup.style.top = `${Math.max(window.scrollY + 8, top)}px`;
-                stylePopup.style.left = `${Math.max(window.scrollX + 8, left)}px`;
+                stylePopup.style.top = `${Math.max(window.scrollY + 6, top)}px`;
+                stylePopup.style.left = `${Math.max(window.scrollX + 6, left)}px`;
             });
         };
 
@@ -5531,6 +5479,18 @@ ${exportTable.outerHTML}
             currentPillSpan = null;
         };
 
+        const ensureSavedSelectionForPills = () => {
+            if (savedEditorSelection && !savedEditorSelection.collapsed) {
+                return true;
+            }
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return false;
+            const range = selection.getRangeAt(0);
+            if (!notesEditor.contains(range.commonAncestorContainer)) return false;
+            savedEditorSelection = range.cloneRange();
+            return true;
+        };
+
         const applyPillTextStyle = (colors, existingSpan = null) => {
             const css = `background:linear-gradient(to right, ${colors[0]}, ${colors[1]}); color:${colors[2]}; padding:2px 8px; border-radius:20px; font-weight:bold;`;
             if (existingSpan) {
@@ -5538,25 +5498,32 @@ ${exportTable.outerHTML}
                 existingSpan.dataset.pillText = colors.join('|');
                 return;
             }
-            if (savedEditorSelection) {
-                const selection = window.getSelection();
-                selection.removeAllRanges();
-                selection.addRange(savedEditorSelection);
+            if (!ensureSavedSelectionForPills()) return;
+            const selection = window.getSelection();
+            if (!selection) return;
+            selection.removeAllRanges();
+            selection.addRange(savedEditorSelection);
+            const range = selection.getRangeAt(0);
+            if (range.collapsed) {
+                savedEditorSelection = null;
+                return;
             }
-            const sel = window.getSelection();
-            if (!sel || !sel.rangeCount || sel.isCollapsed) return;
-            const range = sel.getRangeAt(0);
+            const fallbackText = savedEditorSelection ? savedEditorSelection.toString() : selection.toString();
+            const extracted = range.extractContents();
             const span = document.createElement('span');
             span.style.cssText = css;
             span.dataset.pillText = colors.join('|');
-            span.textContent = range.toString();
-            range.deleteContents();
+            if (!extracted || extracted.childNodes.length === 0) {
+                span.textContent = fallbackText;
+            } else {
+                span.appendChild(extracted);
+            }
             range.insertNode(span);
             const newRange = document.createRange();
             newRange.setStartAfter(span);
             newRange.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(newRange);
+            selection.removeAllRanges();
+            selection.addRange(newRange);
             savedEditorSelection = null;
         };
 
@@ -5593,6 +5560,10 @@ ${exportTable.outerHTML}
         };
 
         const setPillsText = (span = null, anchor = null) => {
+            if (!span && !ensureSavedSelectionForPills()) {
+                hidePillTextPopup();
+                return;
+            }
             currentPillSpan = span;
             showPillTextPopup(span, anchor);
         };
@@ -5773,6 +5744,40 @@ ${exportTable.outerHTML}
             }
         };
 
+        const toggleHeaderRow = (table) => {
+            if (!table || !table.rows.length) return false;
+            const firstRow = table.rows[0];
+            const isHeader = Array.from(firstRow.cells).every(cell => cell.tagName === 'TH');
+            Array.from(firstRow.cells).forEach(cell => convertCellTag(cell, isHeader ? 'td' : 'th'));
+            return !isHeader;
+        };
+
+        const toggleTableStriping = (table) => {
+            if (!table) return false;
+            const willActivate = !table.classList.contains('table-striped');
+            table.classList.toggle('table-striped', willActivate);
+            if (willActivate) {
+                table.dataset.striped = 'true';
+            } else {
+                delete table.dataset.striped;
+            }
+            return willActivate;
+        };
+
+        const autoFitTableColumns = (table) => {
+            if (!table || !table.rows.length) return;
+            const firstRow = table.rows[0];
+            const columns = firstRow ? firstRow.cells.length : 0;
+            if (!columns) return;
+            const widthPercent = 100 / columns;
+            Array.from(table.rows).forEach(row => {
+                Array.from(row.cells).forEach(cell => {
+                    cell.style.width = `${widthPercent}%`;
+                });
+            });
+            table.style.width = '100%';
+        };
+
         const ensureSpacingState = (table) => {
             if (!table) return;
             const firstCell = table.querySelector('th, td');
@@ -5939,9 +5944,21 @@ ${exportTable.outerHTML}
             currentTable = table;
             tableMenu.innerHTML = '';
 
+            const headerBar = document.createElement('div');
+            headerBar.className = 'table-menu-header';
+
+            const summary = document.createElement('span');
+            summary.className = 'table-menu-summary';
+            const totalRows = table.rows.length;
+            const totalCols = table.rows[0] ? table.rows[0].cells.length : 0;
+            summary.textContent = `${totalRows || 0}×${totalCols || 0} celdas`;
+            headerBar.appendChild(summary);
+
             const resizeBtn = document.createElement('button');
-            resizeBtn.className = 'toolbar-btn';
-            resizeBtn.innerHTML = '↔️ Ajustar tamaño';
+            resizeBtn.type = 'button';
+            resizeBtn.className = 'toolbar-btn table-header-btn';
+            resizeBtn.innerHTML = '<span class="table-menu-icon">↔️</span><span class="table-menu-label">Tamaño</span>';
+            resizeBtn.title = 'Activar controles de tamaño';
             resizeBtn.addEventListener('click', () => {
                 tableEditMode = true;
                 editingTable = table;
@@ -5951,7 +5968,9 @@ ${exportTable.outerHTML}
                 table.classList.add('selected');
                 hideTableMenu();
             });
-            tableMenu.appendChild(resizeBtn);
+            headerBar.appendChild(resizeBtn);
+
+            tableMenu.appendChild(headerBar);
 
             const tabsBar = document.createElement('div');
             tabsBar.className = 'table-menu-tabs';
@@ -5965,41 +5984,80 @@ ${exportTable.outerHTML}
 
             const buildEditTab = () => {
                 tabContent.innerHTML = '';
-                const layout = document.createElement('div');
-                layout.className = 'table-edit-layout';
-                const createGroup = (title) => {
-                    const group = document.createElement('div');
-                    group.className = 'table-edit-group';
-                    const heading = document.createElement('div');
-                    heading.className = 'table-edit-group-title';
-                    heading.textContent = title;
-                    group.appendChild(heading);
-                    return group;
+                const quickGrid = document.createElement('div');
+                quickGrid.className = 'table-quick-grid';
+                const actionConfigs = [
+                    { icon: '⬆️', label: 'Fila ↑', onClick: () => addRow(table, rIndex) },
+                    { icon: '⬇️', label: 'Fila ↓', onClick: () => addRow(table, rIndex + 1) },
+                    { icon: '🗑️', label: 'Fila -', onClick: () => deleteRow(table, rIndex) },
+                    { icon: '⬅️', label: 'Col ←', onClick: () => addColumn(table, cIndex) },
+                    { icon: '➡️', label: 'Col →', onClick: () => addColumn(table, cIndex + 1) },
+                    { icon: '🧹', label: 'Col -', onClick: () => deleteColumn(table, cIndex) },
+                    {
+                        icon: '🔎',
+                        label: 'Ver col',
+                        onClick: () => selectColumn(table, cIndex),
+                        persistent: true
+                    },
+                    {
+                        icon: '🔠',
+                        label: 'Cabecera',
+                        onClick: () => toggleHeaderRow(table),
+                        state: () => {
+                            const firstRow = table.rows[0];
+                            return firstRow ? Array.from(firstRow.cells).every(cell => cell.tagName === 'TH') : false;
+                        },
+                        persistent: true
+                    },
+                    {
+                        icon: '🦓',
+                        label: 'Cebra',
+                        onClick: () => toggleTableStriping(table),
+                        state: () => table.classList.contains('table-striped'),
+                        persistent: true
+                    },
+                    {
+                        icon: '📐',
+                        label: 'Auto ancho',
+                        onClick: () => autoFitTableColumns(table)
+                    }
+                ];
+
+                const quickButtons = [];
+                const updateQuickActionStates = () => {
+                    quickButtons.forEach(({ action, button }) => {
+                        if (typeof action.state === 'function') {
+                            const active = !!action.state();
+                            button.classList.toggle('active', active);
+                            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+                        }
+                    });
                 };
-                const createActionButton = (label, icon, handler) => {
+
+                actionConfigs.forEach(action => {
                     const btn = document.createElement('button');
                     btn.type = 'button';
-                    btn.className = 'toolbar-btn table-edit-btn';
-                    btn.innerHTML = `<span class="table-edit-icon">${icon}</span><span>${label}</span>`;
+                    btn.className = 'toolbar-btn table-quick-action';
+                    btn.innerHTML = `<span class="table-quick-icon">${action.icon}</span><span class="table-quick-label">${action.label}</span>`;
                     btn.addEventListener('click', () => {
-                        handler();
-                        hideTableMenu();
+                        action.onClick();
+                        updateQuickActionStates();
                         notesEditor.focus({ preventScroll: true });
+                        if (!action.persistent) {
+                            hideTableMenu();
+                        }
                     });
-                    return btn;
-                };
-                const rowsGroup = createGroup('Filas');
-                rowsGroup.appendChild(createActionButton('Agregar arriba', '⬆️', () => addRow(table, rIndex)));
-                rowsGroup.appendChild(createActionButton('Agregar abajo', '⬇️', () => addRow(table, rIndex + 1)));
-                rowsGroup.appendChild(createActionButton('Eliminar fila', '🗑️', () => deleteRow(table, rIndex)));
-                const colsGroup = createGroup('Columnas');
-                colsGroup.appendChild(createActionButton('Añadir a la izquierda', '⬅️', () => addColumn(table, cIndex)));
-                colsGroup.appendChild(createActionButton('Añadir a la derecha', '➡️', () => addColumn(table, cIndex + 1)));
-                colsGroup.appendChild(createActionButton('Eliminar columna', '🗑️', () => deleteColumn(table, cIndex)));
-                colsGroup.appendChild(createActionButton('Seleccionar columna', '🔎', () => selectColumn(table, cIndex)));
-                layout.appendChild(rowsGroup);
-                layout.appendChild(colsGroup);
-                tabContent.appendChild(layout);
+                    quickGrid.appendChild(btn);
+                    quickButtons.push({ action, button: btn });
+                });
+
+                tabContent.appendChild(quickGrid);
+                updateQuickActionStates();
+
+                const helper = document.createElement('p');
+                helper.className = 'table-menu-hint';
+                helper.textContent = 'Tip: selecciona una columna y aplica estilos sin cerrar este panel.';
+                tabContent.appendChild(helper);
             };
 
             const HEADER_COLORS = [
@@ -6338,7 +6396,7 @@ ${exportTable.outerHTML}
             const editorWidth = Math.max(280, editorRect.width - 16);
             const viewportLimit = Math.max(280, window.innerWidth - 32);
             const maxWidth = Math.min(editorWidth, viewportLimit);
-            const preferredWidth = Math.max(420, Math.min(maxWidth, 640));
+            const preferredWidth = Math.max(340, Math.min(maxWidth, 520));
             const targetWidth = Math.min(preferredWidth, maxWidth);
             tableMenu.style.maxWidth = `${maxWidth}px`;
             tableMenu.style.width = `${targetWidth}px`;
