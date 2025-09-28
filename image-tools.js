@@ -116,8 +116,74 @@ export function setupImageTools(editor, toolbar) {
   `;
   document.body.appendChild(menu);
 
+  const editBackdrop = document.createElement('div');
+  editBackdrop.className = 'image-edit-backdrop hidden';
+  editBackdrop.innerHTML = `
+    <div class="image-edit-dialog" role="dialog" aria-modal="true">
+      <div class="image-edit-header">
+        <h3>Editar imagen</h3>
+        <button type="button" class="image-edit-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="image-edit-body">
+        <div class="image-edit-preview">
+          <canvas></canvas>
+          <p class="image-edit-error" role="alert"></p>
+        </div>
+        <div class="image-edit-controls">
+          <fieldset>
+            <legend>Recorte (px)</legend>
+            <label>Superior
+              <input type="range" min="0" value="0" data-crop="top">
+            </label>
+            <label>Inferior
+              <input type="range" min="0" value="0" data-crop="bottom">
+            </label>
+            <label>Izquierda
+              <input type="range" min="0" value="0" data-crop="left">
+            </label>
+            <label>Derecha
+              <input type="range" min="0" value="0" data-crop="right">
+            </label>
+          </fieldset>
+          <fieldset>
+            <legend>Texto superpuesto</legend>
+            <label>Contenido
+              <textarea data-edit-text rows="3" placeholder="Texto opcional"></textarea>
+            </label>
+            <label>Tamaño
+              <input type="number" min="8" max="200" value="24" data-edit-text-size>
+            </label>
+            <label>Color
+              <input type="color" value="#ffffff" data-edit-text-color>
+            </label>
+            <label>Posición
+              <select data-edit-text-position>
+                <option value="top-left">Arriba izquierda</option>
+                <option value="top-right">Arriba derecha</option>
+                <option value="center">Centro</option>
+                <option value="bottom-left">Abajo izquierda</option>
+                <option value="bottom-right" selected>Abajo derecha</option>
+              </select>
+            </label>
+            <label class="image-edit-checkbox">
+              <input type="checkbox" data-edit-text-bg checked>
+              Fondo semitransparente
+            </label>
+          </fieldset>
+        </div>
+      </div>
+      <div class="image-edit-footer">
+        <button type="button" class="image-edit-cancel">Cancelar</button>
+        <button type="button" class="image-edit-apply">Guardar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(editBackdrop);
+
   const micromoveStep = 4;
   let activeImg = null;
+  let isEditingImage = false;
+  let editState = null;
 
   const sizeGroup = menu.querySelector('.size-group');
   const minusBtn = document.createElement('button');
@@ -135,7 +201,313 @@ export function setupImageTools(editor, toolbar) {
   const delBtn = document.createElement('button');
   delBtn.textContent = '🗑️';
   delBtn.addEventListener('click', deleteImage);
-  sizeGroup.append(minusBtn, plusBtn, upBtn, downBtn, delBtn);
+  const editBtn = document.createElement('button');
+  editBtn.textContent = 'Editar';
+  editBtn.title = 'Recortar o anotar imagen';
+  editBtn.addEventListener('click', () => openImageEditor());
+  sizeGroup.append(minusBtn, plusBtn, upBtn, downBtn, delBtn, editBtn);
+
+  const editCanvas = editBackdrop.querySelector('canvas');
+  const editCtx = editCanvas.getContext('2d');
+  const cropInputs = {
+    top: editBackdrop.querySelector('[data-crop="top"]'),
+    bottom: editBackdrop.querySelector('[data-crop="bottom"]'),
+    left: editBackdrop.querySelector('[data-crop="left"]'),
+    right: editBackdrop.querySelector('[data-crop="right"]')
+  };
+  const textInput = editBackdrop.querySelector('[data-edit-text]');
+  const textSizeInput = editBackdrop.querySelector('[data-edit-text-size]');
+  const textColorInput = editBackdrop.querySelector('[data-edit-text-color]');
+  const textPositionInput = editBackdrop.querySelector('[data-edit-text-position]');
+  const textBgInput = editBackdrop.querySelector('[data-edit-text-bg]');
+  const editError = editBackdrop.querySelector('.image-edit-error');
+  const applyBtn = editBackdrop.querySelector('.image-edit-apply');
+  const cancelBtn = editBackdrop.querySelector('.image-edit-cancel');
+  const closeBtn = editBackdrop.querySelector('.image-edit-close');
+  const scratchCanvas = document.createElement('canvas');
+  const scratchCtx = scratchCanvas.getContext('2d');
+  const validPositions = new Set(['top-left', 'top-right', 'center', 'bottom-left', 'bottom-right']);
+
+  const normalizeColor = (value, fallback = '#ffffff') => {
+    if (!value) return fallback;
+    const hexPattern = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+    const trimmed = value.trim();
+    if (hexPattern.test(trimmed)) return trimmed;
+    if (scratchCtx) {
+      try {
+        scratchCtx.fillStyle = trimmed;
+        const computed = scratchCtx.fillStyle;
+        if (hexPattern.test(computed)) return computed;
+      } catch (err) {
+        return fallback;
+      }
+    }
+    return fallback;
+  };
+
+  const clampValue = (val, min, max) => {
+    const num = Number(val);
+    if (Number.isNaN(num)) return min;
+    return Math.min(Math.max(num, min), max);
+  };
+
+  const ensurePosition = (value) => (validPositions.has(value) ? value : 'bottom-right');
+
+  const cropMap = {
+    top: 'cropTop',
+    bottom: 'cropBottom',
+    left: 'cropLeft',
+    right: 'cropRight'
+  };
+
+  const resetCropInputs = () => {
+    Object.values(cropInputs).forEach(input => {
+      input.value = '0';
+      input.max = '0';
+      input.disabled = true;
+    });
+  };
+
+  const renderEditPreview = () => {
+    if (!editState || !editState.source) return;
+    editError.textContent = '';
+    const image = editState.source;
+    const cropTop = clampValue(editState.cropTop, 0, Math.max(0, image.naturalHeight - 1));
+    const cropBottom = clampValue(editState.cropBottom, 0, Math.max(0, image.naturalHeight - cropTop - 1));
+    const cropLeft = clampValue(editState.cropLeft, 0, Math.max(0, image.naturalWidth - 1));
+    const cropRight = clampValue(editState.cropRight, 0, Math.max(0, image.naturalWidth - cropLeft - 1));
+    editState.cropTop = cropTop;
+    editState.cropBottom = cropBottom;
+    editState.cropLeft = cropLeft;
+    editState.cropRight = cropRight;
+    cropInputs.top.value = String(cropTop);
+    cropInputs.bottom.value = String(cropBottom);
+    cropInputs.left.value = String(cropLeft);
+    cropInputs.right.value = String(cropRight);
+
+    const drawWidth = Math.max(1, image.naturalWidth - cropLeft - cropRight);
+    const drawHeight = Math.max(1, image.naturalHeight - cropTop - cropBottom);
+    editCanvas.width = drawWidth;
+    editCanvas.height = drawHeight;
+    editCtx.clearRect(0, 0, drawWidth, drawHeight);
+    editCtx.drawImage(
+      image,
+      cropLeft,
+      cropTop,
+      drawWidth,
+      drawHeight,
+      0,
+      0,
+      drawWidth,
+      drawHeight
+    );
+
+    const overlayText = (editState.overlayText || '').trim();
+    if (!overlayText) return;
+
+    const fontSize = clampValue(editState.textSize, 8, 200);
+    editState.textSize = fontSize;
+    textSizeInput.value = String(fontSize);
+    const fontFamily = window.getComputedStyle(editor).fontFamily || 'sans-serif';
+    const lines = overlayText.split(/\r?\n/);
+    const lineHeight = fontSize * 1.25;
+    editCtx.save();
+    editCtx.font = `${fontSize}px ${fontFamily}`;
+    editCtx.textBaseline = 'top';
+    editCtx.textAlign = 'left';
+    const measurements = lines.map(line => editCtx.measureText(line));
+    const textWidth = measurements.length ? Math.max(...measurements.map(m => m.width)) : 0;
+    const textHeight = lines.length ? fontSize + (lines.length - 1) * lineHeight : fontSize;
+    const padding = 8;
+    const position = ensurePosition(editState.textPosition);
+    let startX = padding;
+    let startY = padding;
+    if (position === 'top-right') {
+      startX = drawWidth - textWidth - padding;
+      startY = padding;
+    } else if (position === 'bottom-left') {
+      startX = padding;
+      startY = drawHeight - textHeight - padding;
+    } else if (position === 'bottom-right') {
+      startX = drawWidth - textWidth - padding;
+      startY = drawHeight - textHeight - padding;
+    } else if (position === 'center') {
+      startX = (drawWidth - textWidth) / 2;
+      startY = (drawHeight - textHeight) / 2;
+    }
+    startX = clampValue(startX, padding, Math.max(padding, drawWidth - textWidth - padding));
+    startY = clampValue(startY, padding, Math.max(padding, drawHeight - textHeight - padding));
+
+    if (editState.textBackground) {
+      editCtx.fillStyle = 'rgba(15, 23, 42, 0.45)';
+      editCtx.fillRect(
+        startX - padding,
+        startY - padding,
+        textWidth + padding * 2,
+        textHeight + padding * 2
+      );
+    }
+    const color = normalizeColor(editState.textColor, '#ffffff');
+    editState.textColor = color;
+    textColorInput.value = color;
+    editCtx.fillStyle = color;
+    lines.forEach((line, index) => {
+      editCtx.fillText(line, startX, startY + index * lineHeight);
+    });
+    editCtx.restore();
+  };
+
+  const closeImageEditor = (restoreSelection = true) => {
+    if (!isEditingImage) return;
+    editBackdrop.classList.add('hidden');
+    document.body.classList.remove('image-edit-open');
+    isEditingImage = false;
+    const imageToSelect = activeImg;
+    editState = null;
+    if (restoreSelection && imageToSelect) {
+      requestAnimationFrame(() => selectImage(imageToSelect));
+    } else if (!restoreSelection) {
+      clearSelection();
+    }
+  };
+
+  const openImageEditor = () => {
+    if (!activeImg || isEditingImage) return;
+    const src = activeImg.getAttribute('src');
+    if (!src) return;
+    isEditingImage = true;
+    menu.classList.add('hidden');
+    overlay.classList.add('hidden');
+    editBackdrop.classList.remove('hidden');
+    document.body.classList.add('image-edit-open');
+    editError.textContent = '';
+    editState = {
+      source: null,
+      cropTop: 0,
+      cropBottom: 0,
+      cropLeft: 0,
+      cropRight: 0,
+      overlayText: activeImg.dataset.overlayText || '',
+      textColor: normalizeColor(activeImg.dataset.overlayTextColor || textColorInput.value),
+      textSize: clampValue(parseInt(activeImg.dataset.overlayTextSize || '24', 10), 8, 200),
+      textPosition: ensurePosition(activeImg.dataset.overlayTextPosition),
+      textBackground: activeImg.dataset.overlayTextBackground !== 'false'
+    };
+    textInput.value = editState.overlayText;
+    textColorInput.value = editState.textColor;
+    textSizeInput.value = String(editState.textSize);
+    textPositionInput.value = editState.textPosition;
+    textBgInput.checked = editState.textBackground;
+    resetCropInputs();
+
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      if (!editState) return;
+      editState.source = image;
+      const maxTop = Math.max(0, Math.floor(image.naturalHeight / 2));
+      const maxLeft = Math.max(0, Math.floor(image.naturalWidth / 2));
+      cropInputs.top.max = cropInputs.bottom.max = String(maxTop);
+      cropInputs.left.max = cropInputs.right.max = String(maxLeft);
+      Object.values(cropInputs).forEach(input => { input.disabled = false; });
+      renderEditPreview();
+    };
+    image.onerror = () => {
+      editError.textContent = 'No se pudo cargar la imagen para edición.';
+    };
+    image.src = src;
+  };
+
+  const applyImageEdits = () => {
+    if (!editState || !editState.source || !activeImg) return;
+    try {
+      const dataUrl = editCanvas.toDataURL('image/png');
+      const originalWidth = activeImg.style.width;
+      const originalHeight = activeImg.style.height;
+      activeImg.src = dataUrl;
+      if (originalWidth) activeImg.style.width = originalWidth;
+      if (originalHeight) activeImg.style.height = originalHeight;
+      activeImg.dataset.edited = 'true';
+      const overlayText = (editState.overlayText || '').trim();
+      if (overlayText) {
+        activeImg.dataset.overlayText = overlayText;
+        activeImg.dataset.overlayTextColor = editState.textColor;
+        activeImg.dataset.overlayTextSize = String(editState.textSize);
+        activeImg.dataset.overlayTextPosition = editState.textPosition;
+        activeImg.dataset.overlayTextBackground = editState.textBackground ? 'true' : 'false';
+      } else {
+        delete activeImg.dataset.overlayText;
+        delete activeImg.dataset.overlayTextColor;
+        delete activeImg.dataset.overlayTextSize;
+        delete activeImg.dataset.overlayTextPosition;
+        delete activeImg.dataset.overlayTextBackground;
+      }
+      syncCaptionWidth();
+      closeImageEditor(true);
+    } catch (error) {
+      console.error('No se pudo guardar la imagen editada.', error);
+      editError.textContent = 'No se pudo guardar la imagen editada (verifica permisos de origen).';
+    }
+  };
+
+  Object.entries(cropInputs).forEach(([key, input]) => {
+    input.addEventListener('input', () => {
+      if (!editState) return;
+      const max = Number(input.max) || 0;
+      const prop = cropMap[key];
+      const value = clampValue(input.value, 0, max);
+      editState[prop] = value;
+      input.value = String(value);
+      renderEditPreview();
+    });
+  });
+
+  textInput.addEventListener('input', () => {
+    if (!editState) return;
+    editState.overlayText = textInput.value;
+    renderEditPreview();
+  });
+
+  textSizeInput.addEventListener('input', () => {
+    if (!editState) return;
+    const value = clampValue(textSizeInput.value, 8, 200);
+    editState.textSize = value;
+    textSizeInput.value = String(value);
+    renderEditPreview();
+  });
+
+  textColorInput.addEventListener('input', () => {
+    if (!editState) return;
+    editState.textColor = normalizeColor(textColorInput.value);
+    textColorInput.value = editState.textColor;
+    renderEditPreview();
+  });
+
+  textPositionInput.addEventListener('change', () => {
+    if (!editState) return;
+    editState.textPosition = ensurePosition(textPositionInput.value);
+    textPositionInput.value = editState.textPosition;
+    renderEditPreview();
+  });
+
+  textBgInput.addEventListener('change', () => {
+    if (!editState) return;
+    editState.textBackground = !!textBgInput.checked;
+    renderEditPreview();
+  });
+
+  applyBtn.addEventListener('click', () => applyImageEdits());
+  cancelBtn.addEventListener('click', () => closeImageEditor(true));
+  closeBtn.addEventListener('click', () => closeImageEditor(true));
+  editBackdrop.addEventListener('click', (e) => {
+    if (e.target === editBackdrop) closeImageEditor(true);
+  });
+  window.addEventListener('keydown', (e) => {
+    if (isEditingImage && e.key === 'Escape') {
+      e.preventDefault();
+      closeImageEditor(true);
+    }
+  });
 
   const microGroup = menu.querySelector('.micro-group');
   const microButtons = [];
@@ -156,6 +528,7 @@ export function setupImageTools(editor, toolbar) {
   updateMicromoveAvailability();
 
   menu.addEventListener('click', e => {
+    if (isEditingImage) return;
     const layoutBtn = e.target.closest('[data-layout]');
     const alignBtn = e.target.closest('[data-align]');
     if (layoutBtn && activeImg) {
@@ -252,6 +625,7 @@ export function setupImageTools(editor, toolbar) {
   }
 
   editor.addEventListener('click', e => {
+    if (isEditingImage) return;
     if (e.target.tagName === 'IMG') {
       selectImage(e.target);
     } else if (!menu.contains(e.target)) {
@@ -272,6 +646,7 @@ export function setupImageTools(editor, toolbar) {
   }
 
   function clearSelection() {
+    if (isEditingImage) return;
     activeImg = null;
     overlay.classList.add('hidden');
     menu.classList.add('hidden');

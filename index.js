@@ -5641,6 +5641,182 @@ ${exportTable.outerHTML}
             tableMenu.style.display = 'none';
             currentTable = null;
         };
+
+        const sanitizeFilename = (text) => {
+            if (!text) return '';
+            return text
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-zA-Z0-9\-_\s]/g, '')
+                .trim()
+                .replace(/\s+/g, '-')
+                .toLowerCase();
+        };
+
+        const cloneTableForExport = (table) => {
+            const clone = table.cloneNode(true);
+            clone.removeAttribute('contenteditable');
+            clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+            clone.querySelectorAll('.table-resize-handle, .table-resize-guide').forEach(el => el.remove());
+            const sourceElements = [table, ...table.querySelectorAll('*')];
+            const cloneElements = [clone, ...clone.querySelectorAll('*')];
+            sourceElements.forEach((sourceEl, index) => {
+                const targetEl = cloneElements[index];
+                if (!targetEl) return;
+                const computed = window.getComputedStyle(sourceEl);
+                Array.from(computed).forEach(prop => {
+                    const value = computed.getPropertyValue(prop);
+                    const priority = computed.getPropertyPriority(prop);
+                    if (value) {
+                        targetEl.style.setProperty(prop, value, priority);
+                    }
+                });
+                targetEl.classList.remove('selected', 'selected-for-move');
+            });
+            return clone;
+        };
+
+        const downloadDataUrl = (dataUrl, filename) => {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        };
+
+        const triggerBlobDownload = (blob, filename) => {
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        };
+
+        const dataUrlToUint8Array = (dataUrl) => {
+            const base64 = dataUrl.split(',')[1];
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
+        };
+
+        const createPdfFromJpegDataUrl = (dataUrl, widthPx, heightPx) => {
+            const jpegBytes = dataUrlToUint8Array(dataUrl);
+            const widthPt = Math.max(1, Math.round(widthPx * 72 / 96));
+            const heightPt = Math.max(1, Math.round(heightPx * 72 / 96));
+            const encoder = new TextEncoder();
+            const parts = [];
+            const offsets = [0];
+            let length = 0;
+            const push = (data) => {
+                parts.push(data);
+                length += data.length;
+            };
+            const pushString = (str) => push(encoder.encode(str));
+            const startObject = (id) => {
+                offsets[id] = length;
+                pushString(`${id} 0 obj\n`);
+            };
+            const endObject = () => pushString('endobj\n');
+
+            pushString('%PDF-1.4\n');
+
+            startObject(1);
+            pushString('<< /Type /Catalog /Pages 2 0 R >>\n');
+            endObject();
+
+            startObject(2);
+            pushString('<< /Type /Pages /Kids [3 0 R] /Count 1 >>\n');
+            endObject();
+
+            startObject(3);
+            pushString(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${widthPt} ${heightPt}] /Resources << /XObject << /Im0 4 0 R >> /ProcSet [/PDF /ImageC] >> /Contents 5 0 R >>\n`);
+            endObject();
+
+            startObject(4);
+            pushString(`<< /Type /XObject /Subtype /Image /Name /Im0 /Width ${widthPx} /Height ${heightPx} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\n`);
+            pushString('stream\n');
+            push(jpegBytes);
+            pushString('\nendstream\n');
+            endObject();
+
+            const contentStream = `q\n${widthPt} 0 0 ${heightPt} 0 0 cm\n/Im0 Do\nQ\n`;
+            startObject(5);
+            pushString(`<< /Length ${contentStream.length} >>\n`);
+            pushString('stream\n');
+            pushString(contentStream);
+            pushString('\nendstream\n');
+            endObject();
+
+            const startXref = length;
+            pushString('xref\n');
+            pushString('0 6\n');
+            pushString('0000000000 65535 f \n');
+            for (let i = 1; i <= 5; i++) {
+                const offset = offsets[i] || 0;
+                pushString(`${offset.toString().padStart(10, '0')} 00000 n \n`);
+            }
+            pushString(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${startXref}\n%%EOF`);
+            return new Blob(parts, { type: 'application/pdf' });
+        };
+
+        const exportTableSnapshot = (table, format) => {
+            if (!table) return;
+            const rect = table.getBoundingClientRect();
+            const padding = 16;
+            const width = Math.max(1, Math.ceil(rect.width) + padding * 2);
+            const height = Math.max(1, Math.ceil(rect.height) + padding * 2);
+            const clone = cloneTableForExport(table);
+            const container = document.createElement('div');
+            container.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+            container.style.display = 'inline-block';
+            container.style.backgroundColor = '#ffffff';
+            container.style.padding = `${padding}px`;
+            container.style.boxSizing = 'border-box';
+            container.style.width = Math.max(1, Math.ceil(rect.width)) + 'px';
+            container.appendChild(clone);
+            const serializer = new XMLSerializer();
+            const xhtml = serializer.serializeToString(container);
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`;
+            const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(svgBlob);
+            const img = new Image();
+            img.onload = () => {
+                const scale = window.devicePixelRatio || 1;
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, width * scale);
+                canvas.height = Math.max(1, height * scale);
+                const ctx = canvas.getContext('2d');
+                ctx.scale(scale, scale);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0, width, height);
+                URL.revokeObjectURL(url);
+                const tableName = table.dataset.exportName || table.getAttribute('aria-label') || (table.caption ? table.caption.textContent : '');
+                const base = sanitizeFilename(tableName) || 'tabla';
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `${base}-${timestamp}`;
+                if (format === 'png') {
+                    const dataUrl = canvas.toDataURL('image/png');
+                    downloadDataUrl(dataUrl, `${filename}.png`);
+                } else if (format === 'pdf') {
+                    const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                    const pdfBlob = createPdfFromJpegDataUrl(jpegDataUrl, width, height);
+                    triggerBlobDownload(pdfBlob, `${filename}.pdf`);
+                }
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                console.error('No se pudo exportar la tabla seleccionada.');
+            };
+            img.src = url;
+        };
         const cloneCellTemplate = (templateCell) => {
             const tagName = templateCell && templateCell.tagName === 'TH' ? 'th' : 'td';
             const cell = document.createElement(tagName);
@@ -6063,6 +6239,16 @@ ${exportTable.outerHTML}
                         icon: '📐',
                         label: 'Auto ancho',
                         onClick: () => autoFitTableColumns(table)
+                    },
+                    {
+                        icon: '🖼️',
+                        label: 'PNG',
+                        onClick: () => exportTableSnapshot(table, 'png')
+                    },
+                    {
+                        icon: '📄',
+                        label: 'PDF',
+                        onClick: () => exportTableSnapshot(table, 'pdf')
                     }
                 ];
 
