@@ -2303,6 +2303,178 @@ table.table-striped tr:first-child td {
   margin-top: 4px;
   display: block;
 }
+
+.image-edit-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10020;
+  padding: 1.5rem;
+}
+
+.image-edit-backdrop.hidden {
+  display: none;
+}
+
+.image-edit-dialog {
+  background: var(--modal-bg, #ffffff);
+  color: var(--modal-text, #1f2937);
+  width: min(960px, 100%);
+  max-height: 95vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+}
+
+.image-edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color, #cbd5e1);
+}
+
+.image-edit-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.image-edit-header button {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: inherit;
+}
+
+.image-edit-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr);
+  gap: 1.25rem;
+  padding: 1.25rem;
+  overflow: auto;
+}
+
+.image-edit-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.image-edit-preview canvas {
+  max-width: 100%;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  background: #0f172a;
+}
+
+.image-edit-error {
+  color: #b91c1c;
+  font-size: 0.85rem;
+  min-height: 1.2em;
+  text-align: center;
+}
+
+.image-edit-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.image-edit-controls fieldset {
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.image-edit-controls legend {
+  padding: 0 0.25rem;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+}
+
+.image-edit-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #475569);
+}
+
+.image-edit-controls textarea {
+  resize: vertical;
+  min-height: 70px;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.image-edit-controls input[type="number"],
+.image-edit-controls select,
+.image-edit-controls input[type="color"] {
+  padding: 0.35rem;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.image-edit-controls input[type="range"] {
+  width: 100%;
+}
+
+.image-edit-checkbox {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.image-edit-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--border-color, #cbd5e1);
+}
+
+.image-edit-footer button {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background: var(--bg-secondary, #ffffff);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.image-edit-footer .image-edit-apply {
+  background: var(--btn-primary-bg, #3b82f6);
+  color: var(--btn-primary-text, #ffffff);
+  border-color: transparent;
+}
+
+body.image-edit-open {
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .image-edit-dialog {
+    width: 100%;
+    max-height: 100vh;
+  }
+  .image-edit-body {
+    grid-template-columns: 1fr;
+  }
+}
 .section-nav-toggle {
     display: inline-flex;
     align-items: center;
