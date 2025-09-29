@@ -1444,11 +1444,17 @@ document.addEventListener('DOMContentLoaded', function () {
             if (selection && selection.rangeCount > 0) {
                 const range = selection.getRangeAt(0);
                 savedEditorSelection = range.cloneRange();
+                savedHtmlRange = range.cloneRange();
+                savedHtmlBookmark = createSelectionBookmark(range, subNoteEditor);
+                savedHtmlEditor = subNoteEditor;
                 const div = document.createElement('div');
                 div.appendChild(range.cloneContents());
                 savedSelectedHtml = div.innerHTML;
             } else {
                 savedEditorSelection = null;
+                savedHtmlRange = null;
+                savedHtmlBookmark = null;
+                savedHtmlEditor = subNoteEditor;
                 savedSelectedHtml = '';
             }
             currentHtmlEditor = subNoteEditor;
@@ -1632,6 +1638,11 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeTooltipState = null;
     let editingQuickNote = false;
     let savedEditorSelection = null;
+    let savedHtmlRange = null;
+    let savedHtmlBookmark = null;
+    let savedHtmlEditor = null;
+    let savedCalloutRange = null;
+    let savedCalloutBookmark = null;
     let dismissFloatingToolbar = () => {};
     let savedSelectedHtml = '';
     let currentCallout = null;
@@ -1645,6 +1656,81 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!startContainer || !endContainer) return false;
         if (!startContainer.isConnected || !endContainer.isConnected) return false;
         return editor.contains(startContainer) && editor.contains(endContainer);
+    }
+
+    function getNodePath(node, root) {
+        const path = [];
+        while (node && node !== root) {
+            const parent = node.parentNode;
+            if (!parent) return null;
+            const index = Array.prototype.indexOf.call(parent.childNodes, node);
+            if (index === -1) return null;
+            path.unshift(index);
+            node = parent;
+        }
+        return node === root ? path : null;
+    }
+
+    function getNodeFromPath(root, path) {
+        if (!root) return null;
+        let current = root;
+        for (const index of path || []) {
+            if (!current || !current.childNodes || index >= current.childNodes.length) {
+                return null;
+            }
+            current = current.childNodes[index];
+        }
+        return current;
+    }
+
+    function clampRangeOffset(node, offset) {
+        if (!node) return 0;
+        if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.COMMENT_NODE) {
+            const length = node.nodeValue ? node.nodeValue.length : 0;
+            return Math.min(offset, length);
+        }
+        const childCount = node.childNodes ? node.childNodes.length : 0;
+        return Math.min(offset, childCount);
+    }
+
+    function createSelectionBookmark(range, root) {
+        if (!range || !root) return null;
+        const startPath = getNodePath(range.startContainer, root);
+        const endPath = getNodePath(range.endContainer, root);
+        if (!startPath || !endPath) return null;
+        return {
+            startPath,
+            startOffset: range.startOffset,
+            endPath,
+            endOffset: range.endOffset
+        };
+    }
+
+    function restoreRangeFromBookmark(bookmark, root) {
+        if (!bookmark || !root) return null;
+        const startNode = getNodeFromPath(root, bookmark.startPath);
+        const endNode = getNodeFromPath(root, bookmark.endPath);
+        if (!startNode || !endNode) return null;
+        const range = document.createRange();
+        range.setStart(startNode, clampRangeOffset(startNode, bookmark.startOffset));
+        range.setEnd(endNode, clampRangeOffset(endNode, bookmark.endOffset));
+        return range;
+    }
+
+    function clearHtmlSelection() {
+        savedHtmlRange = null;
+        savedHtmlBookmark = null;
+        savedHtmlEditor = null;
+    }
+
+    function rememberCalloutSelection(range, editor) {
+        savedCalloutRange = range ? range.cloneRange() : null;
+        savedCalloutBookmark = range ? createSelectionBookmark(range, editor) : null;
+    }
+
+    function clearCalloutSelection() {
+        savedCalloutRange = null;
+        savedCalloutBookmark = null;
     }
 
     function focusEditorAndRestoreSelection(editor, range, callback) {
@@ -4644,7 +4730,12 @@ ${exportTable.outerHTML}
         editorToolbar.appendChild(createButton('Insertar nota', '📝', null, null, () => {
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0) {
-                savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                const range = selection.getRangeAt(0);
+                savedEditorSelection = range.cloneRange();
+                rememberCalloutSelection(range, notesEditor);
+            } else {
+                savedEditorSelection = null;
+                clearCalloutSelection();
             }
             openNoteStyleModal();
         }));
@@ -7578,11 +7669,17 @@ ${exportTable.outerHTML}
             if (selection && selection.rangeCount > 0) {
                 const range = selection.getRangeAt(0);
                 savedEditorSelection = range.cloneRange();
+                savedHtmlRange = range.cloneRange();
+                savedHtmlBookmark = createSelectionBookmark(range, notesEditor);
+                savedHtmlEditor = notesEditor;
                 const div = document.createElement('div');
                 div.appendChild(range.cloneContents());
                 savedSelectedHtml = div.innerHTML;
             } else {
                 savedEditorSelection = null;
+                savedHtmlRange = null;
+                savedHtmlBookmark = null;
+                savedHtmlEditor = notesEditor;
                 savedSelectedHtml = '';
             }
             currentHtmlEditor = notesEditor;
@@ -7801,6 +7898,8 @@ ${exportTable.outerHTML}
     function closeNoteStyleModal() {
         noteStyleModal.classList.remove('visible');
         currentCallout = null;
+        clearCalloutSelection();
+        savedEditorSelection = null;
         requestAnimationFrame(() => {
             window.scrollTo(0, savedNoteScrollY);
             notesModalContent.scrollTop = savedNoteScrollTop;
@@ -7808,24 +7907,54 @@ ${exportTable.outerHTML}
     }
 
     function applyNoteStyle(opts) {
-        const PREDEF_CLASSES = ['note-blue-left','note-green-card','note-lila-dotted','note-peach-dashed','note-cyan-top','note-pink-double','note-yellow-corner','note-gradient','note-mint-bottom','note-violet-shadow','note-gray-neutral'];
+        const PREDEF_CLASSES = ['note-blue-left','note-green-card','note-lila-dotted','note-peach-dashed','note-cyan-top','note-pink-double','note-yellow-corner','note-gradient','note-mint-bottom','note-violet-shadow','note-gray-neutral','note-info','note-warning','note-error','note-success','note-neutral'];
 
-        focusEditorAndRestoreSelection(notesEditor, savedEditorSelection, () => {
+        focusEditorAndRestoreSelection(notesEditor, savedCalloutRange, () => {
+            let activeRange = null;
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) {
+                const current = selection.getRangeAt(0);
+                if (rangeWithinEditor(current, notesEditor)) {
+                    activeRange = current;
+                }
+            }
+
+            if (!activeRange && savedCalloutBookmark) {
+                const restored = restoreRangeFromBookmark(savedCalloutBookmark, notesEditor);
+                if (restored) {
+                    activeRange = restored;
+                    const sel = window.getSelection();
+                    if (sel) {
+                        sel.removeAllRanges();
+                        sel.addRange(restored);
+                    }
+                }
+            }
+
+            if (activeRange) {
+                rememberCalloutSelection(activeRange, notesEditor);
+            } else {
+                clearCalloutSelection();
+            }
+
+            const workingRange = activeRange ? activeRange.cloneRange() : null;
+
             if (!currentCallout) {
                 const callout = document.createElement('div');
                 callout.className = 'note-callout';
                 callout.setAttribute('role','note');
                 callout.setAttribute('aria-label','Nota');
-                if (savedEditorSelection && !savedEditorSelection.collapsed && rangeWithinEditor(savedEditorSelection, notesEditor)) {
+                if (workingRange && !workingRange.collapsed) {
                     try {
-                        savedEditorSelection.surroundContents(callout);
+                        workingRange.surroundContents(callout);
                     } catch (e) {
-                        callout.textContent = savedEditorSelection.toString();
-                        savedEditorSelection.deleteContents();
-                        savedEditorSelection.insertNode(callout);
+                        const tempRange = workingRange.cloneRange();
+                        callout.textContent = tempRange.toString();
+                        tempRange.deleteContents();
+                        tempRange.insertNode(callout);
                     }
-                } else if (savedEditorSelection && rangeWithinEditor(savedEditorSelection, notesEditor)) {
-                    savedEditorSelection.insertNode(callout);
+                } else if (workingRange) {
+                    workingRange.insertNode(callout);
                 } else {
                     notesEditor.appendChild(callout);
                 }
@@ -7868,14 +7997,15 @@ ${exportTable.outerHTML}
             const range = document.createRange();
             range.selectNodeContents(inner);
             range.collapse(false);
-            const selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(range);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
             inner.focus({ preventScroll: true });
             notesEditor.focus({ preventScroll: true });
             recordHistory();
             closeNoteStyleModal();
             savedEditorSelection = null;
+            clearCalloutSelection();
         });
     }
 
@@ -8552,6 +8682,7 @@ ${exportTable.outerHTML}
         if (!html) {
             hideModal(htmlCodeModal);
             if (currentHtmlEditor) currentHtmlEditor.focus();
+            clearHtmlSelection();
             return;
         }
 
@@ -8560,12 +8691,16 @@ ${exportTable.outerHTML}
         }
 
         const targetEditor = currentHtmlEditor || notesEditor;
+        if (!savedHtmlEditor) {
+            savedHtmlEditor = targetEditor;
+        }
 
         const finalize = () => {
             hideModal(htmlCodeModal);
             if (targetEditor) targetEditor.focus({ preventScroll: true });
             savedEditorSelection = null;
             savedSelectedHtml = '';
+            clearHtmlSelection();
         };
 
         if (!targetEditor) {
@@ -8574,14 +8709,41 @@ ${exportTable.outerHTML}
         }
 
         const performInsert = (activeRange) => {
-            const inserted = insertHtmlContent(targetEditor, html, activeRange);
+            let rangeToUse = activeRange;
+            if (targetEditor && (!rangeToUse || !rangeWithinEditor(rangeToUse, targetEditor))) {
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    const current = selection.getRangeAt(0);
+                    if (rangeWithinEditor(current, targetEditor)) {
+                        rangeToUse = current;
+                    }
+                }
+            }
+
+            if ((!rangeToUse || !rangeWithinEditor(rangeToUse, targetEditor)) && savedHtmlEditor === targetEditor) {
+                if (savedHtmlRange && rangeWithinEditor(savedHtmlRange, targetEditor)) {
+                    rangeToUse = savedHtmlRange.cloneRange();
+                } else if (savedHtmlBookmark) {
+                    const restored = restoreRangeFromBookmark(savedHtmlBookmark, targetEditor);
+                    if (restored) {
+                        rangeToUse = restored;
+                        const selection = window.getSelection();
+                        if (selection) {
+                            selection.removeAllRanges();
+                            selection.addRange(restored);
+                        }
+                    }
+                }
+            }
+
+            const inserted = insertHtmlContent(targetEditor, html, rangeToUse);
             if (inserted && targetEditor === notesEditor) {
                 recordHistory();
             }
             finalize();
         };
 
-        focusEditorAndRestoreSelection(targetEditor, savedEditorSelection, performInsert);
+        focusEditorAndRestoreSelection(targetEditor, savedHtmlRange, performInsert);
     });
 
     cancelHtmlBtn.addEventListener('click', () => {
@@ -8589,6 +8751,7 @@ ${exportTable.outerHTML}
         if (currentHtmlEditor) currentHtmlEditor.focus();
         savedEditorSelection = null;
         savedSelectedHtml = '';
+        clearHtmlSelection();
     });
 
     copySelectedHtmlBtn.addEventListener('click', () => {
@@ -10308,6 +10471,7 @@ ${exportTable.outerHTML}
                 selection.removeAllRanges();
                 selection.addRange(range);
                 savedEditorSelection = range.cloneRange();
+                rememberCalloutSelection(range, notesEditor);
                 openNoteStyleModal(callout);
             }
         });
@@ -10317,7 +10481,11 @@ ${exportTable.outerHTML}
                 e.preventDefault();
                 const selection = window.getSelection();
                 if (selection && selection.rangeCount > 0) {
-                    savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                    const range = selection.getRangeAt(0);
+                    savedEditorSelection = range.cloneRange();
+                    rememberCalloutSelection(range, notesEditor);
+                } else {
+                    clearCalloutSelection();
                 }
                 openNoteStyleModal();
                 return;
