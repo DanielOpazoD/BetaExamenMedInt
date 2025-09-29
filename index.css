@@ -2095,6 +2095,11 @@ table.table-striped tr:first-child td {
 .note-mint-bottom { border:1px solid #c8e6c9; border-bottom-width:6px; background:#fbfffb; }
 .note-violet-shadow { border:1px solid #e6e0f8; background:#fdfcff; box-shadow:0 1px 3px rgba(0,0,0,.03); }
 .note-gray-neutral { border:1px solid #e0e0e0; background:#f9f9f9; }
+.note-info { background:#eaf6ff; border:1px solid #4a90e2; border-left-width:6px; }
+.note-warning { background:#fff9eb; border:1px solid #e6b800; border-left-width:6px; }
+.note-error { background:#fff1f0; border:1px solid #e05252; border-left-width:6px; }
+.note-success { background:#f2fbf2; border:1px solid #2d9d5c; border-left-width:6px; }
+.note-neutral { background:#f6f6f9; border:1px solid #9a7dca; border-left-width:6px; }
 .note-shadow { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .predef-note-btn { margin:0; cursor:pointer; }
 
