@@ -2451,73 +2451,104 @@ document.addEventListener('DOMContentLoaded', function () {
             .toLowerCase() || 'seccion';
     };
 
+    const escapeHtml = (value = '') => {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    };
+
     const exportSectionToHtml = async (headerRow) => {
         if (!headerRow) return;
-        const sectionName = headerRow.dataset.sectionHeader;
+        const sectionId = headerRow.dataset.sectionHeader;
         const titleEl = headerRow.querySelector('.section-title');
-        const titleText = titleEl ? titleEl.textContent.trim() : sectionName;
-        const originalTable = headerRow.closest('table');
-        const exportTable = originalTable ? originalTable.cloneNode(false) : document.createElement('table');
-        if (originalTable) {
-            exportTable.className = originalTable.className;
-            if (originalTable.getAttribute('style')) {
-                exportTable.setAttribute('style', originalTable.getAttribute('style'));
-            }
+        const titleText = titleEl ? titleEl.textContent.trim() : sectionId;
+        const topicRows = Array.from(tableBody.querySelectorAll(`tr[data-section="${sectionId}"][data-topic-id]`));
+        if (!topicRows.length) {
+            await showAlert('No hay temas que exportar en esta sección.');
+            return;
         }
-        exportTable.classList.add('section-export-table');
-        const originalColGroup = originalTable?.querySelector('colgroup');
-        if (originalColGroup) {
-            exportTable.appendChild(originalColGroup.cloneNode(true));
-        }
-        const rows = [headerRow, ...tableBody.querySelectorAll(`tr[data-section="${sectionName}"]`)];
-        const totalRow = getElem(`total-row-${sectionName}`);
-        if (totalRow) rows.push(totalRow);
-        rows.forEach(row => {
-            const clone = row.cloneNode(true);
-            clone.querySelectorAll('.print-section-btn, .section-note-icon, .section-cover-icon, .save-section-html-btn').forEach(el => el.remove());
-            clone.querySelectorAll('button, input').forEach(el => el.remove());
-            clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
-            clone.classList.add('section-export-row');
-            if (row.hasAttribute('data-topic-id')) {
-                clone.classList.add('section-export-topic-row');
-            }
-            exportTable.appendChild(clone);
-        });
+
         const css = await loadSectionStylesheet().catch(() => '');
         const extraStyles = `
-.section-export-body { margin: 0; background-color: var(--bg-primary, #f8fafc); color: var(--text-primary, #1f2937); }
-.section-export-container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-.section-export-title { margin: 0 0 1.5rem; font-size: 2rem; font-weight: 600; }
-.section-export-table { width: 100%; border-collapse: collapse; }
-.section-export-table td, .section-export-table th { border: 1px solid var(--border-color, #e5e7eb); padding: 0.5rem; }
-.section-export-topic-row { break-before: page; page-break-before: always; }
-.section-export-topic-row:first-of-type { break-before: auto; page-break-before: auto; }
-@media print {
-    .section-export-topic-row { break-before: page; page-break-before: always; }
-    .section-export-topic-row:first-of-type { break-before: auto; page-break-before: auto; }
+body.section-export-body { margin: 0; background-color: #f8fafc; color: #1f2937; font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.section-export-container { max-width: 960px; margin: 0 auto; padding: 2rem; }
+.section-export-title { font-size: 2rem; margin-bottom: 1rem; font-weight: 600; }
+.section-export-meta { margin: 0 0 2rem; color: #6b7280; }
+.topic-entry { margin-bottom: 3rem; }
+.topic-entry:last-of-type { margin-bottom: 0; }
+.topic-title { font-size: 1.5rem; margin: 0 0 1rem; display: flex; align-items: center; gap: 0.75rem; }
+.topic-title .topic-number { display: inline-flex; align-items: center; justify-content: center; background: #1d4ed8; color: #fff; border-radius: 999px; width: 2rem; height: 2rem; font-size: 1rem; font-weight: 600; }
+.topic-content { font-size: 1rem; line-height: 1.7; }
+.topic-content img { max-width: 100%; height: auto; }
+.topic-content a { color: inherit; text-decoration: underline; }
+.topic-content .postit-link, .topic-content .gallery-link, .topic-content .subnote-link { color: inherit; text-decoration: none; cursor: default; }
+@media (prefers-color-scheme: dark) {
+    body.section-export-body { background-color: #0f172a; color: #e2e8f0; }
+    .section-export-container { background-color: transparent; }
+    .topic-title .topic-number { background: #2563eb; }
 }
 `;
         const styleContent = [css, extraStyles].filter(Boolean).join('\n');
         const styleBlock = styleContent ? `<style>${styleContent}</style>` : '';
+
+        let counter = 1;
+        const topicSections = [];
+        for (const row of topicRows) {
+            const topicId = row.dataset.topicId;
+            const title = row.cells[1]?.textContent.trim() || '';
+            const topicData = await db.get('topics', topicId);
+            const notesArray = topicData && Array.isArray(topicData.notes) ? topicData.notes : [];
+            const firstNote = notesArray.find(note => note && typeof note.content === 'string' && note.content.trim() !== '' && note.content.trim() !== '<p><br></p>');
+
+            let contentHtml = '';
+            if (firstNote) {
+                const temp = document.createElement('div');
+                temp.innerHTML = firstNote.content;
+                temp.querySelectorAll('a.subnote-link, a.postit-link, a.gallery-link').forEach(link => {
+                    const span = document.createElement('span');
+                    span.innerHTML = link.innerHTML;
+                    link.replaceWith(span);
+                });
+                contentHtml = temp.innerHTML.trim();
+            }
+
+            if (!contentHtml) {
+                contentHtml = '<p>Tema no desarrollado.</p>';
+            }
+
+            topicSections.push(`
+<section class="topic-entry" data-topic-id="${escapeHtml(topicId)}">
+    <h2 class="topic-title"><span class="topic-number">${counter}</span>${escapeHtml(title)}</h2>
+    <div class="topic-content">${contentHtml}</div>
+</section>`);
+            counter++;
+        }
+
+        const generatedHtml = topicSections.join('\n');
         const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8" />
-<title>${titleText || 'Sección'}</title>
+<title>${escapeHtml(titleText || 'Sección')}</title>
 ${styleBlock}
 </head>
 <body class="section-export-body" contenteditable="false" data-readonly="true">
 <main class="section-export-container">
-<h1 class="section-export-title">${titleText || sectionName}</h1>
-${exportTable.outerHTML}
+<h1 class="section-export-title">${escapeHtml(titleText || sectionId)}</h1>
+<p class="section-export-meta">Temas de lectura: ${topicRows.length}</p>
+${generatedHtml}
 </main>
 </body>
 </html>`;
+
         const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${sanitizeFileName(titleText || sectionName)}.html`;
+        link.download = `${sanitizeFileName(titleText || sectionId)}.html`;
         document.body.appendChild(link);
         link.click();
         setTimeout(() => {
