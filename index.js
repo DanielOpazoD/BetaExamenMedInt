@@ -127,13 +127,28 @@ document.addEventListener('DOMContentLoaded', function () {
     const lockOpenIcon = lockNoteBtn?.querySelector('.lock-open-icon');
     const toggleAllSectionsBtn = getElem('toggle-all-sections-btn');
     let sectionStylesheet = '';
-    if (typeof fetch === 'function') {
-        fetch('index.css').then(resp => resp.text()).then(css => {
-            sectionStylesheet = css;
-        }).catch(() => {
-            sectionStylesheet = '';
-        });
-    }
+    let sectionStylesheetPromise = null;
+    const loadSectionStylesheet = () => {
+        if (sectionStylesheet) return Promise.resolve(sectionStylesheet);
+        if (sectionStylesheetPromise) return sectionStylesheetPromise;
+        if (typeof fetch !== 'function') {
+            sectionStylesheetPromise = Promise.resolve('');
+            return sectionStylesheetPromise;
+        }
+        sectionStylesheetPromise = fetch('index.css')
+            .then(resp => (resp.ok ? resp.text() : ''))
+            .catch(() => '')
+            .then(css => {
+                sectionStylesheet = css || '';
+                return sectionStylesheet;
+            });
+        return sectionStylesheetPromise;
+    };
+    // Preload the stylesheet so that exports triggered shortly after load still include the styles.
+    loadSectionStylesheet().catch(() => {
+        sectionStylesheet = '';
+        sectionStylesheetPromise = null;
+    });
 
     // --- Undo/Redo History ---
     const historyStack = [];
@@ -2436,7 +2451,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .toLowerCase() || 'seccion';
     };
 
-    const exportSectionToHtml = (headerRow) => {
+    const exportSectionToHtml = async (headerRow) => {
         if (!headerRow) return;
         const sectionName = headerRow.dataset.sectionHeader;
         const titleEl = headerRow.querySelector('.section-title');
@@ -2449,6 +2464,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 exportTable.setAttribute('style', originalTable.getAttribute('style'));
             }
         }
+        exportTable.classList.add('section-export-table');
+        const originalColGroup = originalTable?.querySelector('colgroup');
+        if (originalColGroup) {
+            exportTable.appendChild(originalColGroup.cloneNode(true));
+        }
         const rows = [headerRow, ...tableBody.querySelectorAll(`tr[data-section="${sectionName}"]`)];
         const totalRow = getElem(`total-row-${sectionName}`);
         if (totalRow) rows.push(totalRow);
@@ -2457,9 +2477,28 @@ document.addEventListener('DOMContentLoaded', function () {
             clone.querySelectorAll('.print-section-btn, .section-note-icon, .section-cover-icon, .save-section-html-btn').forEach(el => el.remove());
             clone.querySelectorAll('button, input').forEach(el => el.remove());
             clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+            clone.classList.add('section-export-row');
+            if (row.hasAttribute('data-topic-id')) {
+                clone.classList.add('section-export-topic-row');
+            }
             exportTable.appendChild(clone);
         });
-        const styleBlock = sectionStylesheet ? `<style>${sectionStylesheet}</style>` : '';
+        const css = await loadSectionStylesheet().catch(() => '');
+        const extraStyles = `
+.section-export-body { margin: 0; background-color: var(--bg-primary, #f8fafc); color: var(--text-primary, #1f2937); }
+.section-export-container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+.section-export-title { margin: 0 0 1.5rem; font-size: 2rem; font-weight: 600; }
+.section-export-table { width: 100%; border-collapse: collapse; }
+.section-export-table td, .section-export-table th { border: 1px solid var(--border-color, #e5e7eb); padding: 0.5rem; }
+.section-export-topic-row { break-before: page; page-break-before: always; }
+.section-export-topic-row:first-of-type { break-before: auto; page-break-before: auto; }
+@media print {
+    .section-export-topic-row { break-before: page; page-break-before: always; }
+    .section-export-topic-row:first-of-type { break-before: auto; page-break-before: auto; }
+}
+`;
+        const styleContent = [css, extraStyles].filter(Boolean).join('\n');
+        const styleBlock = styleContent ? `<style>${styleContent}</style>` : '';
         const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -2467,7 +2506,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <title>${titleText || 'Sección'}</title>
 ${styleBlock}
 </head>
-<body class="section-export-body">
+<body class="section-export-body" contenteditable="false" data-readonly="true">
 <main class="section-export-container">
 <h1 class="section-export-title">${titleText || sectionName}</h1>
 ${exportTable.outerHTML}
@@ -9929,7 +9968,12 @@ ${exportTable.outerHTML}
             if (exportBtn) {
                 e.stopPropagation();
                 const sectionHeaderRow = exportBtn.closest('.section-header-row');
-                exportSectionToHtml(sectionHeaderRow);
+                if (sectionHeaderRow) {
+                    exportSectionToHtml(sectionHeaderRow).catch(error => {
+                        console.error('Error guardando la sección como HTML:', error);
+                        alert('No se pudo guardar la sección como HTML. Intenta nuevamente.');
+                    });
+                }
             }
         });
 
