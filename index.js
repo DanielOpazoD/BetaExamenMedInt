@@ -2438,42 +2438,111 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const exportSectionToHtml = (headerRow) => {
         if (!headerRow) return;
+
         const sectionName = headerRow.dataset.sectionHeader;
         const titleEl = headerRow.querySelector('.section-title');
         const titleText = titleEl ? titleEl.textContent.trim() : sectionName;
         const originalTable = headerRow.closest('table');
-        const exportTable = originalTable ? originalTable.cloneNode(false) : document.createElement('table');
-        if (originalTable) {
-            exportTable.className = originalTable.className;
-            if (originalTable.getAttribute('style')) {
-                exportTable.setAttribute('style', originalTable.getAttribute('style'));
-            }
+        const tableHead = originalTable?.querySelector('thead');
+        const tableHeadClone = tableHead ? tableHead.cloneNode(true) : null;
+        if (tableHeadClone) {
+            tableHeadClone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+            tableHeadClone.querySelectorAll('button, input, textarea, select').forEach(el => el.remove());
         }
-        const rows = [headerRow, ...tableBody.querySelectorAll(`tr[data-section="${sectionName}"]`)];
+
+        const buildBaseTable = () => {
+            const table = originalTable ? originalTable.cloneNode(false) : document.createElement('table');
+            table.className = `${originalTable?.className || ''} section-export-table`.trim();
+            if (originalTable?.getAttribute('style')) {
+                table.setAttribute('style', originalTable.getAttribute('style'));
+            }
+            return table;
+        };
+
+        const cleanExportRow = (row) => {
+            row.querySelectorAll('.print-section-btn, .section-note-icon, .section-cover-icon, .save-section-html-btn').forEach(el => el.remove());
+            row.querySelectorAll('button, input, textarea, select').forEach(el => el.remove());
+            row.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+            return row;
+        };
+
+        const sectionTopics = Array.from(tableBody.querySelectorAll(`tr[data-section="${sectionName}"]`));
         const totalRow = getElem(`total-row-${sectionName}`);
-        if (totalRow) rows.push(totalRow);
-        rows.forEach(row => {
-            const clone = row.cloneNode(true);
-            clone.querySelectorAll('.print-section-btn, .section-note-icon, .section-cover-icon, .save-section-html-btn').forEach(el => el.remove());
-            clone.querySelectorAll('button, input').forEach(el => el.remove());
-            clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
-            exportTable.appendChild(clone);
+
+        const topicsWrapper = document.createElement('div');
+        topicsWrapper.className = 'section-export-topics';
+
+        sectionTopics.forEach((row, index) => {
+            const pageSection = document.createElement('section');
+            pageSection.className = 'section-export-topic';
+            if (index > 0) {
+                pageSection.classList.add('page-break');
+            }
+
+            const table = buildBaseTable();
+            if (tableHeadClone) {
+                table.appendChild(tableHeadClone.cloneNode(true));
+            }
+            const tbody = document.createElement('tbody');
+            tbody.appendChild(cleanExportRow(row.cloneNode(true)));
+            table.appendChild(tbody);
+            pageSection.appendChild(table);
+            topicsWrapper.appendChild(pageSection);
         });
-        const styleBlock = sectionStylesheet ? `<style>${sectionStylesheet}</style>` : '';
+
+        if (totalRow) {
+            const totalSection = document.createElement('section');
+            totalSection.className = 'section-export-total page-break';
+            const table = buildBaseTable();
+            if (tableHeadClone) {
+                table.appendChild(tableHeadClone.cloneNode(true));
+            }
+            const tbody = document.createElement('tbody');
+            tbody.appendChild(cleanExportRow(totalRow.cloneNode(true)));
+            table.appendChild(tbody);
+            totalSection.appendChild(table);
+            topicsWrapper.appendChild(totalSection);
+        }
+
+        const exportContainer = document.createElement('main');
+        exportContainer.className = 'section-export-container';
+        exportContainer.innerHTML = `<h1 class="section-export-title">${titleText || sectionName}</h1>`;
+        exportContainer.appendChild(topicsWrapper);
+
+        const exportBody = document.createElement('body');
+        exportBody.className = 'section-export-body';
+        exportBody.appendChild(exportContainer);
+
+        const exportStyles = `
+.section-export-table thead th { background-color: var(--header-bg, #0f172a); color: var(--header-text, #ffffff); }
+.section-export-topic table,
+.section-export-total table { width: 100%; border-collapse: collapse; }
+.section-export-topic.page-break,
+.section-export-total.page-break { break-before: page; page-break-before: always; }
+.section-export-topic,
+.section-export-total { page-break-inside: avoid; break-inside: avoid; }
+.section-export-topics { display: flex; flex-direction: column; gap: 2rem; }
+@media print {
+    .section-export-topic,
+    .section-export-total { break-inside: avoid; page-break-inside: avoid; }
+    .section-export-topic.page-break,
+    .section-export-total.page-break { break-before: page; page-break-before: always; }
+}
+`; 
+        const styleContent = sectionStylesheet ? `${sectionStylesheet}\n${exportStyles}` : exportStyles;
+        const styleBlock = `<style>${styleContent}</style>`;
+
         const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${titleText || 'Sección'}</title>
 ${styleBlock}
 </head>
-<body class="section-export-body">
-<main class="section-export-container">
-<h1 class="section-export-title">${titleText || sectionName}</h1>
-${exportTable.outerHTML}
-</main>
-</body>
+${exportBody.outerHTML}
 </html>`;
+
         const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
