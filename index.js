@@ -135,6 +135,27 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    const rootElement = document.documentElement;
+    let initialRootFontSize = 16;
+    try {
+        initialRootFontSize = parseFloat(window.getComputedStyle(rootElement).fontSize) || 16;
+    } catch (error) {
+        initialRootFontSize = 16;
+    }
+    let currentZoomLevel = 1;
+
+    const applyRootZoom = (level) => {
+        let numericLevel = Number(level);
+        if (!Number.isFinite(numericLevel) || numericLevel <= 0) {
+            numericLevel = 1;
+        }
+        currentZoomLevel = numericLevel;
+        rootElement.style.fontSize = `${initialRootFontSize * currentZoomLevel}px`;
+        if (notesEditor && notesEditor.style?.zoom) {
+            notesEditor.style.removeProperty('zoom');
+        }
+    };
+
     // --- Undo/Redo History ---
     const historyStack = [];
     let historyIndex = -1;
@@ -261,6 +282,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const tabsNext = getElem('tabs-next');
     const tabConfigBtn = getElem('tab-config-btn');
     const tabConfigPanel = getElem('tab-config-panel');
+    const tabSaveBtn = getElem('tab-save-btn');
     const tabBarToggle = getElem('tab-bar-toggle');
     const tabColorSelect = getElem('tab-color-select');
     const fullscreenBgInput = getElem('fullscreen-bg-color');
@@ -294,6 +316,17 @@ document.addEventListener('DOMContentLoaded', function () {
     if (tabConfigBtn && tabConfigPanel) {
         tabConfigBtn.addEventListener('click', () => {
             tabConfigPanel.classList.toggle('hidden');
+        });
+    }
+
+    if (tabSaveBtn) {
+        tabSaveBtn.addEventListener('click', async () => {
+            tabSaveBtn.disabled = true;
+            try {
+                await saveState();
+            } finally {
+                tabSaveBtn.disabled = false;
+            }
         });
     }
 
@@ -4265,7 +4298,8 @@ ${exportTable.outerHTML}
         });
         selectZoom.addEventListener('change', () => {
             if (selectZoom.value) {
-                notesEditor.style.zoom = selectZoom.value;
+                applyRootZoom(parseFloat(selectZoom.value));
+                saveStateToCache(getStateObject());
                 selectZoom.selectedIndex = 0;
                 notesEditor.focus({ preventScroll: true });
             }
@@ -8022,6 +8056,29 @@ ${exportTable.outerHTML}
         });
     }
 
+    const LOCAL_STATE_CACHE_KEY = 'temarioStateCache';
+
+    function saveStateToCache(state) {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        try {
+            window.localStorage.setItem(LOCAL_STATE_CACHE_KEY, JSON.stringify(state));
+        } catch (error) {
+            console.warn('No se pudo guardar el estado en el caché local:', error);
+        }
+    }
+
+    function loadStateFromCache() {
+        if (typeof window === 'undefined' || !window.localStorage) return null;
+        try {
+            const cached = window.localStorage.getItem(LOCAL_STATE_CACHE_KEY);
+            if (!cached) return null;
+            return JSON.parse(cached);
+        } catch (error) {
+            console.warn('No se pudo cargar el estado desde el caché local:', error);
+            return null;
+        }
+    }
+
     // --- State Management ---
     function getStateObject() {
         const state = {
@@ -8030,6 +8087,7 @@ ${exportTable.outerHTML}
             settings: {
                 theme: document.documentElement.dataset.theme,
                 iconStyle: document.documentElement.dataset.iconStyle,
+                zoom: currentZoomLevel,
             },
             headers: {}
         };
@@ -8072,6 +8130,11 @@ ${exportTable.outerHTML}
         if(state.settings) {
             applyTheme(state.settings.theme || 'default');
             applyIconStyle(state.settings.iconStyle || 'solid');
+            if (state.settings.zoom) {
+                applyRootZoom(state.settings.zoom);
+            } else {
+                applyRootZoom(1);
+            }
         }
 
         if(state.headers) {
@@ -8165,14 +8228,16 @@ ${exportTable.outerHTML}
     async function saveState() {
         try {
             const state = getStateObject();
-            
+
+            saveStateToCache(state);
+
             const settingsPromise = db.set('keyvalue', { key: 'settings', value: state.settings });
             const headersPromise = db.set('keyvalue', { key: 'headers', value: state.headers });
 
-            const topicPromises = Object.entries(state.topics).map(([topicId, data]) => 
+            const topicPromises = Object.entries(state.topics).map(([topicId, data]) =>
                 db.set('topics', { id: topicId, ...data })
             );
-            const sectionPromises = Object.entries(state.sections).map(([sectionId, data]) => 
+            const sectionPromises = Object.entries(state.sections).map(([sectionId, data]) =>
                 db.set('sections', { id: sectionId, ...data })
             );
 
@@ -8197,20 +8262,24 @@ ${exportTable.outerHTML}
             const settingsData = await db.get('keyvalue', 'settings');
             const headersData = await db.get('keyvalue', 'headers');
 
-            const state = {
-                topics: topics.reduce((acc, topic) => {
-                    acc[topic.id] = topic;
-                    return acc;
-                }, {}),
-                sections: sections.reduce((acc, section) => {
-                    acc[section.id] = section;
-                    return acc;
-                }, {}),
-                settings: settingsData ? settingsData.value : {},
-                headers: headersData ? headersData.value : {}
-            };
-            
-            _loadStateFromObject(state);
+            const hasDbData = topics.length > 0 || sections.length > 0 || settingsData || headersData;
+            if (hasDbData) {
+                const state = {
+                    topics: topics.reduce((acc, topic) => {
+                        acc[topic.id] = topic;
+                        return acc;
+                    }, {}),
+                    sections: sections.reduce((acc, section) => {
+                        acc[section.id] = section;
+                        return acc;
+                    }, {}),
+                    settings: settingsData ? settingsData.value : {},
+                    headers: headersData ? headersData.value : {}
+                };
+
+                _loadStateFromObject(state);
+                saveStateToCache(getStateObject());
+            }
         } catch (error) {
             console.error("Error loading state from IndexedDB:", error);
             await showAlert("No se pudo cargar el progreso desde la base de datos local.");
@@ -8219,6 +8288,10 @@ ${exportTable.outerHTML}
 
     async function loadState() {
          try {
+            const cachedState = loadStateFromCache();
+            if (cachedState) {
+                _loadStateFromObject(cachedState);
+            }
             await db.connect();
             await loadStateFromDB();
         } catch (error) {
