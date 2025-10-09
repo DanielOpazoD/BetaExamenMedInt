@@ -14,6 +14,11 @@ import { setupCloudIntegration } from './cloud-sync.js';
 import { setupAdvancedEditing } from './editor-enhancements.js';
 import { improveText, askNotesQuestion } from './ai-tools.js';
 import { setupImageTools } from './image-tools.js';
+import { createFloatingNote } from './floating-notes.js';
+
+if (typeof window !== 'undefined') {
+    window.createFloatingNote = createFloatingNote;
+}
 
 // --- IndexedDB Helper ---
 // NOTE: The IndexedDB helper has been moved into db.js.  The following
