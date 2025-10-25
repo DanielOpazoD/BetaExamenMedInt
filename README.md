@@ -9,7 +9,7 @@ This contains everything you need to run your app locally.
 
 1. Install dependencies:
    `npm install`
-2. Set the `OPENAI_API_KEY` in your Netlify environment settings (or in [.env.local](.env.local) for local testing)
+2. Set the `OPENAI_API_KEY` (or `VITE_OPENAI_API_KEY`) in your Netlify environment settings or in a `.env` file for local testing.
 3. Run the app:
    `npm run dev`
 

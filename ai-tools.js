@@ -1,5 +1,8 @@
 export async function callOpenAI(messages) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey =
+    import.meta.env.VITE_OPENAI_API_KEY ||
+    import.meta.env.OPENAI_API_KEY ||
+    process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('Falta la clave API');
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
