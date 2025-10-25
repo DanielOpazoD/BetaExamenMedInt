@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="default">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestor de Planillas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="templates.css" />
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <header class="flex items-center justify-between p-4 bg-white shadow">
+    <div class="flex items-center gap-2">
+      <input id="search" type="text" placeholder="Buscar" class="border rounded px-2 py-1" />
+      <select id="sort" class="border rounded px-2 py-1">
+        <option value="newest">Más nuevas</option>
+        <option value="az">A-Z</option>
+      </select>
+      <button id="edit-toggle" class="px-3 py-1 bg-blue-600 text-white rounded">Editar</button>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="save-btn" class="px-3 py-1 bg-green-600 text-white rounded">Guardar</button>
+      <button id="import-btn" class="px-3 py-1 bg-sky-600 text-white rounded">Importar</button>
+      <input type="file" id="import-file" accept=".json" class="hidden" />
+      <button id="export-btn" class="px-3 py-1 bg-purple-600 text-white rounded">Exportar</button>
+    </div>
+  </header>
+
+  <section class="p-4">
+    <div id="tag-scroll" class="flex items-center gap-2 overflow-x-auto pb-2 mb-4"></div>
+    <div id="templates-container" class="h-[60vh] overflow-y-auto">
+      <div id="templates-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </div>
+    <div class="flex justify-between items-center mt-4">
+      <button id="prev-page" class="px-2 py-1 border rounded">Anterior</button>
+      <span id="page-info" class="text-sm"></span>
+      <button id="next-page" class="px-2 py-1 border rounded">Siguiente</button>
+    </div>
+  </section>
+
+  <div id="toast" class="hidden fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded shadow"></div>
+
+  <script type="module" src="templates.js"></script>
+</body>
+</html>
