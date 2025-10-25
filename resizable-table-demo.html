@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Demo Tablas Redimensionables</title>
+<link rel="stylesheet" href="resizable-table.css" />
+</head>
+<body>
+<h1>Ejemplos de tablas redimensionables</h1>
+
+<div class="indent-1">
+  <table class="resizable-table tabla-estandar" data-example="a">
+    <tr class="header"><td>Enfrentamiento de HTA Resistente (ESC 2024)</td></tr>
+    <tr>
+      <td>
+        <ul>
+          <li>Confirmar adherencia y técnica correcta</li>
+          <li>Añadir diurético tiazídico potente</li>
+          <li>Evaluar causas secundarias</li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="indent-1">
+  <table class="resizable-table tabla-estandar" data-example="b">
+    <tr class="header"><td>Término</td><td>Definición</td></tr>
+    <tr><td>HTA resistente</td><td>PA no controlada pese a 3 fármacos</td></tr>
+    <tr><td>HTA refractaria</td><td>PA no controlada pese a ≥5 fármacos</td></tr>
+  </table>
+</div>
+
+<div class="indent-2">
+  <table class="resizable-table tabla-estandar" data-example="c">
+    <tr class="header"><td>Grupo</td><td>Causa</td><td>Frecuencia</td></tr>
+    <tr><td rowspan="2">Cardíacas</td><td>Insuficiencia cardiaca</td><td>Alta</td></tr>
+    <tr style="background:#fff9c4"><td>Valvulopatías</td><td>Media</td></tr>
+    <tr><td>Renales</td><td style="background:#fff9c4">Estenosis de arteria renal</td><td>Baja</td></tr>
+  </table>
+</div>
+
+<script src="resizable-table.js"></script>
+<script>
+  initResizableTables();
+</script>
+</body>
+</html>
