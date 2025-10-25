@@ -9504,7 +9504,7 @@ ${exportTable.outerHTML}
                 const cover = document.createElement('div');
                 cover.className = 'section-cover-page';
                 cover.id = `print-section-${sectionId}`;
-                if (printArea.children.length > 0) {
+                if (printArea.children.length > 0 && printArea.lastElementChild.id !== 'print-index') {
                     cover.style.pageBreakBefore = 'always';
                 }
                 const titleEl = document.createElement('h1');
