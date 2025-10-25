@@ -54,6 +54,23 @@
     <div class="max-w-7xl mx-auto bg-secondary rounded-xl shadow-lg overflow-hidden my-8">
         <div class="p-6 sm:p-8">
             <h1 class="text-2xl sm:text-3xl font-bold text-primary mb-4 text-center">Temario para Examen Final de Medicina Interna</h1>
+            <div class="flex flex-col md:flex-row gap-2 mb-4">
+                <input id="patient-name" type="text" placeholder="Nombre del paciente" class="flex-1 border rounded p-2" />
+                <input id="patient-rut" type="text" placeholder="RUT del paciente" class="flex-1 border rounded p-2" />
+            </div>
+            <div class="my-4 space-y-2">
+                <div class="flex gap-2">
+                    <input id="drug-name" type="text" placeholder="Fármaco" class="flex-1 border rounded p-2" />
+                    <input id="drug-dose" type="text" placeholder="Dosis (mg/día)" class="w-40 border rounded p-2" />
+                    <button id="add-drug-btn" class="px-3 py-2 bg-blue-600 text-white rounded">Añadir</button>
+                </div>
+                <table class="min-w-full border border-gray-300 text-sm">
+                    <thead>
+                        <tr><th class="border px-2">Fármaco</th><th class="border px-2">Dosis (mg/día)</th></tr>
+                    </thead>
+                    <tbody id="drugs-table-body"></tbody>
+                </table>
+            </div>
             <div class="flex flex-col md:flex-row flex-wrap items-center justify-between gap-4 my-4">
                 <div id="status-filters" class="order-2 flex items-center space-x-1 bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
                     <span class="mr-2">Filtrar por estado de avance</span>
